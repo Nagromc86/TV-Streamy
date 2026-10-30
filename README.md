@@ -1,4 +1,4 @@
-# Lecteur IPTV
+# TV Streamy
 
 Appli Android pour regarder ses abonnements IPTV (Xtream Codes) : plusieurs comptes, TV en direct avec programme,
 films et séries, favoris, reprise de lecture, recherche. Les identifiants restent sur le téléphone.

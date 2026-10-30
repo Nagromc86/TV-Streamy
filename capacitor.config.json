@@ -1,8 +1,17 @@
 {
-  "appId": "io.github.nagromc86.lecteuriptv",
-  "appName": "Lecteur IPTV",
+  "appId": "io.github.nagromc86.tvstreamy",
+  "appName": "TV Streamy",
   "webDir": "www",
-  "server": { "androidScheme": "https" },
-  "android": { "allowMixedContent": true, "backgroundColor": "#0c0e13" },
-  "plugins": { "CapacitorHttp": { "enabled": true } }
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#101014"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
 }

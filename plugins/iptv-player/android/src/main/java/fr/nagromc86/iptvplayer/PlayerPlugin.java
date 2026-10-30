@@ -63,7 +63,7 @@ public class PlayerPlugin extends Plugin {
         try {
             DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
             r.setTitle(call.getString("title", fileName));
-            r.setDescription("Lecteur IPTV · téléchargement pour regarder hors connexion");
+            r.setDescription("TV Streamy · téléchargement pour regarder hors connexion");
             r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
             r.setDestinationInExternalFilesDir(getContext(), Environment.DIRECTORY_MOVIES, fileName);
             String ua = call.getString("userAgent", "");

@@ -73,6 +73,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v1.${{ github.run_number }}" tv-streamy.apk \
-            --title "Lecteur IPTV 1.${{ github.run_number }} ($APP_VERSION)" \
-            --notes "Appli Android Lecteur IPTV, version du $APP_VERSION. Télécharge tv-streamy.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
+            --title "TV Streamy 1.${{ github.run_number }} ($APP_VERSION)" \
+            --notes "Appli Android TV Streamy, version du $APP_VERSION. Télécharge tv-streamy.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
             --latest

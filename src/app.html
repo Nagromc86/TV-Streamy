@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c0e13">
-<title>Lecteur IPTV</title>
+<title>TV Streamy</title>
 <style>/*@@FONTS@@*/</style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -31,7 +31,8 @@ svg{flex:none}
 .top.solid{background:rgba(16,16,20,.97);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .top.over{position:fixed;left:0;right:0}
 .top .in{display:flex;align-items:center;gap:10px;padding-block:10px}
-.brand{font-family:var(--display);font-weight:800;font-size:1.45rem;letter-spacing:-.02em;flex:none;color:var(--accent2)}
+.brand{display:inline-flex;align-items:center;gap:7px;font-family:var(--display);font-weight:800;font-size:1.3rem;letter-spacing:-.02em;flex:none;color:var(--ink)}
+.brand svg{width:26px;height:26px;color:var(--accent)}
 .acc{flex:1;min-width:0;display:flex;align-items:center;gap:8px;justify-content:flex-end}
 .pill{display:inline-flex;align-items:center;gap:6px;border:0;background:rgba(255,255,255,.12);border-radius:999px;padding:7px 12px;font-weight:600;font-size:.86rem;min-height:36px;max-width:100%}
 .pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -533,7 +534,7 @@ function moreHtml(key){return '<button type="button" class="morebtn" data-more="
 /* ---------- views ---------- */
 function topHtml(){
   var a=acc(),busy=Object.keys(UPD).length;
-  return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand">LECTEUR</span><div class="acc">'+
+  return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span><div class="acc">'+
     (busy?'<span class="upd" title="Mise à jour du catalogue en arrière-plan"><i></i>Mise à jour</span>':'')+
     (a?'<button type="button" class="iconbtn" data-tab="search" aria-label="Rechercher">'+IC.search+'</button>':'')+
     (a?'<button type="button" class="pill" data-accounts>'+IC.user+'<span>'+esc(a.name)+'</span></button>':'')+'</div></div>'+
@@ -658,7 +659,7 @@ function viewSearch(){
   return h||'<div class="empty" style="margin-top:12px"><p>Aucun résultat pour « '+esc(S.q)+' ».</p></div>';
 }
 function welcomeHtml(){
-  return '<header class="top gut solid"><div class="in"><span class="brand">LECTEUR</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
+  return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
     '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur ce téléphone.</p>'+accountForm({})+'</section></main>';
 }
 function navHtml(){
