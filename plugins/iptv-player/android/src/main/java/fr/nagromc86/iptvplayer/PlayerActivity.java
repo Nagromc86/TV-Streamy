@@ -23,6 +23,7 @@ import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.Tracks;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -60,6 +61,7 @@ public class PlayerActivity extends Activity {
     private String fallbackUrl;
     private String lastError;
     private boolean finishing;
+    private boolean tracksChecked;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +122,24 @@ public class PlayerActivity extends Activity {
             }
 
             @Override
+            public void onTracksChanged(Tracks tracks) {
+                // Tell once, when the video has loaded, whether it carries subtitles at all
+                if (tracksChecked || live || tracks.isEmpty() || !tracks.containsType(C.TRACK_TYPE_VIDEO)) {
+                    return;
+                }
+                tracksChecked = true;
+                String msg;
+                if (!tracks.containsType(C.TRACK_TYPE_TEXT)) {
+                    msg = "Pas de sous-titres dans cette vidéo";
+                } else if (!hasFrenchText(tracks)) {
+                    msg = "Pas de sous-titres français · autres langues dans CC";
+                } else {
+                    return;
+                }
+                Toast.makeText(PlayerActivity.this, msg, Toast.LENGTH_LONG).show();
+            }
+
+            @Override
             public void onPlayerError(PlaybackException error) {
                 lastError = error.getErrorCodeName();
                 if (!triedFallback && !TextUtils.isEmpty(fallbackUrl)) {
@@ -143,6 +163,21 @@ public class PlayerActivity extends Activity {
         }
         player.prepare();
         player.setPlayWhenReady(true);
+    }
+
+    private static boolean hasFrenchText(Tracks tracks) {
+        for (Tracks.Group g : tracks.getGroups()) {
+            if (g.getType() != C.TRACK_TYPE_TEXT) {
+                continue;
+            }
+            for (int i = 0; i < g.length; i++) {
+                String lang = g.getTrackFormat(i).language;
+                if (lang != null && (lang.startsWith("fr") || lang.equals("fre"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private MediaItem buildItem(String url, String title) {

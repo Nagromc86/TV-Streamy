@@ -41,6 +41,8 @@ SERIES = [{'num': i + 1, 'name': t, 'series_id': 7000 + i, 'cover': 'http://loca
            'cast': 'Acteur A, Actrice B', 'director': 'Réal C', 'genre': ['Drame', 'Policier'][i % 2], 'releaseDate': '20%02d-09-01' % (15 + i),
            'last_modified': str(NOW - i * 7200), 'rating': str(6.5 + i * 0.4), 'rating_5based': 3.6, 'backdrop_path': [],
            'youtube_trailer': '', 'episode_run_time': '45', 'category_id': SER_CATS[i % 2]['category_id']} for i, t in enumerate(stitles)]
+# like some real providers: the same series listed twice (here in both categories)
+SERIES.append(dict(SERIES[0], category_id='21'))
 
 def b64(s):
     return base64.b64encode(s.encode()).decode()

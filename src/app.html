@@ -522,8 +522,8 @@ function chHtml(x){
     '<button type="button" class="star'+(isFav('live',id)?' on':'')+'" data-fav="live:'+esc(id)+'" aria-label="Favori">'+(isFav('live',id)?IC.starOn:IC.star)+'</button></div>';
 }
 function catsHtml(cats,list,current,attr){
-  var count={};list.forEach(function(x){count[x.category_id]=(count[x.category_id]||0)+1});
-  var h='<div class="chips"><button type="button" class="chip" '+attr+'="all" aria-pressed="'+(current==='all')+'">Tout<b>'+list.length+'</b></button><button type="button" class="chip" '+attr+'="fav" aria-pressed="'+(current==='fav')+'">Ma liste</button>';
+  var count={},seen={};list.forEach(function(x){var k=x.category_id+'|'+(x.stream_id||x.series_id);if(seen[k])return;seen[k]=1;count[x.category_id]=(count[x.category_id]||0)+1});
+  var h='<div class="chips"><button type="button" class="chip" '+attr+'="all" aria-pressed="'+(current==='all')+'">Tout<b>'+uniq(list).length+'</b></button><button type="button" class="chip" '+attr+'="fav" aria-pressed="'+(current==='fav')+'">Ma liste</button>';
   cats.forEach(function(c){if(count[c.category_id])h+='<button type="button" class="chip" '+attr+'="'+esc(c.category_id)+'" aria-pressed="'+(String(current)===String(c.category_id))+'">'+esc(c.category_name)+'<b>'+count[c.category_id]+'</b></button>'});
   return h+'</div>';
 }
@@ -544,7 +544,7 @@ function paintTop(){var t=$('#topbar');if(!t)return;var w=document.createElement
 /* billboard: one featured title per day, picked among recent well-rated films (or series) */
 var billInfo={},BILL=false;
 function featured(kind){
-  var L=(kind==='series'?DATA.series:DATA.vod).filter(function(x){return imgOf(kind,x)});
+  var L=uniq(kind==='series'?DATA.series:DATA.vod).filter(function(x){return imgOf(kind,x)});
   if(!L.length)return null;
   var good=L.filter(function(x){return parseFloat(x.rating)>=7}).sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,15);
   var pool=good.length?good:L.slice(0,15),day=Math.floor(Date.now()/864e5);
@@ -565,7 +565,7 @@ function billHtml(kind){
 }
 function catRows(kind,max){
   var cats=kind==='movie'?DATA.vodCats:DATA.serCats,L=kind==='movie'?DATA.vod:DATA.series,by={},h='';
-  L.forEach(function(x){(by[x.category_id]=by[x.category_id]||[]).push(x)});
+  L.forEach(function(x){(by[x.category_id]=by[x.category_id]||[]).push(x)});Object.keys(by).forEach(function(k){by[k]=dedupe(by[k])});
   cats.filter(function(c){return (by[c.category_id]||[]).length}).slice(0,max).forEach(function(c){
     var items=by[c.category_id].slice().sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,20);
     h+=rowHtml(c.category_name,items.map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''),'<button type="button" class="more" data-'+(kind==='movie'?'vcat':'scat')+'="'+esc(c.category_id)+'" data-goto="'+(kind==='movie'?'movies':'series')+'">Tout voir</button>');
@@ -582,7 +582,7 @@ function continueRow(){
   return rowHtml('Reprendre la lecture',h);
 }
 function top10(){
-  var L=DATA.vod.filter(function(x){return parseFloat(x.rating)>0}).sort(function(a,b){return parseFloat(b.rating)-parseFloat(a.rating)||(+(b.added)||0)-(+(a.added)||0)}).slice(0,10);
+  var L=uniq(DATA.vod).filter(function(x){return parseFloat(x.rating)>0}).sort(function(a,b){return parseFloat(b.rating)-parseFloat(a.rating)||(+(b.added)||0)-(+(a.added)||0)}).slice(0,10);
   return L.map(function(x,i){return '<span class="top10"><span class="rk" aria-hidden="true">'+(i+1)+'</span>'+posterHtml('movie',x)+'</span>'}).join('');
 }
 function viewHome(){
@@ -593,17 +593,20 @@ function viewHome(){
   if(rec.length)h+='<section class="sec"><div class="sech"><h2>Revenir sur une chaîne</h2><button type="button" class="more" data-tab="live">Toutes</button></div><div class="chlist">'+rec.map(chHtml).join('')+'</div></section>';
   var favs=Object.keys(USER.favs).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind!=='live'}).sort(function(a,b){return b.at-a.at}).slice(0,20);
   h+=rowHtml('Ma liste',favs.map(function(f){var x=byId(f.kind,f.id);return x?posterHtml(f.kind,x):''}).join(''),'<button type="button" class="more" data-tab="favs">Tout voir</button>');
-  h+=rowHtml('Nouveautés films',DATA.vod.slice().sort(function(a,b){return (+b.added||0)-(+a.added||0)}).slice(0,20).map(function(x){return posterHtml('movie',x,{fresh:true})}).join(''),'<button type="button" class="more" data-tab="movies">Tout voir</button>');
+  h+=rowHtml('Nouveautés films',uniq(DATA.vod).slice().sort(function(a,b){return (+b.added||0)-(+a.added||0)}).slice(0,20).map(function(x){return posterHtml('movie',x,{fresh:true})}).join(''),'<button type="button" class="more" data-tab="movies">Tout voir</button>');
   h+=rowHtml('Top 10 des films les mieux notés',top10());
-  h+=rowHtml('Séries mises à jour',DATA.series.slice().sort(function(a,b){return (+b.last_modified||0)-(+a.last_modified||0)}).slice(0,20).map(function(x){return posterHtml('series',x,{fresh:true})}).join(''),'<button type="button" class="more" data-tab="series">Tout voir</button>');
+  h+=rowHtml('Séries mises à jour',uniq(DATA.series).slice().sort(function(a,b){return (+b.last_modified||0)-(+a.last_modified||0)}).slice(0,20).map(function(x){return posterHtml('series',x,{fresh:true})}).join(''),'<button type="button" class="more" data-tab="series">Tout voir</button>');
   h+=catRows('movie',6)+catRows('series',4);
   if(!DATA.vod.length&&!DATA.series.length&&!DATA.live.length)h+='<div class="empty" style="margin-top:20px"><p>Ce compte ne contient encore rien. Essaie « Actualiser » dans le compte.</p></div>';
   return h;
 }
+var UQ=new WeakMap();
+function dedupe(L){var seen={};return L.filter(function(x){var id=x.stream_id||x.series_id;if(seen[id])return false;seen[id]=1;return true})}
+function uniq(L){var u=UQ.get(L);if(!u){u=dedupe(L);UQ.set(L,u)}return u}
 function filtered(kind,cat){
-  var L=kind==='live'?DATA.live:kind==='movie'?DATA.vod:DATA.series;
+  var L=uniq(kind==='live'?DATA.live:kind==='movie'?DATA.vod:DATA.series);
   if(cat==='fav')return L.filter(function(x){return isFav(kind,x.stream_id||x.series_id)});
-  if(cat!=='all')return L.filter(function(x){return String(x.category_id)===String(cat)});
+  if(cat!=='all')return dedupe((kind==='live'?DATA.live:kind==='movie'?DATA.vod:DATA.series).filter(function(x){return String(x.category_id)===String(cat)}));
   return L;
 }
 function viewLive(){
@@ -613,14 +616,14 @@ function viewLive(){
   return h+'</div>'+(pg.more?moreHtml('live:'+S.liveCat):'')+(!L.length?'<div class="empty"><p>'+(S.liveCat==='fav'?'Touche l\'étoile d\'une chaîne pour la retrouver ici.':'Aucune chaîne dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
 function viewGrid(kind){
-  var catKey=kind==='movie'?'vodCat':'serCat',cats=kind==='movie'?DATA.vodCats:DATA.serCats,all=kind==='movie'?DATA.vod:DATA.series,sec=kind==='movie'?'vod':'series';
+  var catKey=kind==='movie'?'vodCat':'serCat',cats=kind==='movie'?DATA.vodCats:DATA.serCats,all=uniq(kind==='movie'?DATA.vod:DATA.series),sec=kind==='movie'?'vod':'series';
   if(S[catKey]==='all'){
-    return billHtml(kind)+'<section class="sec">'+catsHtml(cats,all,'all',kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section>'+
+    return billHtml(kind)+'<section class="sec">'+catsHtml(cats,kind==='movie'?DATA.vod:DATA.series,'all',kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section>'+
       rowHtml(kind==='movie'?'Nouveautés':'Mises à jour récentes',all.slice().sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,20).map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''))+
       catRows(kind,40)+(!all.length?'<div class="empty"><p>Rien pour l\'instant dans ce compte.</p></div>':'');
   }
   var L=filtered(kind,S[catKey]),key=kind+':'+S[catKey],pg=pageOf(L,key,60);
-  var h='<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div><section class="sec" style="margin-top:12px">'+catsHtml(cats,all,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
+  var h='<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div><section class="sec" style="margin-top:12px">'+catsHtml(cats,kind==='movie'?DATA.vod:DATA.series,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
   pg.items.forEach(function(x){h+=posterHtml(kind,x,{rate:true,fresh:true,prog:kind==='movie'?progressOf('movie:'+x.stream_id):null})});
   return h+'</div>'+(pg.more?moreHtml(key):'')+(!L.length?'<div class="empty"><p>'+(S[catKey]==='fav'?'Ajoute des titres à ta liste depuis leur fiche.':'Rien dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
@@ -652,7 +655,7 @@ function viewSearch(){
   var q=norm(S.q).trim();
   if(q.length<2)return '<div class="empty" style="margin-top:12px"><p>Tape au moins 2 lettres : nom d\'une chaîne, d\'un film ou d\'une série.</p></div>';
   var words=q.split(/\s+/),m=function(x){return words.every(function(w){return x._n.indexOf(w)>=0})};
-  var live=DATA.live.filter(m).slice(0,30),mv=DATA.vod.filter(m).slice(0,40),se=DATA.series.filter(m).slice(0,40),h='';
+  var live=uniq(DATA.live).filter(m).slice(0,30),mv=uniq(DATA.vod).filter(m).slice(0,40),se=uniq(DATA.series).filter(m).slice(0,40),h='';
   if(live.length){h+='<section class="sec"><div class="sech"><h2>Chaînes</h2></div><div class="chlist">';live.forEach(function(x){h+=chHtml(x)});h+='</div></section>'}
   if(mv.length){h+='<section class="sec"><div class="sech"><h2>Films</h2></div><div class="grid">';mv.forEach(function(x){h+=posterHtml('movie',x)});h+='</div></section>'}
   if(se.length){h+='<section class="sec"><div class="sech"><h2>Séries</h2></div><div class="grid">';se.forEach(function(x){h+=posterHtml('series',x)});h+='</div></section>'}
@@ -715,7 +718,7 @@ function renderSheet(){
     h+='<div class="acts"><button type="button" class="btn" data-addacc>'+IC.plus+'Ajouter un compte</button></div>';
     if(DATA){
       h+='<h3 style="margin:8px 0 0;font-size:1rem">Catalogue</h3><p class="hint" style="margin:0">Mis à jour automatiquement une fois par jour, en arrière-plan. Tu peux forcer une catégorie :</p>';
-      [['live','TV en direct',DATA.live.length+' chaînes'],['vod','Films',DATA.vod.length+' films'],['series','Séries',DATA.series.length+' séries']].forEach(function(r){
+      [['live','TV en direct',uniq(DATA.live).length+' chaînes'],['vod','Films',uniq(DATA.vod).length+' films'],['series','Séries',uniq(DATA.series).length+' séries']].forEach(function(r){
         h+='<div class="updrow"><span><b>'+r[1]+' · '+r[2]+'</b><small>'+esc(updLabel(r[0]))+'</small></span><button type="button" class="btn ghost" data-refresh="'+r[0]+'"'+(UPD[r[0]]?' disabled':'')+'>'+IC.refresh+(UPD[r[0]]?'En cours':'Actualiser')+'</button></div>';
       });
     }
