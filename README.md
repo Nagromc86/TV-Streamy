@@ -3,7 +3,7 @@
 Appli Android pour regarder ses abonnements IPTV (Xtream Codes) : plusieurs comptes, TV en direct avec programme,
 films et séries, favoris, reprise de lecture, recherche. Les identifiants restent sur le téléphone.
 
-Dernière version : https://github.com/Nagromc86/lecteur-iptv/releases/latest/download/lecteur-iptv.apk
+Dernière version : https://github.com/Nagromc86/TV-Streamy/releases/latest/download/tv-streamy.apk
 
 - `src/app.html` : l'interface (assemblée dans `www/index.html` par `tools/build.py`, avec les polices intégrées).
 - `plugins/iptv-player` : le lecteur vidéo natif (Media3 / ExoPlayer) : TS, HLS, MP4, MKV, pistes audio et sous-titres.

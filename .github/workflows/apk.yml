@@ -1,5 +1,5 @@
 # Construit l'appli Android (APK) à chaque modification et la publie dans les Releases.
-# Lien fixe vers la dernière version : https://github.com/Nagromc86/lecteur-iptv/releases/latest/download/lecteur-iptv.apk
+# Lien fixe vers la dernière version : https://github.com/Nagromc86/TV-Streamy/releases/latest/download/tv-streamy.apk
 name: APK Android
 
 on:
@@ -65,14 +65,14 @@ jobs:
           trap 'rm -f "$RUNNER_TEMP/key.p12"' EXIT
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           "$BT/zipalign" -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-          "$BT/apksigner" sign --ks "$RUNNER_TEMP/key.p12" --ks-type PKCS12 --ks-key-alias carnet --ks-pass env:KS_PASS --key-pass env:KS_PASS --out lecteur-iptv.apk aligned.apk
-          ls -la lecteur-iptv.apk
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/key.p12" --ks-type PKCS12 --ks-key-alias carnet --ks-pass env:KS_PASS --key-pass env:KS_PASS --out tv-streamy.apk aligned.apk
+          ls -la tv-streamy.apk
 
       - name: Publier la version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.${{ github.run_number }}" lecteur-iptv.apk \
+          gh release create "v1.${{ github.run_number }}" tv-streamy.apk \
             --title "Lecteur IPTV 1.${{ github.run_number }} ($APP_VERSION)" \
-            --notes "Appli Android Lecteur IPTV, version du $APP_VERSION. Télécharge lecteur-iptv.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
+            --notes "Appli Android Lecteur IPTV, version du $APP_VERSION. Télécharge tv-streamy.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
             --latest
