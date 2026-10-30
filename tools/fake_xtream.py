@@ -6,10 +6,10 @@ from urllib.parse import urlparse, parse_qs
 
 random.seed(4)
 NOW = int(time.time())
-LIVE_CATS = [{'category_id': '1', 'category_name': 'FR | Généralistes', 'parent_id': 0},
-             {'category_id': '2', 'category_name': 'FR | Info', 'parent_id': 0},
-             {'category_id': '3', 'category_name': 'FR | Sport', 'parent_id': 0},
-             {'category_id': '4', 'category_name': 'FR | Jeunesse', 'parent_id': 0}]
+LIVE_CATS = [{'category_id': '1', 'category_name': 'FR ◉ Généralistes', 'parent_id': 0},
+             {'category_id': '2', 'category_name': 'VIP ❖ Info', 'parent_id': 0},
+             {'category_id': '3', 'category_name': 'VIP ❖ Sport', 'parent_id': 0},
+             {'category_id': '4', 'category_name': 'AR ◉ Jeunesse', 'parent_id': 0}]
 names = {'1': ['Chaîne Une', 'Deux TV', 'Trois Monde', 'Canal Quatre', 'Cinq Plus', 'Six Max'],
          '2': ['Info Continue', 'Le Fil Info', 'Monde 24', 'Éco Direct'],
          '3': ['Sport Arena', 'Foot Plus', 'Tennis Live', 'Moto Racing', 'Rugby Club'],

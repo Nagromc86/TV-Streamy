@@ -610,7 +610,7 @@ function catsHtml(kind,current,attr){
   cats.forEach(function(c){if(count[c.category_id])h+='<button type="button" class="chip" '+attr+'="'+esc(c.category_id)+'" aria-pressed="'+(String(current)===String(c.category_id))+'">'+esc(c.category_name)+'<b>'+count[c.category_id]+'</b></button>'});
   return h+'</div>';
 }
-function freshHtml(sec){var nh=Object.keys(hidG(sec)).length;return '<div class="freshness"><span>'+esc(updLabel(sec))+'</span><span style="display:flex;gap:16px"><button type="button" data-groups="'+sec+'">'+IC.filter+'Filtrer'+(nh?' · '+nh:'')+'</button><button type="button" data-refresh="'+sec+'"'+(UPD[sec]?' disabled':'')+'>'+IC.refresh+'Actualiser</button></span></div>'}
+function freshHtml(sec){var nh=hidCount(sec);return '<div class="freshness"><span>'+esc(updLabel(sec))+'</span><span style="display:flex;gap:16px"><button type="button" data-groups="'+sec+'">'+IC.filter+'Filtrer'+(nh?' · '+nh:'')+'</button><button type="button" data-refresh="'+sec+'"'+(UPD[sec]?' disabled':'')+'>'+IC.refresh+'Actualiser</button></span></div>'}
 function pageOf(list,key,size){var n=S.limit[key]||size;return{items:list.slice(0,n),more:list.length>n}}
 function moreHtml(key){return '<button type="button" class="morebtn" data-more="'+key+'">Afficher plus</button>'}
 
@@ -717,25 +717,28 @@ function secOf(kind){return kind==='live'?'live':kind==='movie'||kind==='vod'?'v
 function kindOf(sec){return sec==='live'?'live':sec==='vod'?'movie':'series'}
 function rawList(kind){var k=secOf(kind);return k==='live'?DATA.live:k==='vod'?DATA.vod:DATA.series}
 function rawCats(kind){var k=secOf(kind);return k==='live'?DATA.liveCats:k==='vod'?DATA.vodCats:DATA.serCats}
-function grpOf(name){var m=/^\s*[\[(]?([A-Za-z]{2,4}(?:[ \-][A-Za-z]{2,4})?)[\])]?\s*[★✪✰☆⭐|:•\-–»]/.exec(name||'');return m?m[1].toUpperCase().replace(/\s+/g,' '):'Autres'}
+function grpOf(name){var m=/^\s*[\[(]?([A-Za-z0-9]{2,5}(?:[ \-][A-Za-z]{2,4})?)[\])]?\s*[^\p{L}\p{N}\s]/u.exec(name||'');return m?m[1].toUpperCase().replace(/\s+/g,' '):'Autres'}
 function hidG(kind){return (USER.hidden&&USER.hidden[secOf(kind)])||{}}
-function hidSig(kind){return Object.keys(hidG(kind)).sort().join(',')}
+function hidC(kind){return (USER.hiddenCats&&USER.hiddenCats[secOf(kind)])||{}}
+function catHidden(kind,c){return !!(hidG(kind)[grpOf(c.category_name)]||hidC(kind)[c.category_id])}
+function hidCount(kind){return Object.keys(hidG(kind)).length+Object.keys(hidC(kind)).length}
+function hidSig(kind){return Object.keys(hidG(kind)).sort().join(',')+'/'+Object.keys(hidC(kind)).sort().join(',')}
 var VZ=new WeakMap(),VL=new WeakMap();
 function visCats(kind){
   var h=hidG(kind),sig=hidSig(kind),C=rawCats(kind),c=VZ.get(C);if(c&&c.sig===sig)return c.v;
-  var v=sig?C.filter(function(x){return !h[grpOf(x.category_name)]}):C;VZ.set(C,{sig:sig,v:v});return v;
+  var v=sig!=='/'?C.filter(function(x){return !catHidden(kind,x)}):C;VZ.set(C,{sig:sig,v:v});return v;
 }
 function visList(kind){
   var L=rawList(kind),sig=hidSig(kind),c=VL.get(L);if(c&&c.sig===sig)return c.v;
   var v;
-  if(!sig)v=uniq(L);
-  else{var bad={};rawCats(kind).forEach(function(x){if(hidG(kind)[grpOf(x.category_name)])bad[x.category_id]=1});v=dedupe(L.filter(function(x){return !bad[x.category_id]}))}
+  if(sig==='/')v=uniq(L);
+  else{var bad={};rawCats(kind).forEach(function(x){if(catHidden(kind,x))bad[x.category_id]=1});v=dedupe(L.filter(function(x){return !bad[x.category_id]}))}
   VL.set(L,{sig:sig,v:v});return v;
 }
 function groupsOf(kind){
   var C=rawCats(kind),per={},g={};
   rawList(kind).forEach(function(x){per[x.category_id]=(per[x.category_id]||0)+1});
-  C.forEach(function(c){var k=grpOf(c.category_name);g[k]=g[k]||{name:k,cats:0,n:0,ex:[]};g[k].cats++;g[k].n+=per[c.category_id]||0;if(g[k].ex.length<3)g[k].ex.push(c.category_name)});
+  C.forEach(function(c){var k=grpOf(c.category_name);g[k]=g[k]||{name:k,cats:0,n:0,ex:[],list:[]};g[k].cats++;g[k].n+=per[c.category_id]||0;if(g[k].ex.length<3)g[k].ex.push(c.category_name);if(per[c.category_id])g[k].list.push({id:c.category_id,name:c.category_name,n:per[c.category_id]})});
   return Object.keys(g).map(function(k){return g[k]}).filter(function(x){return x.n}).sort(function(a,b){return b.n-a.n});
 }
 function nf(n){return Number(n).toLocaleString('fr-FR')}
@@ -756,7 +759,7 @@ function viewGrid(kind){
   if(S[catKey]==='all'){
     return billHtml(kind)+'<section class="sec">'+catsHtml(kind,'all',kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section>'+continueRow(kind)+
       rowHtml(kind==='movie'?'Nouveautés':'Mises à jour récentes',all.slice().sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,20).map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''))+
-      catRows(kind,40)+(!all.length?'<div class="empty"><p>'+(Object.keys(hidG(kind)).length?'Tous les groupes sont masqués. Touche « Filtrer » pour en réafficher.':'Rien pour l\'instant dans ce compte.')+'</p></div>':'');
+      catRows(kind,40)+(!all.length?'<div class="empty"><p>'+(hidCount(kind)?'Tous les groupes sont masqués. Touche « Filtrer » pour en réafficher.':'Rien pour l\'instant dans ce compte.')+'</p></div>':'');
   }
   var L=filtered(kind,S[catKey]),key=kind+':'+S[catKey],pg=pageOf(L,key,60);
   var h='<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div><section class="sec" style="margin-top:12px">'+catsHtml(kind,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
@@ -855,8 +858,8 @@ function renderSheet(){
     if(DATA){
       h+='<h3 style="margin:8px 0 0;font-size:1rem">Catalogue</h3><p class="hint" style="margin:0">Mis à jour automatiquement une fois par jour, en arrière-plan. Le filtre masque des groupes (par langue ou pays) partout : listes, accueil, recherche. Tu peux aussi forcer une mise à jour :</p>';
       [['live','TV en direct',' chaînes'],['vod','Films',' films'],['series','Séries',' séries']].forEach(function(r){
-        var nh=Object.keys(hidG(r[0])).length;
-        h+='<div class="updrow"><span><b>'+r[1]+' · '+nf(visList(r[0]).length)+r[2]+'</b><small>'+esc(updLabel(r[0]))+(nh?' · '+nh+' groupe'+(nh>1?'s':'')+' masqué'+(nh>1?'s':''):'')+'</small></span><span class="acts" style="flex-wrap:nowrap"><button type="button" class="btn ghost" data-groups="'+r[0]+'" aria-label="Filtrer les groupes">'+IC.filter+'</button><button type="button" class="btn ghost" data-refresh="'+r[0]+'"'+(UPD[r[0]]?' disabled':'')+'>'+IC.refresh+(UPD[r[0]]?'En cours':'Actualiser')+'</button></span></div>';
+        var nh=hidCount(r[0]);
+        h+='<div class="updrow"><span><b>'+r[1]+' · '+nf(visList(r[0]).length)+r[2]+'</b><small>'+esc(updLabel(r[0]))+(nh?' · '+nh+' masqué'+(nh>1?'s':''):'')+'</small></span><span class="acts" style="flex-wrap:nowrap"><button type="button" class="btn ghost" data-groups="'+r[0]+'" aria-label="Filtrer les groupes">'+IC.filter+'</button><button type="button" class="btn ghost" data-refresh="'+r[0]+'"'+(UPD[r[0]]?' disabled':'')+'>'+IC.refresh+(UPD[r[0]]?'En cours':'Actualiser')+'</button></span></div>';
       });
     }
     if(NATIVE)h+='<label class="chk"><input type="checkbox" id="allowMobile"'+(PREFS.allowMobile?' checked':'')+'><span>Télécharger aussi en données mobiles (4G/5G)<br><span class="hint" style="font-weight:400">Sinon, les téléchargements attendent le Wi-Fi.</span></span></label>';
@@ -874,11 +877,20 @@ function renderSheet(){
       (S.apkUpdate?'<button type="button" class="btn red" data-getapk>'+IC.dl+'Télécharger la mise à jour'+(S.apkUpdate.tag?' ('+esc(S.apkUpdate.tag)+')':'')+'</button><p class="hint" style="margin:0;flex-basis:100%">Ouvre ensuite le fichier tv-streamy.apk pour l\'installer par-dessus : tes comptes et ta liste sont conservés.</p>':'')+'</div>';
     h+='<div class="acts"><button type="button" class="btn ghost" data-close>Fermer</button></div></div>';
   }else if(sheet.kind==='groups'){
-    var gs=groupsOf(sheet.sec),hg=hidG(sheet.sec),unit={live:'chaînes',vod:'films',series:'séries'}[sheet.sec];
-    h+='<div class="grab"></div><div class="in gut"><h2>Groupes · '+{live:'TV en direct',vod:'Films',series:'Séries'}[sheet.sec]+'</h2><p class="hint" style="margin:0">Décoche les groupes que tu ne veux plus voir. Ils disparaissent des listes, de l\'accueil, des recommandations et de la recherche. Ta liste et tes reprises restent intactes.</p>'+
-      '<div class="acts"><button type="button" class="btn ghost" data-gall="1">Tout cocher</button><button type="button" class="btn ghost" data-gall="0">Tout décocher</button></div><div style="display:flex;flex-direction:column;gap:4px">';
+    var gs=groupsOf(sheet.sec),hg=hidG(sheet.sec),hc=hidC(sheet.sec),unit={live:'chaînes',vod:'films',series:'séries'}[sheet.sec];
+    sheet.open=sheet.open||{};if(gs.length===1)sheet.open[gs[0].name]=true;
+    h+='<div class="grab"></div><div class="in gut"><h2>Filtrer · '+{live:'TV en direct',vod:'Films',series:'Séries'}[sheet.sec]+'</h2><p class="hint" style="margin:0">Décoche un groupe entier, ou ouvre-le pour choisir catégorie par catégorie. Ce qui est décoché disparaît des listes, de l\'accueil, des recommandations et de la recherche. Ta liste et tes reprises restent intactes.</p>'+
+      '<div class="acts"><button type="button" class="btn ghost" data-gall="1">Tout cocher</button><button type="button" class="btn ghost" data-gall="0">Tout décocher</button></div><div style="display:flex;flex-direction:column">';
     gs.forEach(function(g){
-      h+='<label class="chk" style="padding:10px 0;border-bottom:1px solid var(--line)"><input type="checkbox" data-grp="'+esc(g.name)+'"'+(hg[g.name]?'':' checked')+'><span>'+esc(g.name)+' <span class="hint" style="font-weight:400">· '+nf(g.n)+' '+unit+' · '+g.cats+' catégorie'+(g.cats>1?'s':'')+'</span><br><span class="hint" style="font-weight:400">'+esc(g.ex.join(' · '))+(g.cats>g.ex.length?'…':'')+'</span></span></label>';
+      var off=!!hg[g.name],nOff=g.list.filter(function(c){return hc[c.id]}).length,open=sheet.open[g.name];
+      h+='<div style="border-bottom:1px solid var(--line);padding:6px 0"><div style="display:flex;align-items:center;gap:8px"><label class="chk" style="flex:1;padding:6px 0;min-width:0"><input type="checkbox" data-grp="'+esc(g.name)+'"'+(off?'':' checked')+'><span style="min-width:0">'+esc(g.name)+' <span class="hint" style="font-weight:400">· '+nf(g.n)+' '+unit+' · '+g.cats+' catégorie'+(g.cats>1?'s':'')+(nOff&&!off?' · '+nOff+' décochée'+(nOff>1?'s':''):'')+'</span><br><span class="hint" style="font-weight:400;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(g.ex.join(' · '))+(g.cats>g.ex.length?'…':'')+'</span></span></label>'+
+        '<button type="button" class="btn ghost" data-gopen="'+esc(g.name)+'" aria-expanded="'+(!!open)+'" style="min-height:38px;padding:6px 12px;font-size:.85rem">'+(open?'Fermer':'Détail')+'</button></div>';
+      if(open){
+        h+='<div style="padding:2px 0 8px 32px;display:flex;flex-direction:column">';
+        g.list.forEach(function(c){h+='<label class="chk" style="padding:7px 0;font-weight:500'+(off?';opacity:.45':'')+'"><input type="checkbox" data-hcat="'+esc(c.id)+'"'+(hc[c.id]?'':' checked')+(off?' disabled':'')+'><span>'+esc(c.name)+' <span class="hint" style="font-weight:400">· '+nf(c.n)+'</span></span></label>'});
+        h+='</div>';
+      }
+      h+='</div>';
     });
     h+='</div><div class="acts"><button type="button" class="btn" data-close>Terminé</button></div></div>';
   }else if(sheet.kind==='accform'){
@@ -926,7 +938,9 @@ function renderSheet(){
     h+='</div>';
   }
   h+='</div>';
-  el.innerHTML=h;el.hidden=false;document.body.style.overflow='hidden';
+  var op=el.querySelector('.panel'),st=op&&!el.hidden&&el.getAttribute('data-kind')===sheet.kind?op.scrollTop:0;
+  el.innerHTML=h;el.hidden=false;el.setAttribute('data-kind',sheet.kind);document.body.style.overflow='hidden';
+  if(st){var np=el.querySelector('.panel');if(np){np.style.animation='none';np.scrollTop=st}}
 }
 function movieDlHtml(x){
   if(!NATIVE)return '';
@@ -983,7 +997,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-gopen],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1009,7 +1023,8 @@ document.addEventListener('click',function(e){
   if(t.hasAttribute('data-checkupd')){checkUpdate(true);return}
   if(t.hasAttribute('data-getapk')){openExternal(APK_URL);toast('Téléchargement de la mise à jour…');return}
   if(d.groups){openSheet({kind:'groups',sec:d.groups,back:sheet&&sheet.kind==='accounts'});return}
-  if(d.gall){var gk=sheet.sec;USER.hidden=USER.hidden||{};USER.hidden[gk]={};if(d.gall==='0')groupsOf(gk).forEach(function(g){USER.hidden[gk][g.name]=1});groupsChanged(gk);return}
+  if(d.gopen){sheet.open=sheet.open||{};sheet.open[d.gopen]=!sheet.open[d.gopen];renderSheet();return}
+  if(d.gall){var gk=sheet.sec;USER.hidden=USER.hidden||{};USER.hidden[gk]={};USER.hiddenCats=USER.hiddenCats||{};USER.hiddenCats[gk]={};if(d.gall==='0')groupsOf(gk).forEach(function(g){USER.hidden[gk][g.name]=1});groupsChanged(gk);return}
   if(t.hasAttribute('data-accounts')){openSheet({kind:'accounts'});return}
   if(t.hasAttribute('data-addacc')){openSheet({kind:'accform',acc:{}});return}
   if(d.editacc){var a=S.accounts.filter(function(x){return x.id===d.editacc})[0];if(a)openSheet({kind:'accform',acc:a});return}
@@ -1034,6 +1049,7 @@ function groupsChanged(sec){
   renderSheet();clearTimeout(groupsChanged.t);groupsChanged.t=setTimeout(function(){var y=window.scrollY;render();window.scrollTo(0,y)},250);
 }
 document.addEventListener('change',function(e){
+  if(e.target.hasAttribute&&e.target.hasAttribute('data-hcat')&&sheet&&sheet.kind==='groups'){var ci=e.target.getAttribute('data-hcat');USER.hiddenCats=USER.hiddenCats||{};var hcs=USER.hiddenCats[sheet.sec]=USER.hiddenCats[sheet.sec]||{};if(e.target.checked)delete hcs[ci];else hcs[ci]=1;groupsChanged(sheet.sec);return}
   if(e.target.hasAttribute&&e.target.hasAttribute('data-grp')&&sheet&&sheet.kind==='groups'){var g=e.target.getAttribute('data-grp');USER.hidden=USER.hidden||{};var hs=USER.hidden[sheet.sec]=USER.hidden[sheet.sec]||{};if(e.target.checked)delete hs[g];else hs[g]=1;groupsChanged(sheet.sec);return}if(e.target.id==='subMode'){PREFS.subMode=e.target.value;kset('prefs',PREFS);toast('Réglage des sous-titres enregistré.')}if(e.target.id==='allowMobile'){PREFS.allowMobile=e.target.checked;kset('prefs',PREFS);toast(PREFS.allowMobile?'Les téléchargements utiliseront aussi les données mobiles.':'Les téléchargements attendront le Wi-Fi.')}});
 window.addEventListener('online',function(){render()});window.addEventListener('offline',function(){render()});
 document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target)});
