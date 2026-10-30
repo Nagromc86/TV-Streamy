@@ -1,0 +1,265 @@
+package fr.nagromc86.iptvplayer;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.net.Uri;
+import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.annotation.OptIn;
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.MimeTypes;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+import androidx.media3.ui.PlayerView;
+
+/**
+ * Full-screen player: live TV (TS or HLS), films and episodes (MP4, MKV...).
+ * Audio and subtitle tracks are chosen from the player's settings button; French is preferred.
+ */
+@OptIn(markerClass = UnstableApi.class)
+public class PlayerActivity extends Activity {
+
+    static final String EXTRA_URL = "url";
+    static final String EXTRA_FALLBACK_URL = "fallbackUrl";
+    static final String EXTRA_TITLE = "title";
+    static final String EXTRA_SUBTITLE = "subtitle";
+    static final String EXTRA_START_MS = "startMs";
+    static final String EXTRA_LIVE = "live";
+    static final String EXTRA_USER_AGENT = "userAgent";
+
+    static final String RESULT_POSITION = "positionMs";
+    static final String RESULT_DURATION = "durationMs";
+    static final String RESULT_ENDED = "ended";
+    static final String RESULT_ERROR = "error";
+
+    private ExoPlayer player;
+    private PlayerView playerView;
+    private LinearLayout titleBox;
+    private boolean live;
+    private boolean ended;
+    private boolean triedFallback;
+    private String fallbackUrl;
+    private String lastError;
+    private boolean finishing;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        Intent in = getIntent();
+        String url = in.getStringExtra(EXTRA_URL);
+        fallbackUrl = in.getStringExtra(EXTRA_FALLBACK_URL);
+        live = in.getBooleanExtra(EXTRA_LIVE, false);
+        long startMs = in.getLongExtra(EXTRA_START_MS, 0L);
+        String userAgent = in.getStringExtra(EXTRA_USER_AGENT);
+        if (TextUtils.isEmpty(userAgent)) {
+            userAgent = "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0";
+        }
+
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.BLACK);
+        playerView = new PlayerView(this);
+        playerView.setLayoutParams(new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        playerView.setShowSubtitleButton(true);
+        playerView.setKeepScreenOn(true);
+        root.addView(playerView);
+        titleBox = buildTitle(in.getStringExtra(EXTRA_TITLE), in.getStringExtra(EXTRA_SUBTITLE));
+        root.addView(titleBox);
+        setContentView(root);
+        hideSystemUi();
+
+        playerView.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility -> {
+            titleBox.setVisibility(visibility);
+            if (visibility != View.VISIBLE) {
+                hideSystemUi();
+            }
+        });
+
+        DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
+                .setUserAgent(userAgent)
+                .setAllowCrossProtocolRedirects(true)
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(30000);
+        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http));
+        DefaultRenderersFactory renderers = new DefaultRenderersFactory(this).setEnableDecoderFallback(true);
+
+        player = new ExoPlayer.Builder(this, renderers).setMediaSourceFactory(sources).build();
+        player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                .setPreferredAudioLanguage("fr")
+                .setPreferredTextLanguage("fr")
+                .build());
+        playerView.setPlayer(player);
+
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_ENDED && !live) {
+                    ended = true;
+                    finishWithResult();
+                }
+            }
+
+            @Override
+            public void onPlayerError(PlaybackException error) {
+                lastError = error.getErrorCodeName();
+                if (!triedFallback && !TextUtils.isEmpty(fallbackUrl)) {
+                    triedFallback = true;
+                    long pos = live ? C.TIME_UNSET : player.getCurrentPosition();
+                    player.setMediaItem(buildItem(fallbackUrl, getIntent().getStringExtra(EXTRA_TITLE)));
+                    if (pos != C.TIME_UNSET && pos > 0) {
+                        player.seekTo(pos);
+                    }
+                    player.prepare();
+                    player.play();
+                    return;
+                }
+                Toast.makeText(PlayerActivity.this, "Lecture impossible : " + describe(error), Toast.LENGTH_LONG).show();
+            }
+        });
+
+        player.setMediaItem(buildItem(url, in.getStringExtra(EXTRA_TITLE)));
+        if (!live && startMs > 0) {
+            player.seekTo(startMs);
+        }
+        player.prepare();
+        player.setPlayWhenReady(true);
+    }
+
+    private MediaItem buildItem(String url, String title) {
+        MediaItem.Builder b = new MediaItem.Builder().setUri(Uri.parse(url));
+        if (url != null && url.toLowerCase().contains(".m3u8")) {
+            b.setMimeType(MimeTypes.APPLICATION_M3U8);
+        }
+        if (!TextUtils.isEmpty(title)) {
+            b.setMediaMetadata(new MediaMetadata.Builder().setTitle(title).build());
+        }
+        return b.build();
+    }
+
+    private String describe(PlaybackException e) {
+        switch (e.errorCode) {
+            case PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED:
+            case PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT:
+                return "connexion au serveur impossible.";
+            case PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS:
+                return "le serveur a refusé le flux (abonnement, nombre de connexions ?).";
+            case PlaybackException.ERROR_CODE_DECODER_INIT_FAILED:
+            case PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED:
+                return "format vidéo non pris en charge par ce téléphone.";
+            default:
+                return e.getErrorCodeName();
+        }
+    }
+
+    private LinearLayout buildTitle(String title, String subtitle) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(20);
+        box.setPadding(pad, dp(14), pad, dp(14));
+        box.setBackgroundColor(0x99000000);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP);
+        box.setLayoutParams(lp);
+        TextView t = new TextView(this);
+        t.setText(title == null ? "" : title);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        t.setMaxLines(1);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        box.addView(t);
+        if (!TextUtils.isEmpty(subtitle)) {
+            TextView s = new TextView(this);
+            s.setText(subtitle);
+            s.setTextColor(0xCCFFFFFF);
+            s.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+            s.setMaxLines(1);
+            s.setEllipsize(TextUtils.TruncateAt.END);
+            box.addView(s);
+        }
+        return box;
+    }
+
+    private int dp(int v) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()));
+    }
+
+    @SuppressWarnings("deprecation")
+    private void hideSystemUi() {
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemUi();
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public void onBackPressed() {
+        finishWithResult();
+    }
+
+    private void finishWithResult() {
+        if (finishing) {
+            return;
+        }
+        finishing = true;
+        Intent data = new Intent();
+        if (player != null) {
+            long duration = player.getDuration();
+            data.putExtra(RESULT_POSITION, Math.max(0L, player.getCurrentPosition()));
+            data.putExtra(RESULT_DURATION, duration == C.TIME_UNSET ? 0L : duration);
+        }
+        data.putExtra(RESULT_ENDED, ended);
+        if (lastError != null) {
+            data.putExtra(RESULT_ERROR, lastError);
+        }
+        setResult(RESULT_OK, data);
+        finish();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if (player != null && !isFinishing()) {
+            player.pause();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (player != null) {
+            player.release();
+            player = null;
+        }
+        super.onDestroy();
+    }
+}

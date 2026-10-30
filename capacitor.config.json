@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.nagromc86.lecteuriptv",
+  "appName": "Lecteur IPTV",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": true, "backgroundColor": "#0c0e13" },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}

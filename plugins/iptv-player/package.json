@@ -1,0 +1,8 @@
+{
+  "name": "iptv-player",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lecteur vidéo natif Android (Media3 / ExoPlayer) pour le Lecteur IPTV",
+  "main": "index.js",
+  "capacitor": { "android": { "src": "android" } }
+}

@@ -1,0 +1,78 @@
+# Construit l'appli Android (APK) à chaque modification et la publie dans les Releases.
+# Lien fixe vers la dernière version : https://github.com/Nagromc86/lecteur-iptv/releases/latest/download/lecteur-iptv.apk
+name: APK Android
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'plugins/**', 'tools/**', 'assets/**', 'package.json', 'capacitor.config.json', '.github/workflows/apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Préparer le projet Android
+        shell: bash
+        run: |
+          # en cas d'échec, la fin du journal est remontée en annotation
+          fail() { MSG=$(tail -60 "$1" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g'); echo "::error title=$2::$MSG"; exit 1; }
+          ( npm install --no-audit --no-fund ) > npm.log 2>&1 || fail npm.log npm
+          python3 tools/build.py node_modules
+          ( npx cap add android && npx capacitor-assets generate --android && npx cap sync android ) > cap.log 2>&1 || fail cap.log capacitor
+          # les serveurs IPTV et leurs flux sont souvent en http
+          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          VERSION=$(grep -o "var APP_VERSION='[0-9][^']*'" www/index.html | head -1 | cut -d"'" -f2)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" android/app/build.gradle
+          sed -i "s/versionName \"1.0\"/versionName \"1.${{ github.run_number }}\"/" android/app/build.gradle
+
+      - name: Construire l'APK
+        working-directory: android
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace > gradle.log 2>&1 || { MSG=$(grep -E "FAILURE|What went wrong|error:|Error|Exception|> |\.java:" gradle.log | head -40 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g'); echo "::error title=gradle::$MSG"; tail -30 gradle.log; exit 1; }
+          tail -5 gradle.log
+
+      - name: Signer l'APK
+        shell: bash
+        env:
+          # Clé rangée dans le coffre secret du dépôt (Settings › Secrets and variables › Actions).
+          KS_B64: ${{ secrets.APK_KEYSTORE }}
+          KS_PASS: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS_B64" ] || [ -z "$KS_PASS" ]; then echo "::error title=Signature::Ajoute les secrets APK_KEYSTORE et APK_KEYSTORE_PASSWORD dans Settings › Secrets and variables › Actions."; exit 1; fi
+          printf %s "$KS_B64" | base64 -d > "$RUNNER_TEMP/key.p12"
+          trap 'rm -f "$RUNNER_TEMP/key.p12"' EXIT
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/key.p12" --ks-type PKCS12 --ks-key-alias carnet --ks-pass env:KS_PASS --key-pass env:KS_PASS --out lecteur-iptv.apk aligned.apk
+          ls -la lecteur-iptv.apk
+
+      - name: Publier la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.${{ github.run_number }}" lecteur-iptv.apk \
+            --title "Lecteur IPTV 1.${{ github.run_number }} ($APP_VERSION)" \
+            --notes "Appli Android Lecteur IPTV, version du $APP_VERSION. Télécharge lecteur-iptv.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
+            --latest
