@@ -66,6 +66,13 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 .bill .tags{display:flex;justify-content:center;flex-wrap:wrap;gap:4px 10px;font-size:.85rem;color:#d7d7de}
 .bill .tags span+span::before{content:"•";margin-right:10px;color:var(--accent2)}
 .bill .acts{justify-content:center;margin-top:14px}
+.bslides{position:relative;z-index:1;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;scroll-behavior:smooth;margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)))}
+.bslides::-webkit-scrollbar{display:none}
+.bslide{flex:0 0 100%;scroll-snap-align:center;scroll-snap-stop:always;padding-inline:max(16px,env(safe-area-inset-left,0px))}
+.bill .bg{transition:background-image .4s}
+.bdots{position:relative;z-index:1;display:flex;justify-content:center;gap:6px;margin-top:14px}
+.bdots button{width:7px;height:7px;border-radius:4px;border:0;padding:0;background:rgba(255,255,255,.35);transition:width .2s,background .2s}
+.bdots button[aria-current="true"]{width:20px;background:#fff}
 .badge{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;background:var(--accent);color:#fff;border-radius:4px;padding:2px 6px}
 
 /* rows & grids */
@@ -626,26 +633,70 @@ function topHtml(){
 function paintTop(){var t=$('#topbar');if(!t)return;var w=document.createElement('div');w.innerHTML=topHtml();var n=w.firstChild;if(t.classList.contains('solid'))n.classList.add('solid');var q=$('#q');if(q&&document.activeElement===q)return;t.replaceWith(n)}
 /* billboard: one featured title per day, picked among recent well-rated films (or series) */
 var billInfo={},BILL=false;
-function featured(kind){
-  var L=visList(kind).filter(function(x){return imgOf(kind,x)});
-  if(!L.length)return null;
-  var good=L.filter(function(x){return parseFloat(x.rating)>=7}).sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,15);
-  var pool=good.length?good:L.slice(0,15),day=Math.floor(Date.now()/864e5);
-  return pool[day%pool.length];
+/* billboard: 5 suggestions, swipeable, renewed every day.
+   Picks well-rated recent titles with artwork, skips what was already watched, mixes categories. */
+function suggest(kind,cat,n){
+  var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind);
+  L=L.filter(function(x){if(!imgOf(kind,x))return false;var p=kind==='movie'?USER.prog['movie:'+x.stream_id]:null;return !(p&&p.done)});
+  if(!L.length)return [];
+  var now=Date.now()/1000;
+  var sc=function(x){var r=parseFloat(x.rating)||0,t=+(x.added||x.last_modified)||0,age=t?(now-t)/86400:999;return (r>10?r/10:r)+(age<30?2:age<120?1:0)};
+  var pool=L.map(function(x){return {x:x,s:sc(x)}}).sort(function(a,b){return b.s-a.s}).slice(0,Math.max(30,n*6)).map(function(o){return o.x});
+  var day=Math.floor(Date.now()/864e5),out=[],perCat={},start=(day*7)%pool.length;
+  for(var i=0;i<pool.length&&out.length<n;i++){var x=pool[(start+i)%pool.length];if(!cat&&(perCat[x.category_id]||0)>=2)continue;perCat[x.category_id]=(perCat[x.category_id]||0)+1;out.push(x)}
+  for(i=0;i<pool.length&&out.length<n;i++){if(out.indexOf(pool[i])<0)out.push(pool[i])}
+  return out.map(function(x){return {kind:kind,x:x}});
 }
-function billHtml(kind){
-  var x=featured(kind);if(!x)return '';BILL=true;
-  var id=x.stream_id||x.series_id,k=kind+':'+id,inf=billInfo[k],img=imgOf(kind,x),r=parseFloat(x.rating);
-  if(!inf&&navigator.onLine!==false){billInfo[k]={};kget('info:'+S.activeId+':'+kind+':'+id).then(function(c){if(c)return c;return api(acc(),kind==='movie'?'action=get_vod_info&vod_id='+id:'action=get_series_info&series_id='+id).then(function(r){kset('info:'+S.activeId+':'+kind+':'+id,r);return r})}).then(function(r){billInfo[k]=(kind==='movie'?r&&r.info:r&&r.info)||{};softRender()},function(){})}
-  inf=inf||{};
-  var genre=(inf.genre||x.genre||'').split(/[,\/]/).map(function(g){return g.trim()}).filter(Boolean).slice(0,3);
-  var p=kind==='movie'?progressOf('movie:'+id):USER.prog['series:'+id];
-  return '<section class="bill"><span class="bg" style="background-image:url(\''+esc(img)+'\')"></span>'+
-    '<button type="button" class="card" data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
-    '<div class="info"><div class="tags">'+(r>0?'<span>★ '+r.toFixed(1)+'</span>':'')+genre.map(function(g){return '<span>'+esc(g)+'</span>'}).join('')+(year(inf.releasedate||inf.releaseDate||x.releaseDate||x.name)?'<span>'+year(inf.releasedate||inf.releaseDate||x.releaseDate||x.name)+'</span>':'')+'</div>'+
-    '<div class="acts">'+(kind==='movie'?'<button type="button" class="btn" data-playmovie="'+esc(id)+'">'+IC.play+(p&&!p.done&&p.pos?'Reprendre':'Lecture')+'</button>':'<button type="button" class="btn" data-open="'+k+'">'+IC.play+'Regarder</button>')+
-    '<button type="button" class="btn ghost" data-fav="'+k+'">'+(isFav(kind,id)?IC.check+'Ma liste':IC.plus+'Ma liste')+'</button></div></div></section>';
+function wantBillInfo(kind,x){
+  var id=x.stream_id||x.series_id,k=kind+':'+id;if(billInfo[k]||navigator.onLine===false)return;billInfo[k]={};
+  kget('info:'+S.activeId+':'+kind+':'+id).then(function(c){if(c)return c;return api(acc(),kind==='movie'?'action=get_vod_info&vod_id='+id:'action=get_series_info&series_id='+id).then(function(r){kset('info:'+S.activeId+':'+kind+':'+id,r);return r})}).then(function(r){
+    billInfo[k]=(r&&r.info)||{};var el=document.querySelector('.bslide[data-k="'+k+'"] .tags');if(el)el.innerHTML=billTags(kind,x);
+  },function(){});
 }
+function billTags(kind,x){
+  var inf=billInfo[kind+':'+(x.stream_id||x.series_id)]||{},r=parseFloat(x.rating),yr=year(inf.releasedate||inf.releaseDate||x.releaseDate||x.name);
+  var genre=String(inf.genre||x.genre||'').split(/[,\/]/).map(function(g){return g.trim()}).filter(Boolean).slice(0,2);
+  return (r>0?'<span>★ '+(r>10?r/10:r).toFixed(1)+'</span>':'')+genre.map(function(g){return '<span>'+esc(g)+'</span>'}).join('')+(yr?'<span>'+yr+'</span>':'');
+}
+var BILLKEY='';
+function billHtml(kind,cat){
+  var items;
+  if(kind==='mix'){var m=suggest('movie',null,3),se=suggest('series',null,2);items=[];for(var i=0;i<5;i++){if(m[i])items.push(m[i]);if(se[i])items.push(se[i])}items=items.slice(0,5)}
+  else items=suggest(kind,cat,5);
+  if(!items.length)return '';BILL=true;
+  var key=kind+':'+(cat||'all');BILLKEY=key;S.billIdx=S.billIdx||{};var cur=Math.min(S.billIdx[key]||0,items.length-1);
+  wantBillInfo(items[cur].kind,items[cur].x);
+  var h='<section class="bill" data-bill="'+esc(key)+'"><span class="bg" style="background-image:url(\''+esc(imgOf(items[cur].kind,items[cur].x))+'\')"></span><div class="bslides">';
+  items.forEach(function(o){
+    var kd=o.kind,x=o.x,id=x.stream_id||x.series_id,k=kd+':'+id,img=imgOf(kd,x),p=kd==='movie'?progressOf('movie:'+id):USER.prog['series:'+id];
+    h+='<div class="bslide" data-k="'+k+'" data-img="'+esc(img)+'"><button type="button" class="card" data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
+      '<div class="info"><div class="tags">'+billTags(kd,x)+'</div>'+
+      '<div class="acts">'+(kd==='movie'?'<button type="button" class="btn" data-playmovie="'+esc(id)+'">'+IC.play+(p&&!p.done&&p.pos?'Reprendre':'Lecture')+'</button>':'<button type="button" class="btn" data-open="'+k+'">'+IC.play+'Regarder</button>')+
+      '<button type="button" class="btn ghost" data-fav="'+k+'">'+(isFav(kd,id)?IC.check+'Ma liste':IC.plus+'Ma liste')+'</button></div></div></div>';
+  });
+  h+='</div>'+(items.length>1?'<div class="bdots">'+items.map(function(o,i){return '<button type="button" data-bdot="'+i+'" aria-label="Suggestion '+(i+1)+'"'+(i===cur?' aria-current="true"':'')+'></button>'}).join('')+'</div>':'')+'</section>';
+  return h;
+}
+/* keep the carousel where it was across re-renders, follow swipes, advance by itself */
+function billSync(){
+  var b=document.querySelector('.bill[data-bill]');if(!b)return;var sl=b.querySelector('.bslides');if(!sl)return;
+  var i=(S.billIdx||{})[b.getAttribute('data-bill')]||0;sl.style.scrollBehavior='auto';sl.scrollLeft=i*sl.clientWidth;sl.style.scrollBehavior='';
+}
+function billOnScroll(sl){
+  var b=sl.closest('.bill'),key=b.getAttribute('data-bill'),i=Math.round(sl.scrollLeft/Math.max(1,sl.clientWidth)),slides=sl.children;
+  if(!slides[i]||(S.billIdx[key]||0)===i)return;
+  S.billIdx[key]=i;
+  b.querySelector('.bg').style.backgroundImage='url("'+slides[i].getAttribute('data-img').replace(/"/g,'%22')+'")';
+  [].forEach.call(b.querySelectorAll('[data-bdot]'),function(d,j){if(j===i)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current')});
+  var k=slides[i].getAttribute('data-k').split(':'),x=byId(k[0],k[1]);if(x)wantBillInfo(k[0],x);
+}
+document.addEventListener('scroll',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('bslides'))billOnScroll(t)},true);
+var billTouch=0;['touchstart','pointerdown','wheel'].forEach(function(ev){document.addEventListener(ev,function(e){if(e.target.closest&&e.target.closest('.bill'))billTouch=Date.now()},{passive:true,capture:true})});
+setInterval(function(){
+  if(document.hidden||sheet||Date.now()-billTouch<12000)return;
+  var sl=document.querySelector('.bslides');if(!sl||sl.children.length<2)return;var r=sl.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return;
+  var i=Math.round(sl.scrollLeft/sl.clientWidth),n=(i+1)%sl.children.length;sl.scrollTo({left:n*sl.clientWidth,behavior:'smooth'});
+},7000);
 function catRows(kind,max){
   var cats=visCats(kind),L=rawList(kind),by={},h='';
   L.forEach(function(x){(by[x.category_id]=by[x.category_id]||[]).push(x)});Object.keys(by).forEach(function(k){by[k]=dedupe(by[k])});
@@ -669,7 +720,7 @@ function top10(){
   return L.map(function(x,i){return '<span class="top10"><span class="rk" aria-hidden="true">'+(i+1)+'</span>'+posterHtml('movie',x)+'</span>'}).join('');
 }
 function viewHome(){
-  var h=billHtml(DATA.vod.length?'movie':'series')+continueRow();
+  var h=billHtml('mix')+continueRow();
   var dls=Object.keys(USER.downloads||{}).filter(function(k){return USER.downloads[k].status==='done'});
   if(dls.length)h+=rowHtml('Téléchargés',dls.map(function(k){var d=USER.downloads[k];return '<button type="button" class="poster labeled" data-dlplay="'+esc(k)+'"><span class="art"><span class="ph">'+esc(d.title)+'</span>'+(d.icon?'<img loading="lazy" src="'+esc(d.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span class="t">'+esc(d.title)+'</span></button>'}).join(''),'<button type="button" class="more" data-tab="favs">Gérer</button>');
   var rec=USER.recent.map(function(id){return byId('live',id)}).filter(Boolean).slice(0,4);
@@ -762,7 +813,8 @@ function viewGrid(kind){
       catRows(kind,40)+(!all.length?'<div class="empty"><p>'+(hidCount(kind)?'Tous les groupes sont masqués. Touche « Filtrer » pour en réafficher.':'Rien pour l\'instant dans ce compte.')+'</p></div>':'');
   }
   var L=filtered(kind,S[catKey]),key=kind+':'+S[catKey],pg=pageOf(L,key,60);
-  var h='<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div><section class="sec" style="margin-top:12px">'+catsHtml(kind,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
+  var bh=S[catKey]!=='fav'?billHtml(kind,S[catKey]):'';
+  var h=(bh||'<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div>')+'<section class="sec" style="margin-top:12px">'+catsHtml(kind,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
   pg.items.forEach(function(x){h+=posterHtml(kind,x,{rate:true,fresh:true,prog:kind==='movie'?progressOf('movie:'+x.stream_id):null})});
   return h+'</div>'+(pg.more?moreHtml(key):'')+(!L.length?'<div class="empty"><p>'+(S[catKey]==='fav'?'Ajoute des titres à ta liste depuis leur fiche.':'Rien dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
@@ -821,7 +873,7 @@ function render(){
   app.innerHTML=topHtml()+'<main class="gut">'+lead+(navigator.onLine===false?'<p class="offline">Hors connexion : les films et épisodes téléchargés restent lisibles (Ma liste).</p>':'')+(S.msg?'<p class="err" style="margin-top:8px">'+esc(S.msg)+'</p>':'')+v+'</main>';
   nav.innerHTML=navHtml();nav.hidden=false;
   if(hadFocus){var q=$('#q');if(q){q.focus();try{q.setSelectionRange(sel,sel)}catch(e){}}}
-  onScroll();observe();
+  onScroll();observe();billSync();
 }
 function onScroll(){var t=$('#topbar');if(t&&t.classList.contains('over'))t.classList.toggle('solid',window.scrollY>40)}
 window.addEventListener('scroll',onScroll,{passive:true});
@@ -997,7 +1049,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-gopen],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-gopen],[data-bdot],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1022,6 +1074,7 @@ document.addEventListener('click',function(e){
   if(d.more){S.limit[d.more]=(S.limit[d.more]||60)+60;var y=window.scrollY;render();window.scrollTo(0,y);return}
   if(t.hasAttribute('data-checkupd')){checkUpdate(true);return}
   if(t.hasAttribute('data-getapk')){openExternal(APK_URL);toast('Téléchargement de la mise à jour…');return}
+  if(d.bdot){var bs=document.querySelector('.bslides');billTouch=Date.now();if(bs)bs.scrollTo({left:(+d.bdot)*bs.clientWidth,behavior:'smooth'});return}
   if(d.groups){openSheet({kind:'groups',sec:d.groups,back:sheet&&sheet.kind==='accounts'});return}
   if(d.gopen){sheet.open=sheet.open||{};sheet.open[d.gopen]=!sheet.open[d.gopen];renderSheet();return}
   if(d.gall){var gk=sheet.sec;USER.hidden=USER.hidden||{};USER.hidden[gk]={};USER.hiddenCats=USER.hiddenCats||{};USER.hiddenCats[gk]={};if(d.gall==='0')groupsOf(gk).forEach(function(g){USER.hidden[gk][g.name]=1});groupsChanged(gk);return}
