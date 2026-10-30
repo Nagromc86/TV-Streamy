@@ -22,9 +22,9 @@ for c, L in names.items():
                      'epg_channel_id': nm.lower().replace(' ', '') + '.fr', 'added': str(NOW - n * 3600), 'category_id': c,
                      'tv_archive': 0, 'direct_source': '', 'tv_archive_duration': 0})
         n += 1
-VOD_CATS = [{'category_id': '10', 'category_name': 'Films | Action', 'parent_id': 0},
-            {'category_id': '11', 'category_name': 'Films | Comédie', 'parent_id': 0},
-            {'category_id': '12', 'category_name': 'Films | Animation', 'parent_id': 0}]
+VOD_CATS = [{'category_id': '10', 'category_name': 'FR ★ Action', 'parent_id': 0},
+            {'category_id': '11', 'category_name': 'FR ★ Comédie', 'parent_id': 0},
+            {'category_id': '12', 'category_name': 'AR ★ Animation', 'parent_id': 0}]
 titles = ['Le Dernier Convoi', 'Nuit Blanche à Lyon', 'Les Brigands du Sud', 'Opération Sirocco', 'Mon Voisin le Pirate',
           'La Grande Évasion du Lundi', 'Comète', 'Le Jardin des Robots', 'Petit Renard', 'Vents Contraires', 'L\'Échappée',
           'Code Azur', 'Les Vacances de Mamie', 'Tempête sur Brest', 'Le Mystère du Phare']
@@ -34,8 +34,8 @@ for i, t in enumerate(titles):
                 'rating': str(round(5.5 + (i * 0.37) % 3.5, 1)), 'rating_5based': 3.5, 'added': str(NOW - i * 86400),
                 'category_id': VOD_CATS[i % 3]['category_id'], 'container_extension': 'mp4' if i % 2 else 'mkv',
                 'custom_sid': '', 'direct_source': ''})
-SER_CATS = [{'category_id': '20', 'category_name': 'Séries | Drame', 'parent_id': 0},
-            {'category_id': '21', 'category_name': 'Séries | Policier', 'parent_id': 0}]
+SER_CATS = [{'category_id': '20', 'category_name': 'FR ★ Drame', 'parent_id': 0},
+            {'category_id': '21', 'category_name': 'MA ✪ Policier', 'parent_id': 0}]
 stitles = ['Les Gardiens du Port', 'Brigade Nord', 'Saison des Pluies', 'La Ferme d\'en Haut', 'Code Rouge']
 SERIES = [{'num': i + 1, 'name': t, 'series_id': 7000 + i, 'cover': 'http://localhost:8899/img/%d.svg' % (7000 + i), 'plot': 'Une série de test numéro %d.' % (i + 1),
            'cast': 'Acteur A, Actrice B', 'director': 'Réal C', 'genre': ['Drame', 'Policier'][i % 2], 'releaseDate': '20%02d-09-01' % (15 + i),
@@ -43,6 +43,9 @@ SERIES = [{'num': i + 1, 'name': t, 'series_id': 7000 + i, 'cover': 'http://loca
            'youtube_trailer': '', 'episode_run_time': '45', 'category_id': SER_CATS[i % 2]['category_id']} for i, t in enumerate(stitles)]
 # like some real providers: the same series listed twice (here in both categories)
 SERIES.append(dict(SERIES[0], category_id='21'))
+# other language versions of the same titles
+SERIES.append(dict(SERIES[1], series_id=7100, name='VOSTFR ★ Brigade Nord'))
+VOD.append(dict(VOD[6], stream_id=5100, name='VOSTFR | Comète (2016) [4K]'))
 
 def b64(s):
     return base64.b64encode(s.encode()).decode()

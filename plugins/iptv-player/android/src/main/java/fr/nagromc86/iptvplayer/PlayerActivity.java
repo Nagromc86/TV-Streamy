@@ -16,6 +16,9 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem;
@@ -46,6 +49,10 @@ public class PlayerActivity extends Activity {
     static final String EXTRA_START_MS = "startMs";
     static final String EXTRA_LIVE = "live";
     static final String EXTRA_USER_AGENT = "userAgent";
+    static final String EXTRA_SUB_MODE = "subMode";
+    static final String EXTRA_SUB_URLS = "subUrls";
+    static final String EXTRA_SUB_LABELS = "subLabels";
+    static final String EXTRA_SUB_LANGS = "subLangs";
 
     static final String RESULT_POSITION = "positionMs";
     static final String RESULT_DURATION = "durationMs";
@@ -62,6 +69,8 @@ public class PlayerActivity extends Activity {
     private String lastError;
     private boolean finishing;
     private boolean tracksChecked;
+    private String subMode;
+    private List<MediaItem.SubtitleConfiguration> extraSubs = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,6 +82,25 @@ public class PlayerActivity extends Activity {
         fallbackUrl = in.getStringExtra(EXTRA_FALLBACK_URL);
         live = in.getBooleanExtra(EXTRA_LIVE, false);
         long startMs = in.getLongExtra(EXTRA_START_MS, 0L);
+        subMode = in.getStringExtra(EXTRA_SUB_MODE);
+        if (subMode == null) {
+            subMode = "auto";
+        }
+        String[] subUrls = in.getStringArrayExtra(EXTRA_SUB_URLS);
+        String[] subLabels = in.getStringArrayExtra(EXTRA_SUB_LABELS);
+        String[] subLangs = in.getStringArrayExtra(EXTRA_SUB_LANGS);
+        if (subUrls != null) {
+            for (int i = 0; i < subUrls.length; i++) {
+                if (TextUtils.isEmpty(subUrls[i])) {
+                    continue;
+                }
+                extraSubs.add(new MediaItem.SubtitleConfiguration.Builder(Uri.parse(subUrls[i]))
+                        .setMimeType(MimeTypes.APPLICATION_SUBRIP)
+                        .setLanguage(subLangs != null && i < subLangs.length ? subLangs[i] : "fr")
+                        .setLabel(subLabels != null && i < subLabels.length ? subLabels[i] : "Sous-titres")
+                        .build());
+            }
+        }
         String userAgent = in.getStringExtra(EXTRA_USER_AGENT);
         if (TextUtils.isEmpty(userAgent)) {
             userAgent = "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0";
@@ -109,6 +137,7 @@ public class PlayerActivity extends Activity {
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                 .setPreferredAudioLanguage("fr")
                 .setPreferredTextLanguage("fr")
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, "never".equals(subMode))
                 .build());
         playerView.setPlayer(player);
 
@@ -128,6 +157,15 @@ public class PlayerActivity extends Activity {
                     return;
                 }
                 tracksChecked = true;
+                if ("auto".equals(subMode) && audioIsFrench(tracks)) {
+                    // French audio: keep subtitles available in CC but don't show them
+                    player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build());
+                    return;
+                }
+                if ("never".equals(subMode)) {
+                    return;
+                }
                 String msg;
                 if (!tracks.containsType(C.TRACK_TYPE_TEXT)) {
                     msg = "Pas de sous-titres dans cette vidéo";
@@ -165,6 +203,22 @@ public class PlayerActivity extends Activity {
         player.setPlayWhenReady(true);
     }
 
+    private static boolean audioIsFrench(Tracks tracks) {
+        for (Tracks.Group g : tracks.getGroups()) {
+            if (g.getType() != C.TRACK_TYPE_AUDIO || !g.isSelected()) {
+                continue;
+            }
+            for (int i = 0; i < g.length; i++) {
+                if (!g.isTrackSelected(i)) {
+                    continue;
+                }
+                String lang = g.getTrackFormat(i).language;
+                return lang != null && (lang.startsWith("fr") || lang.equals("fre"));
+            }
+        }
+        return false;
+    }
+
     private static boolean hasFrenchText(Tracks tracks) {
         for (Tracks.Group g : tracks.getGroups()) {
             if (g.getType() != C.TRACK_TYPE_TEXT) {
@@ -184,6 +238,9 @@ public class PlayerActivity extends Activity {
         MediaItem.Builder b = new MediaItem.Builder().setUri(Uri.parse(url));
         if (url != null && url.toLowerCase().contains(".m3u8")) {
             b.setMimeType(MimeTypes.APPLICATION_M3U8);
+        }
+        if (!extraSubs.isEmpty()) {
+            b.setSubtitleConfigurations(extraSubs);
         }
         if (!TextUtils.isEmpty(title)) {
             b.setMediaMetadata(new MediaMetadata.Builder().setTitle(title).build());

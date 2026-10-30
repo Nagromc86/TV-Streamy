@@ -43,6 +43,22 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_START_MS, call.getData().optLong("startMs", 0L));
         intent.putExtra(PlayerActivity.EXTRA_LIVE, call.getBoolean("live", false));
         intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", ""));
+        intent.putExtra(PlayerActivity.EXTRA_SUB_MODE, call.getString("subMode", "auto"));
+        JSArray subs = call.getArray("subtitles");
+        if (subs != null && subs.length() > 0) {
+            String[] urls = new String[subs.length()];
+            String[] labels = new String[subs.length()];
+            String[] langs = new String[subs.length()];
+            for (int i = 0; i < subs.length(); i++) {
+                org.json.JSONObject o = subs.optJSONObject(i);
+                urls[i] = o == null ? "" : o.optString("url", "");
+                labels[i] = o == null ? "" : o.optString("label", "Sous-titres");
+                langs[i] = o == null ? "" : o.optString("lang", "fr");
+            }
+            intent.putExtra(PlayerActivity.EXTRA_SUB_URLS, urls);
+            intent.putExtra(PlayerActivity.EXTRA_SUB_LABELS, labels);
+            intent.putExtra(PlayerActivity.EXTRA_SUB_LANGS, langs);
+        }
         startActivityForResult(call, intent, "onPlayerClosed");
     }
 
