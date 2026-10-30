@@ -261,7 +261,7 @@ var IC={
 var S={accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
 var DATA=null;      /* catalogue of the active account */
 var USER={favs:{},prog:{},recent:[],downloads:{}};
-var PREFS={allowMobile:false,subMode:'auto',os:null};  /* per-account personal data */
+var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:''};  /* per-account personal data */
 var sheet=null,epgCache={},epgQ=[],epgBusy=0;
 
 /* ---------- helpers ---------- */
@@ -635,17 +635,78 @@ function paintTop(){var t=$('#topbar');if(!t)return;var w=document.createElement
 var billInfo={},BILL=false;
 /* billboard: 5 suggestions, swipeable, renewed every day.
    Picks well-rated recent titles with artwork, skips what was already watched, mixes categories. */
-function suggest(kind,cat,n){
+/* ---------- what to suggest: this week's trends in France (TMDB) + best rated ---------- */
+function rate(x){var r=parseFloat(x.rating)||0;return r>10?r/10:r}
+function added(x){return +(x.added||x.last_modified)||0}
+var TREND=null,trendLoading=false;
+function tmdbReq(path){
+  var k=PREFS.tmdb,bearer=k.length>40,u='https://api.themoviedb.org/3'+path+(path.indexOf('?')<0?'?':'&')+'language=fr-FR&region=FR'+(bearer?'':'&api_key='+encodeURIComponent(k));
+  return withTimeout(fetch(u,{headers:bearer?{'Authorization':'Bearer '+k,'Accept':'application/json'}:{'Accept':'application/json'}}),15000).then(function(r){
+    if(r.status===401)throw new Error('clé TMDB refusée');if(!r.ok)throw new Error('HTTP '+r.status);return r.json()});
+}
+/* once a day: trending films and series of the week (3 pages each = 60 titles) */
+function loadTrends(force){
+  if(!PREFS.tmdb||trendLoading)return Promise.resolve(TREND);
+  var day=new Date().toDateString();
+  return kget('trend').then(function(c){
+    if(c&&c.day===day&&!force){TREND=c;return c}
+    if(navigator.onLine===false){TREND=c||null;return TREND}
+    trendLoading=true;
+    var pages=function(kind){return Promise.all([1,2,3].map(function(pg){return tmdbReq('/trending/'+kind+'/week?page='+pg).then(function(r){return r.results||[]},function(e){if(pg===1)throw e;return []})})).then(function(a){return [].concat.apply([],a).map(function(t){
+      return {id:t.id,t:[t.title||t.name,t.original_title||t.original_name].filter(Boolean),y:String(t.release_date||t.first_air_date||'').slice(0,4),v:t.vote_average||0,n:t.vote_count||0}})})};
+    return Promise.all([pages('movie'),pages('tv')]).then(function(r){TREND={day:day,movie:r[0],tv:r[1]};kset('trend',TREND);return TREND});
+  }).catch(function(e){if(force)throw e;return TREND}).then(function(t){trendLoading=false;return t},function(e){trendLoading=false;throw e});
+}
+/* match TMDB titles with the provider's catalogue: by TMDB id when the provider gives it, else by title (+ year) */
+var TIX=new WeakMap();
+function trendIndex(kind){
+  var L=visList(kind),ix=TIX.get(L);if(ix)return ix;
+  ix={id:{},key:{}};
+  L.forEach(function(x){var tid=x.tmdb||x.tmdb_id;if(tid)ix.id[tid]=ix.id[tid]||x;var k=verParts(x.name).key;if(k.length>1)(ix.key[k]=ix.key[k]||[]).push(x)});
+  TIX.set(L,ix);return ix;
+}
+function trendingIn(kind,cat){
+  if(!TREND)return [];
+  var T=kind==='movie'?TREND.movie:TREND.tv,ix=trendIndex(kind),out=[],seen={};
+  (T||[]).forEach(function(t,rank){
+    var c=ix.id[t.id]?[ix.id[t.id]]:[];
+    if(!c.length)t.t.forEach(function(name){var k=verParts(name).key;(ix.key[k]||[]).forEach(function(x){var y=year(x.releaseDate||x.name);if(!y||!t.y||y===t.y)c.push(x)})});
+    if(cat)c=c.filter(function(x){return String(x.category_id)===String(cat)});
+    /* prefer a French version when several versions of the title exist */
+    c.sort(function(a,b){var fa=/^\s*\[?(fr|vf|vff|multi)\b/i.test(a.name)?0:1,fb=/^\s*\[?(fr|vf|vff|multi)\b/i.test(b.name)?0:1;return fa-fb});
+    var x=c[0];if(!x)return;var id=x.stream_id||x.series_id;if(seen[id])return;seen[id]=1;
+    out.push({kind:kind,x:x,rank:rank+1,v:t.v});
+  });
+  return out;
+}
+function watched(kind,x){var p=kind==='movie'?USER.prog['movie:'+x.stream_id]:null;return !!(p&&p.done)}
+function bestRated(kind,cat,n,skip){
   var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind);
-  L=L.filter(function(x){if(!imgOf(kind,x))return false;var p=kind==='movie'?USER.prog['movie:'+x.stream_id]:null;return !(p&&p.done)});
-  if(!L.length)return [];
-  var now=Date.now()/1000;
-  var sc=function(x){var r=parseFloat(x.rating)||0,t=+(x.added||x.last_modified)||0,age=t?(now-t)/86400:999;return (r>10?r/10:r)+(age<30?2:age<120?1:0)};
-  var pool=L.map(function(x){return {x:x,s:sc(x)}}).sort(function(a,b){return b.s-a.s}).slice(0,Math.max(30,n*6)).map(function(o){return o.x});
-  var day=Math.floor(Date.now()/864e5),out=[],perCat={},start=(day*7)%pool.length;
-  for(var i=0;i<pool.length&&out.length<n;i++){var x=pool[(start+i)%pool.length];if(!cat&&(perCat[x.category_id]||0)>=2)continue;perCat[x.category_id]=(perCat[x.category_id]||0)+1;out.push(x)}
-  for(i=0;i<pool.length&&out.length<n;i++){if(out.indexOf(pool[i])<0)out.push(pool[i])}
-  return out.map(function(x){return {kind:kind,x:x}});
+  var yNow=new Date().getFullYear();
+  return L.filter(function(x){return imgOf(kind,x)&&rate(x)>0&&rate(x)<=9.6&&!skip[x.stream_id||x.series_id]&&!watched(kind,x)})
+    .map(function(x){var y=+year(x.releaseDate||x.name)||0;return {x:x,s:rate(x)+(y&&yNow-y<=3?0.4:0)}})
+    .sort(function(a,b){return b.s-a.s||added(b.x)-added(a.x)}).slice(0,n).map(function(o){return {kind:kind,x:o.x,best:true}});
+}
+function recentGood(kind,cat,n,skip){
+  var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind),now=Date.now()/1000;
+  var R=L.filter(function(x){return imgOf(kind,x)&&!skip[x.stream_id||x.series_id]&&!watched(kind,x)&&added(x)&&now-added(x)<45*86400});
+  return R.sort(function(a,b){return rate(b)-rate(a)||added(b)-added(a)}).slice(0,n).map(function(x){return {kind:kind,x:x,fresh:true}});
+}
+/* 3 trends (or recent well-rated additions without TMDB) + best rated, 5 in total */
+function suggest(kind,cat,n){
+  var skip={},out=[];
+  var add=function(list,max){list.forEach(function(o){if(out.length>=n||max<=0)return;var id=o.x.stream_id||o.x.series_id,vk='v:'+verParts(o.x.name).key;if(skip[id]||skip[vk]||watched(o.kind,o.x)||!imgOf(o.kind,o.x))return;skip[id]=1;skip[vk]=1;out.push(o);max--})};
+  add(trendingIn(kind,cat),3);
+  if(!out.length)add(recentGood(kind,cat,3,skip),3);
+  add(bestRated(kind,cat,n,skip),n-out.length);
+  if(out.length<n)add(trendingIn(kind,cat).concat(recentGood(kind,cat,n,skip)),n-out.length);
+  return out;
+}
+function billBadge(o){
+  if(o.rank){var w=o.kind==='movie'?'films':'séries';return '<span class="badge">'+(o.rank===1?'N°1 des '+w+' cette semaine':'Tendance '+w+' · N°'+o.rank)+'</span>'}
+  if(o.best)return '<span class="badge" style="background:var(--gold);color:#111">Parmi les mieux notés</span>';
+  if(o.fresh)return '<span class="badge" style="background:#fff;color:#111">Nouveauté</span>';
+  return '';
 }
 function wantBillInfo(kind,x){
   var id=x.stream_id||x.series_id,k=kind+':'+id;if(billInfo[k]||navigator.onLine===false)return;billInfo[k]={};
@@ -656,12 +717,17 @@ function wantBillInfo(kind,x){
 function billTags(kind,x){
   var inf=billInfo[kind+':'+(x.stream_id||x.series_id)]||{},r=parseFloat(x.rating),yr=year(inf.releasedate||inf.releaseDate||x.releaseDate||x.name);
   var genre=String(inf.genre||x.genre||'').split(/[,\/]/).map(function(g){return g.trim()}).filter(Boolean).slice(0,2);
-  return (r>0?'<span>★ '+(r>10?r/10:r).toFixed(1)+'</span>':'')+genre.map(function(g){return '<span>'+esc(g)+'</span>'}).join('')+(yr?'<span>'+yr+'</span>':'');
+  return (r>0?'<span>★ '+rate(x).toFixed(1)+'</span>':'')+genre.map(function(g){return '<span>'+esc(g)+'</span>'}).join('')+(yr?'<span>'+yr+'</span>':'');
 }
 var BILLKEY='';
 function billHtml(kind,cat){
   var items;
-  if(kind==='mix'){var m=suggest('movie',null,3),se=suggest('series',null,2);items=[];for(var i=0;i<5;i++){if(m[i])items.push(m[i]);if(se[i])items.push(se[i])}items=items.slice(0,5)}
+  if(kind==='mix'){
+    /* home: the 5 strongest picks among films and series, trends first (by rank), then best rated */
+    var m=suggest('movie',null,5),se=suggest('series',null,5),all=m.concat(se);
+    var tr=all.filter(function(o){return o.rank}).sort(function(a,b){return a.rank-b.rank}),rest=all.filter(function(o){return !o.rank}).sort(function(a,b){return rate(b.x)-rate(a.x)});
+    items=tr.slice(0,3).concat(rest).slice(0,5);if(items.length<5)items=items.concat(tr.slice(3)).slice(0,5);
+  }
   else items=suggest(kind,cat,5);
   if(!items.length)return '';BILL=true;
   var key=kind+':'+(cat||'all');BILLKEY=key;S.billIdx=S.billIdx||{};var cur=Math.min(S.billIdx[key]||0,items.length-1);
@@ -670,7 +736,7 @@ function billHtml(kind,cat){
   items.forEach(function(o){
     var kd=o.kind,x=o.x,id=x.stream_id||x.series_id,k=kd+':'+id,img=imgOf(kd,x),p=kd==='movie'?progressOf('movie:'+id):USER.prog['series:'+id];
     h+='<div class="bslide" data-k="'+k+'" data-img="'+esc(img)+'"><button type="button" class="card" data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
-      '<div class="info"><div class="tags">'+billTags(kd,x)+'</div>'+
+      '<div class="info">'+(billBadge(o)?'<div style="margin-bottom:8px">'+billBadge(o)+'</div>':'')+'<div class="tags">'+billTags(kd,x)+'</div>'+
       '<div class="acts">'+(kd==='movie'?'<button type="button" class="btn" data-playmovie="'+esc(id)+'">'+IC.play+(p&&!p.done&&p.pos?'Reprendre':'Lecture')+'</button>':'<button type="button" class="btn" data-open="'+k+'">'+IC.play+'Regarder</button>')+
       '<button type="button" class="btn ghost" data-fav="'+k+'">'+(isFav(kd,id)?IC.check+'Ma liste':IC.plus+'Ma liste')+'</button></div></div></div>';
   });
@@ -916,6 +982,10 @@ function renderSheet(){
     }
     if(NATIVE)h+='<label class="chk"><input type="checkbox" id="allowMobile"'+(PREFS.allowMobile?' checked':'')+'><span>Télécharger aussi en données mobiles (4G/5G)<br><span class="hint" style="font-weight:400">Sinon, les téléchargements attendent le Wi-Fi.</span></span></label>';
     var o=PREFS.os||{};
+    h+='<h3 style="margin:8px 0 0;font-size:1rem">Suggestions</h3><form class="form" id="tmdbform"><p class="hint" style="margin:0">Pour suggérer les vraies tendances de la semaine en France, l\'appli utilise TMDB (base de films et séries, compte gratuit). Sans clé : nouveautés et mieux notés de ton catalogue.</p>'+
+      '<div class="fld"><label for="tmdb-key">Clé API TMDB</label><input id="tmdb-key" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(PREFS.tmdb||'')+'" placeholder="Clé API ou jeton de lecture"></div>'+
+      '<p class="err" id="tmdberr" hidden></p><p class="okmsg" id="tmdbok"'+(PREFS.tmdb&&TREND?'':' hidden')+'>'+(TREND?esc('Tendances chargées : '+(TREND.movie||[]).length+' films, '+(TREND.tv||[]).length+' séries.'):'')+'</p>'+
+      '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>';
     h+='<h3 style="margin:8px 0 0;font-size:1rem">Sous-titres</h3>'+
       '<div class="fld"><label for="subMode">Afficher les sous-titres français</label><select id="subMode"><option value="auto"'+(PREFS.subMode==='auto'||!PREFS.subMode?' selected':'')+'>Seulement si la vidéo n\'est pas en français</option><option value="always"'+(PREFS.subMode==='always'?' selected':'')+'>Toujours</option><option value="never"'+(PREFS.subMode==='never'?' selected':'')+'>Jamais (activables avec CC)</option></select></div>'+
       '<form class="form" id="osform"><p class="hint" style="margin:0">Quand une vidéo n\'a pas de sous-titres, l\'appli peut les chercher sur OpenSubtitles (compte gratuit, environ 20 par jour). Ils sont gardés sur le téléphone, aussi pour les téléchargements.</p>'+
@@ -1105,7 +1175,13 @@ document.addEventListener('change',function(e){
   if(e.target.hasAttribute&&e.target.hasAttribute('data-hcat')&&sheet&&sheet.kind==='groups'){var ci=e.target.getAttribute('data-hcat');USER.hiddenCats=USER.hiddenCats||{};var hcs=USER.hiddenCats[sheet.sec]=USER.hiddenCats[sheet.sec]||{};if(e.target.checked)delete hcs[ci];else hcs[ci]=1;groupsChanged(sheet.sec);return}
   if(e.target.hasAttribute&&e.target.hasAttribute('data-grp')&&sheet&&sheet.kind==='groups'){var g=e.target.getAttribute('data-grp');USER.hidden=USER.hidden||{};var hs=USER.hidden[sheet.sec]=USER.hidden[sheet.sec]||{};if(e.target.checked)delete hs[g];else hs[g]=1;groupsChanged(sheet.sec);return}if(e.target.id==='subMode'){PREFS.subMode=e.target.value;kset('prefs',PREFS);toast('Réglage des sous-titres enregistré.')}if(e.target.id==='allowMobile'){PREFS.allowMobile=e.target.checked;kset('prefs',PREFS);toast(PREFS.allowMobile?'Les téléchargements utiliseront aussi les données mobiles.':'Les téléchargements attendront le Wi-Fi.')}});
 window.addEventListener('online',function(){render()});window.addEventListener('offline',function(){render()});
-document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target)});
+document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target);if(e.target.id==='tmdbform')submitTmdb(e.target)});
+function submitTmdb(f){
+  var k=$('#tmdb-key').value.trim(),err=$('#tmdberr'),ok=$('#tmdbok');err.hidden=true;ok.hidden=true;PREFS.tmdb=k;kset('prefs',PREFS);TREND=null;kdel('trend');
+  if(!k){ok.textContent='TMDB désactivé : suggestions à partir de ton catalogue.';ok.hidden=false;softRender();return}
+  var b=f.querySelector('[type=submit]');b.disabled=true;b.textContent='Test…';
+  loadTrends(true).then(function(t){var mm=trendingIn('movie').length,ss=trendingIn('series').length;ok.textContent='Tendances chargées. Trouvées dans ton catalogue : '+mm+' film'+(mm>1?'s':'')+' et '+ss+' série'+(ss>1?'s':'')+'.';ok.hidden=false;var y=window.scrollY;render();window.scrollTo(0,y)}).catch(function(e){err.textContent='TMDB : '+errText(e);err.hidden=false}).then(function(){b.disabled=false;b.textContent='Enregistrer et tester'});
+}
 function submitOs(f){
   var k=$('#os-key').value.trim(),u=$('#os-user').value.trim(),pw=$('#os-pass').value,err=$('#oserr'),ok=$('#osok');err.hidden=true;ok.hidden=true;
   if(!k){PREFS.os=null;kset('prefs',PREFS);ok.textContent='OpenSubtitles désactivé.';ok.hidden=false;return}
@@ -1135,6 +1211,8 @@ setInterval(dailyRefresh,60*60*1000);
 window.addEventListener('online',function(){dailyRefresh()});
 
 /* ---------- start ---------- */
+function refreshTrends(){loadTrends(false).then(function(t){if(t&&DATA&&!sheet){softRender()}})}
+setTimeout(refreshTrends,1200);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')refreshTrends()});
 if(NATIVE)setTimeout(function(){checkUpdate(false)},5000);
 render();
 kget('prefs').then(function(p){if(p)PREFS=Object.assign(PREFS,p)});
