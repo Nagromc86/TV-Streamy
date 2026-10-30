@@ -59,8 +59,20 @@ public class PlayerPlugin extends Plugin {
             intent.putExtra(PlayerActivity.EXTRA_SUB_LABELS, labels);
             intent.putExtra(PlayerActivity.EXTRA_SUB_LANGS, langs);
         }
+        PlayerActivity open = PlayerActivity.current;
+        if (open != null && !open.isFinishing()) {
+            // a video is still playing in its floating window: close it first (its position is saved),
+            // then start this one once the first result has come back
+            pendingCall = call;
+            pendingIntent = intent;
+            open.closeForNewVideo();
+            return;
+        }
         startActivityForResult(call, intent, "onPlayerClosed");
     }
+
+    private PluginCall pendingCall;
+    private Intent pendingIntent;
 
     /* ---------- offline downloads (films and episodes) ---------- */
 
@@ -156,6 +168,7 @@ public class PlayerPlugin extends Plugin {
     @ActivityCallback
     private void onPlayerClosed(PluginCall call, ActivityResult result) {
         if (call == null) {
+            launchPending();
             return;
         }
         JSObject ret = new JSObject();
@@ -170,5 +183,16 @@ public class PlayerPlugin extends Plugin {
             }
         }
         call.resolve(ret);
+        launchPending();
+    }
+
+    private void launchPending() {
+        if (pendingIntent != null) {
+            PluginCall next = pendingCall;
+            Intent intent = pendingIntent;
+            pendingCall = null;
+            pendingIntent = null;
+            startActivityForResult(next, intent, "onPlayerClosed");
+        }
     }
 }

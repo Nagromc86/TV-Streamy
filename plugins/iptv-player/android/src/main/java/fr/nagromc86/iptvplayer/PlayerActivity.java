@@ -1,6 +1,11 @@
 package fr.nagromc86.iptvplayer;
 
 import android.app.Activity;
+import android.app.PictureInPictureParams;
+import android.content.res.Configuration;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
+import android.util.Rational;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
@@ -27,6 +32,7 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.common.Tracks;
+import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -59,7 +65,12 @@ public class PlayerActivity extends Activity {
     static final String RESULT_ENDED = "ended";
     static final String RESULT_ERROR = "error";
 
+    /** The player currently open (full screen or in its floating window). */
+    static PlayerActivity current;
+
     private ExoPlayer player;
+    private TextView pipButton;
+    private boolean inPip;
     private PlayerView playerView;
     private LinearLayout titleBox;
     private boolean live;
@@ -115,11 +126,19 @@ public class PlayerActivity extends Activity {
         root.addView(playerView);
         titleBox = buildTitle(in.getStringExtra(EXTRA_TITLE), in.getStringExtra(EXTRA_SUBTITLE));
         root.addView(titleBox);
+        pipButton = buildPipButton();
+        if (pipButton != null) {
+            root.addView(pipButton);
+        }
         setContentView(root);
+        current = this;
         hideSystemUi();
 
         playerView.setControllerVisibilityListener((PlayerView.ControllerVisibilityListener) visibility -> {
-            titleBox.setVisibility(visibility);
+            titleBox.setVisibility(inPip ? View.GONE : visibility);
+            if (pipButton != null) {
+                pipButton.setVisibility(inPip ? View.GONE : visibility);
+            }
             if (visibility != View.VISIBLE) {
                 hideSystemUi();
             }
@@ -148,6 +167,16 @@ public class PlayerActivity extends Activity {
                     ended = true;
                     finishWithResult();
                 }
+            }
+
+            @Override
+            public void onVideoSizeChanged(VideoSize size) {
+                updatePipParams();
+            }
+
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                updatePipParams();
             }
 
             @Override
@@ -201,6 +230,111 @@ public class PlayerActivity extends Activity {
         }
         player.prepare();
         player.setPlayWhenReady(true);
+    }
+
+    /* ---------- floating window (picture-in-picture) ---------- */
+
+    private boolean pipSupported() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE);
+    }
+
+    private PictureInPictureParams buildPipParams() {
+        PictureInPictureParams.Builder b = new PictureInPictureParams.Builder();
+        Rational ratio = new Rational(16, 9);
+        if (player != null) {
+            VideoSize v = player.getVideoSize();
+            if (v.width > 0 && v.height > 0) {
+                float r = v.width * v.pixelWidthHeightRatio / v.height;
+                r = Math.max(1 / 2.39f, Math.min(2.39f, r));
+                ratio = new Rational(Math.round(r * 1000), 1000);
+            }
+        }
+        b.setAspectRatio(ratio);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            b.setAutoEnterEnabled(player != null && player.isPlaying());
+            b.setSeamlessResizeEnabled(true);
+        }
+        return b.build();
+    }
+
+    private void updatePipParams() {
+        if (!pipSupported()) {
+            return;
+        }
+        try {
+            setPictureInPictureParams(buildPipParams());
+        } catch (Exception ignored) {
+            // the system may refuse while the activity is finishing
+        }
+    }
+
+    private void enterPip(boolean fromButton) {
+        if (!pipSupported()) {
+            if (fromButton) {
+                Toast.makeText(this, "Ce téléphone ne permet pas la vidéo en fenêtre", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+        try {
+            enterPictureInPictureMode(buildPipParams());
+        } catch (Exception e) {
+            if (fromButton) {
+                Toast.makeText(this, "Vidéo en fenêtre désactivée : Réglages Android › Applis › TV Streamy › Picture-in-picture", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private TextView buildPipButton() {
+        if (!pipSupported()) {
+            return null;
+        }
+        TextView b = new TextView(this);
+        b.setText("Réduire");
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        b.setPadding(dp(14), dp(8), dp(14), dp(8));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(0x66000000);
+        bg.setStroke(dp(1), 0x99FFFFFF);
+        bg.setCornerRadius(dp(18));
+        b.setBackground(bg);
+        b.setContentDescription("Réduire la vidéo dans une fenêtre");
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
+        lp.setMargins(0, dp(14), dp(20), 0);
+        b.setLayoutParams(lp);
+        b.setOnClickListener(v -> enterPip(true));
+        return b;
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // Android 12+ enters the window by itself (auto-enter); older versions need this
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying() && !finishing) {
+            enterPip(false);
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        inPip = isInPictureInPictureMode;
+        playerView.setUseController(!inPip);
+        if (inPip) {
+            playerView.hideController();
+            titleBox.setVisibility(View.GONE);
+            if (pipButton != null) {
+                pipButton.setVisibility(View.GONE);
+            }
+        } else {
+            hideSystemUi();
+        }
+    }
+
+    /** Close from outside (another video is being started). */
+    void closeForNewVideo() {
+        finishWithResult();
     }
 
     private static boolean audioIsFrench(Tracks tracks) {
@@ -341,6 +475,11 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onStop() {
         super.onStop();
+        if (inPip) {
+            // the floating window was closed: stop and report where we were
+            finishWithResult();
+            return;
+        }
         if (player != null && !isFinishing()) {
             player.pause();
         }
@@ -348,6 +487,9 @@ public class PlayerActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (current == this) {
+            current = null;
+        }
         if (player != null) {
             player.release();
             player = null;
