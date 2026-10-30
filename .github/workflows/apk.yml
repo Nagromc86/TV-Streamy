@@ -1,4 +1,4 @@
-# Construit l'appli Android (APK) à chaque modification et la publie dans les Releases.
+# Construit l'appli Android TV Streamy (APK) à chaque modification et la publie dans les Releases.
 # Lien fixe vers la dernière version : https://github.com/Nagromc86/TV-Streamy/releases/latest/download/tv-streamy.apk
 name: APK Android
 
