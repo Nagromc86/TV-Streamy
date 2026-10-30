@@ -501,6 +501,20 @@ function subAvailHtml(key){
   return a.n?'<span style="color:var(--ok)">ST FR disponibles</span>':'<span>Pas de ST FR sur OpenSubtitles</span>';
 }
 
+/* ---------- app updates: compare with the latest APK published on GitHub ---------- */
+var APK_URL='https://github.com/Nagromc86/TV-Streamy/releases/latest/download/tv-streamy.apk';
+var REL_API='https://api.github.com/repos/Nagromc86/TV-Streamy/releases/latest';
+function checkUpdate(manual){
+  if(navigator.onLine===false){if(manual)toast('Pas de connexion : réessaie plus tard.');return Promise.resolve()}
+  S.updChecking=true;if(manual&&sheet&&sheet.kind==='accounts')renderSheet();
+  return withTimeout(fetch(REL_API,{headers:{'Accept':'application/vnd.github+json'}}),15000).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(r){
+    var m=/\(([^)]+)\)\s*$/.exec(r.name||''),v=m?m[1]:'';
+    if(v&&v!==APP_VERSION&&APP_VERSION.indexOf('@@')<0){S.apkUpdate={v:v,tag:r.tag_name||''};toast('Nouvelle version '+(r.tag_name||v)+' disponible : menu du compte › Télécharger la mise à jour.')}
+    else{S.apkUpdate=null;if(manual)toast('L\'appli est à jour ('+(r.tag_name||APP_VERSION)+').')}
+  }).catch(function(e){if(manual)toast('Impossible de vérifier la mise à jour : '+errText(e))}).then(function(){S.updChecking=false;if(sheet&&sheet.kind==='accounts')renderSheet();paintTop()});
+}
+function openExternal(url){var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},1000)}
+
 /* ---------- playback ---------- */
 function play(o){
   o.subMode=PREFS.subMode||'auto';
@@ -606,7 +620,7 @@ function topHtml(){
   return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span><div class="acc">'+
     (busy?'<span class="upd" title="Mise à jour du catalogue en arrière-plan"><i></i>Mise à jour</span>':'')+
     (a?'<button type="button" class="iconbtn" data-tab="search" aria-label="Rechercher">'+IC.search+'</button>':'')+
-    (a?'<button type="button" class="pill" data-accounts>'+IC.user+'<span>'+esc(a.name)+'</span></button>':'')+'</div></div>'+
+    (a?'<button type="button" class="pill" data-accounts'+(S.apkUpdate?' style="box-shadow:inset 0 0 0 2px var(--accent)" aria-label="Compte · mise à jour disponible"':'')+'>'+IC.user+'<span>'+esc(a.name)+'</span>'+(S.apkUpdate?'<span class="badge" style="padding:1px 5px">MAJ</span>':'')+'</button>':'')+'</div></div>'+
     (S.tab==='search'?'<div class="searchbar"><input id="q" type="search" placeholder="Chaîne, film, série…" value="'+esc(S.q)+'" autocomplete="off"></div>':'')+'</header>';
 }
 function paintTop(){var t=$('#topbar');if(!t)return;var w=document.createElement('div');w.innerHTML=topHtml();var n=w.firstChild;if(t.classList.contains('solid'))n.classList.add('solid');var q=$('#q');if(q&&document.activeElement===q)return;t.replaceWith(n)}
@@ -855,7 +869,10 @@ function renderSheet(){
       '<div class="fld"><label for="os-pass">Mot de passe OpenSubtitles</label><input id="os-pass" type="password" value="'+esc(o.pass||'')+'"></div>'+
       '<p class="err" id="oserr" hidden></p><p class="okmsg" id="osok"'+(o.key&&o.remaining!=null?'':' hidden')+'>'+(o.remaining!=null?esc(o.remaining+' téléchargement'+(o.remaining>1?'s':'')+' restant'+(o.remaining>1?'s':'')+' aujourd\'hui'):'')+'</p>'+
       '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>';
-    h+='<p class="hint">Version de l\'appli : '+esc(APP_VERSION)+'</p><div class="acts"><button type="button" class="btn ghost" data-close>Fermer</button></div></div>';
+    h+='<h3 style="margin:8px 0 0;font-size:1rem">Appli</h3><p class="hint" style="margin:0">Version de l\'appli : '+esc(APP_VERSION)+'</p>'+
+      '<div class="acts"><button type="button" class="btn ghost" data-checkupd'+(S.updChecking?' disabled':'')+'>'+IC.refresh+(S.updChecking?'Recherche…':'Rechercher une mise à jour')+'</button>'+
+      (S.apkUpdate?'<button type="button" class="btn red" data-getapk>'+IC.dl+'Télécharger la mise à jour'+(S.apkUpdate.tag?' ('+esc(S.apkUpdate.tag)+')':'')+'</button><p class="hint" style="margin:0;flex-basis:100%">Ouvre ensuite le fichier tv-streamy.apk pour l\'installer par-dessus : tes comptes et ta liste sont conservés.</p>':'')+'</div>';
+    h+='<div class="acts"><button type="button" class="btn ghost" data-close>Fermer</button></div></div>';
   }else if(sheet.kind==='groups'){
     var gs=groupsOf(sheet.sec),hg=hidG(sheet.sec),unit={live:'chaînes',vod:'films',series:'séries'}[sheet.sec];
     h+='<div class="grab"></div><div class="in gut"><h2>Groupes · '+{live:'TV en direct',vod:'Films',series:'Séries'}[sheet.sec]+'</h2><p class="hint" style="margin:0">Décoche les groupes que tu ne veux plus voir. Ils disparaissent des listes, de l\'accueil, des recommandations et de la recherche. Ta liste et tes reprises restent intactes.</p>'+
@@ -966,7 +983,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -989,6 +1006,8 @@ document.addEventListener('click',function(e){
   if(d.vcat){S.vodCat=d.vcat;if(d.goto)S.tab=d.goto;render();window.scrollTo(0,0);return}
   if(d.scat){S.serCat=d.scat;if(d.goto)S.tab=d.goto;render();window.scrollTo(0,0);return}
   if(d.more){S.limit[d.more]=(S.limit[d.more]||60)+60;var y=window.scrollY;render();window.scrollTo(0,y);return}
+  if(t.hasAttribute('data-checkupd')){checkUpdate(true);return}
+  if(t.hasAttribute('data-getapk')){openExternal(APK_URL);toast('Téléchargement de la mise à jour…');return}
   if(d.groups){openSheet({kind:'groups',sec:d.groups,back:sheet&&sheet.kind==='accounts'});return}
   if(d.gall){var gk=sheet.sec;USER.hidden=USER.hidden||{};USER.hidden[gk]={};if(d.gall==='0')groupsOf(gk).forEach(function(g){USER.hidden[gk][g.name]=1});groupsChanged(gk);return}
   if(t.hasAttribute('data-accounts')){openSheet({kind:'accounts'});return}
@@ -1047,6 +1066,7 @@ setInterval(dailyRefresh,60*60*1000);
 window.addEventListener('online',function(){dailyRefresh()});
 
 /* ---------- start ---------- */
+if(NATIVE)setTimeout(function(){checkUpdate(false)},5000);
 render();
 kget('prefs').then(function(p){if(p)PREFS=Object.assign(PREFS,p)});
 kget('accounts').then(function(r){
