@@ -462,7 +462,7 @@ function pollDownloads(){
     if(active)pollT=setTimeout(pollDownloads,1500);
   },function(){});
 }
-function refreshUi(){if(sheet)renderSheet();if(S.tab==='favs'||S.tab==='home'||S.tab==='movies')render()}
+function refreshUi(){if(sheet)renderSheet();if(S.tab==='favs'||S.tab==='home'||S.tab==='movies'){var y=window.scrollY;render();window.scrollTo(0,y)}}
 function spd(b){return b>=1048576?(b/1048576).toFixed(1).replace('.',',')+' Mo/s':Math.round(b/1024)+' Ko/s'}
 function eta(sec){sec=Math.round(sec);if(sec>=3600)return Math.floor(sec/3600)+' h '+String(Math.floor(sec/60)%60).padStart(2,'0');return Math.max(1,Math.round(sec/60))+' min'}
 function dlLabel(d){
@@ -921,7 +921,7 @@ function top10(){
 function viewHome(){
   var h=billHtml('mix')+continueRow();
   var dls=Object.keys(USER.downloads||{}).filter(function(k){return USER.downloads[k].status==='done'});
-  if(dls.length)h+=rowHtml('Téléchargés',dls.map(function(k){var d=USER.downloads[k];return '<button type="button" class="poster labeled" data-dlplay="'+esc(k)+'"><span class="art"><span class="ph">'+esc(d.title)+'</span>'+(d.icon?'<img loading="lazy" src="'+esc(d.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span class="t">'+esc(d.title)+'</span></button>'}).join(''),'<button type="button" class="more" data-tab="favs">Gérer</button>');
+  if(dls.length)h+=rowHtml('Mes téléchargements',dls.map(function(k){var d=USER.downloads[k];return '<button type="button" class="poster labeled" data-dlplay="'+esc(k)+'"><span class="art"><span class="ph">'+esc(d.title)+'</span>'+(d.icon?'<img loading="lazy" src="'+esc(d.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span class="t">'+esc(d.title)+'</span></button>'}).join(''),'<button type="button" class="more" data-fcat="dl">Mes téléchargements</button>');
   var rec=USER.recent.map(function(id){return byId('live',id)}).filter(Boolean).slice(0,4);
   if(rec.length)h+='<section class="sec"><div class="sech"><h2>Revenir sur une chaîne</h2><button type="button" class="more" data-tab="live">Toutes</button></div><div class="chlist">'+rec.map(chHtml).join('')+'</div></section>';
   var favs=Object.keys(USER.favs).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind!=='live'}).sort(function(a,b){return b.at-a.at}).slice(0,20);
@@ -1018,31 +1018,70 @@ function viewGrid(kind){
   pg.items.forEach(function(x){h+=posterHtml(kind,x,{rate:true,fresh:true,prog:kind==='movie'?progressOf('movie:'+x.stream_id):null})});
   return h+'</div>'+(pg.more?moreHtml(key):'')+(!L.length?'<div class="empty"><p>'+(S[catKey]==='fav'?'Ajoute des titres à ta liste depuis leur fiche.':'Rien dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
-function downloadsHtml(){
-  var rk={running:0,queued:1,pending:1,paused:2,failed:3,done:4};
-  var L=Object.keys(USER.downloads||{}).map(function(k){return Object.assign({k:k},USER.downloads[k])}).sort(function(a,b){var r=(rk[a.status]||0)-(rk[b.status]||0);if(r)return r;return a.status==='done'?b.at-a.at:a.at-b.at});
-  if(!L.length)return '';
-  var h='<section class="sec"><div class="sech"><h2>Téléchargements</h2>'+(freeBytes?'<span class="muted" style="font-size:.8rem">'+size(freeBytes)+' libres</span>':'')+'</div><div>';
-  L.forEach(function(d){
+function dlRowHtml(d){
+  var h='';
     var pc=d.total?Math.floor(d.bytes/d.total*100):0,done=d.status==='done';
     h+='<div class="dlrow"><span class="art">'+(d.icon?'<img loading="lazy" src="'+esc(d.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span style="min-width:0"><b>'+esc(d.title)+'</b><small class="'+(done?'ok':'')+'">'+esc(dlLabel(d))+'</small>'+(!done&&d.status!=='failed'?'<span class="dlbar"><i style="width:'+pc+'%"></i></span>':'')+'</span>'+
       '<span class="dlacts">'+(done?'<button type="button" class="iconbtn" data-dlplay="'+esc(d.k)+'" aria-label="Regarder">'+IC.play+'</button>':
         dlActive(d)?'<button type="button" class="iconbtn" data-dlpause="'+esc(d.k)+'" aria-label="Mettre en pause">'+IC.pause+'</button>':
         '<button type="button" class="iconbtn" data-dlresume="'+esc(d.k)+'" aria-label="'+(d.status==='failed'?'Réessayer':'Reprendre')+'">'+IC.refresh+'</button>')+
       (S.confirmDl===d.k?'<button type="button" class="epdl warn" data-dlrm="'+esc(d.k)+'">Supprimer ?</button>':'<button type="button" class="iconbtn" data-dlask="'+esc(d.k)+'" aria-label="Supprimer">'+IC.x+'</button>')+'</span></div>';
-  });
-  return h+'</div><p class="hint">Les fichiers restent dans l\'appli et se regardent sans connexion. Ils sont supprimés si tu désinstalles l\'appli.</p></section>';
+  return h;
+}
+function dlList(){
+  var rk={running:0,queued:1,pending:1,paused:2,failed:3,done:4};
+  return Object.keys(USER.downloads||{}).map(function(k){return Object.assign({k:k},USER.downloads[k])}).sort(function(a,b){var r=(rk[a.status]||0)-(rk[b.status]||0);if(r)return r;return a.status==='done'?b.at-a.at:a.at-b.at});
+}
+/* "Mes téléchargements": in progress first, then films, then series grouped by series */
+function downloadsHtml(){
+  var L=dlList();
+  if(!L.length)return '<div class="empty" style="margin-top:16px"><p>'+(NATIVE?'Aucun téléchargement. Sur la fiche d\'un film ou d\'une série, touche « Télécharger » pour le regarder ensuite sans connexion (train, avion…).':'Les téléchargements fonctionnent dans l\'appli Android.')+'</p></div>';
+  var act=L.filter(function(d){return d.status!=='done'}),mv=L.filter(function(d){return d.status==='done'&&d.kind==='movie'}),ep=L.filter(function(d){return d.status==='done'&&d.kind!=='movie'});
+  var used=L.filter(function(d){return d.status==='done'}).reduce(function(t,d){return t+(d.total||0)},0);
+  var h='<p class="hint" style="margin:10px 0 0">'+L.filter(function(d){return d.status==='done'}).length+' vidéo'+(L.length>1?'s':'')+' sur le téléphone'+(used?' · '+size(used)+' utilisés':'')+(freeBytes?' · '+size(freeBytes)+' libres':'')+'</p>';
+  if(act.length){h+='<section class="sec"><div class="sech"><h2>En cours</h2><span class="muted" style="font-size:.8rem">'+act.length+' dans la file</span></div><div>';act.forEach(function(d){h+=dlRowHtml(d)});h+='</div></section>'}
+  if(mv.length){h+='<section class="sec"><div class="sech"><h2>Films</h2></div><div>';mv.forEach(function(d){h+=dlRowHtml(d)});h+='</div></section>'}
+  if(ep.length){
+    var by={},order=[];
+    ep.forEach(function(d){var sid=(d.series&&d.series.series_id)||d.title.split(' · ')[0];if(!by[sid]){by[sid]=[];order.push(sid)}by[sid].push(d)});
+    h+='<section class="sec"><div class="sech"><h2>Séries</h2></div><div>';
+    S.dlOpen=S.dlOpen||{};
+    order.forEach(function(sid){
+      var g=by[sid].sort(function(a,b){var ea=a.ep||{},eb=b.ep||{};return (+ea.season||0)-(+eb.season||0)||(+ea.episode_num||0)-(+eb.episode_num||0)}),f=g[0],open=S.dlOpen[sid]||order.length===1;
+      var name=(f.series&&f.series.name)?cleanName(f.series.name):f.title.split(' · ')[0],tot=g.reduce(function(t,d){return t+(d.total||0)},0);
+      h+='<button type="button" class="dlrow" data-dlgroup="'+esc(sid)+'" aria-expanded="'+!!open+'" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;text-align:left;padding:10px 0"><span class="art">'+(f.icon?'<img loading="lazy" src="'+esc(f.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span style="min-width:0"><b>'+esc(name)+'</b><small>'+g.length+' épisode'+(g.length>1?'s':'')+(tot?' · '+size(tot):'')+'</small></span><span class="dlacts"><span class="iconbtn" aria-hidden="true" style="transform:rotate('+(open?'180':'0')+'deg)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></span></button>';
+      if(open){h+='<div style="padding-left:16px">';g.forEach(function(d){h+=dlRowHtml(d)});h+='</div>'}
+    });
+    h+='</div></section>';
+  }
+  return h+'<p class="hint">Les fichiers restent dans l\'appli et se regardent sans connexion. Ils sont supprimés si tu désinstalles l\'appli.</p>';
+}
+/* compact row for the "Tout" view */
+function dlStrip(){
+  var L=dlList();if(!L.length)return '';
+  var act=L.filter(function(d){return d.status!=='done'}).length,done=L.filter(function(d){return d.status==='done'});
+  var seen={},items=done.filter(function(d){var k=d.kind==='movie'?d.k:'s'+((d.series&&d.series.series_id)||d.title);if(seen[k])return false;seen[k]=1;return true}).slice(0,15);
+  return rowHtml('Mes téléchargements',items.map(function(d){var t=d.kind==='movie'?d.title:((d.series&&cleanName(d.series.name))||d.title);return '<button type="button" class="poster labeled" data-'+(d.kind==='movie'?'dlplay':'dlseries')+'="'+esc(d.kind==='movie'?d.k:((d.series&&d.series.series_id)||''))+'"><span class="art"><span class="ph">'+esc(t)+'</span>'+(d.icon?'<img loading="lazy" src="'+esc(d.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span class="t">'+esc(t)+'</span></button>'}).join('')||'<p class="hint" style="margin:0">'+act+' en cours…</p>',
+    '<button type="button" class="more" data-fcat="dl">'+(act?act+' en cours · ':'')+'Tout voir</button>');
 }
 function viewFavs(){
   var F=Object.keys(USER.favs).map(function(k){return USER.favs[k]}).sort(function(a,b){return b.at-a.at});
   var live=F.filter(function(f){return f.kind==='live'}).map(function(f){return byId('live',f.id)}).filter(Boolean);
   var mv=F.filter(function(f){return f.kind==='movie'}).map(function(f){return byId('movie',f.id)}).filter(Boolean);
   var se=F.filter(function(f){return f.kind==='series'}).map(function(f){return byId('series',f.id)}).filter(Boolean);
-  var h=downloadsHtml();
-  if(!live.length&&!mv.length&&!se.length)return h+'<div class="empty" style="margin-top:20px"><p>Pas encore de favoris. Touche l\'étoile d\'une chaîne, d\'un film ou d\'une série'+(NATIVE?', ou télécharge un film pour le regarder hors connexion':'')+'.</p></div>';
+  var nd=Object.keys(USER.downloads||{}).length,cur=S.favCat||'all';
+  var chip=function(k,label,n){return '<button type="button" class="chip" data-fcat="'+k+'" aria-pressed="'+(cur===k)+'">'+label+(n?'<b>'+n+'</b>':'')+'</button>'};
+  var h='<div class="pagehead"><h1>Ma liste</h1></div><section class="sec" style="margin-top:12px"><div class="chips">'+chip('all','Tout')+chip('dl','Mes téléchargements',nd)+chip('movie','Films',mv.length)+chip('series','Séries',se.length)+chip('live','Chaînes',live.length)+'</div></section>';
+  if(cur==='dl')return h+downloadsHtml();
+  var grid=function(kind,L){return '<section class="sec" style="margin-top:14px"><div class="grid">'+L.map(function(x){return posterHtml(kind,x,{labeled:true})}).join('')+'</div></section>'};
+  if(cur==='movie')return h+(mv.length?grid('movie',mv):'<div class="empty" style="margin-top:16px"><p>Touche « Ajouter aux favoris » sur la fiche d\'un film.</p></div>');
+  if(cur==='series')return h+(se.length?grid('series',se):'<div class="empty" style="margin-top:16px"><p>Touche « Ajouter aux favoris » sur la fiche d\'une série.</p></div>');
+  if(cur==='live')return h+(live.length?'<section class="sec"><div class="chlist">'+live.map(chHtml).join('')+'</div></section>':'<div class="empty" style="margin-top:16px"><p>Touche l\'étoile d\'une chaîne pour la retrouver ici.</p></div>');
+  h+=dlStrip();
+  if(!live.length&&!mv.length&&!se.length)return h+'<div class="empty" style="margin-top:20px"><p>Pas encore de favoris. Touche l\'étoile d\'une chaîne, d\'un film ou d\'une série'+(NATIVE&&!nd?', ou télécharge un film pour le regarder hors connexion':'')+'.</p></div>';
+  if(mv.length)h+=rowHtml('Films',mv.map(function(x){return posterHtml('movie',x)}).join(''),'<button type="button" class="more" data-fcat="movie">Tout voir</button>');
+  if(se.length)h+=rowHtml('Séries',se.map(function(x){return posterHtml('series',x)}).join(''),'<button type="button" class="more" data-fcat="series">Tout voir</button>');
   if(live.length){h+='<section class="sec"><div class="sech"><h2>Chaînes</h2></div><div class="chlist">';live.forEach(function(x){h+=chHtml(x)});h+='</div></section>'}
-  if(mv.length){h+='<section class="sec"><div class="sech"><h2>Films</h2></div><div class="row">';mv.forEach(function(x){h+=posterHtml('movie',x)});h+='</div></section>'}
-  if(se.length){h+='<section class="sec"><div class="sech"><h2>Séries</h2></div><div class="row">';se.forEach(function(x){h+=posterHtml('series',x)});h+='</div></section>'}
   return h;
 }
 function viewSearch(){
@@ -1262,7 +1301,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1271,6 +1310,9 @@ document.addEventListener('click',function(e){
       startDownload('ep:'+de.id,streamUrl('episode',de),de.container_extension,{kind:'ep',id:de.id,title:cleanName(ds.name)+' · '+lb,icon:ds.cover,
         ep:{id:de.id,season:de.season,episode_num:de.episode_num,title:de.title,container_extension:de.container_extension},series:{series_id:ds.series_id,name:ds.name,cover:ds.cover},subMeta:subMeta('series',ds,sheet.info&&sheet.info.info,de)})}
     return}
+  if(d.fcat){S.favCat=d.fcat;if(S.tab!=='favs')S.tab='favs';render();window.scrollTo(0,0);return}
+  if(d.dlgroup){S.dlOpen=S.dlOpen||{};S.dlOpen[d.dlgroup]=!S.dlOpen[d.dlgroup];var y0=window.scrollY;render();window.scrollTo(0,y0);return}
+  if(d.dlseries!==undefined){S.favCat='dl';if(d.dlseries){S.dlOpen=S.dlOpen||{};S.dlOpen[d.dlseries]=true}render();window.scrollTo(0,0);return}
   if(d.dlpause){pauseDl(d.dlpause);return}
   if(d.dlresume){resumeDl(d.dlresume);return}
   if(d.dlseason&&sheet&&sheet.kind==='series'){var ss=sheet.item,se=(sheet.info.episodes||{})[d.dlseason]||[],todo=se.filter(function(ep){return !dlOf('ep:'+ep.id)});
@@ -1285,7 +1327,7 @@ document.addEventListener('click',function(e){
     if(pd.kind==='movie'){var pm=byId('movie',pd.id)||{stream_id:pd.id,name:pd.title,stream_icon:pd.icon};playMovie(pm,false)}
     else if(pd.ep&&pd.series)playEpisode(pd.series,pd.ep,false);
     return}
-  if(d.tab){S.confirmDl=null;if(d.tab===S.tab&&d.tab==='movies')S.vodCat='all';if(d.tab===S.tab&&d.tab==='series')S.serCat='all';S.tab=d.tab;if(d.tab!=='search')S.q=S.q;render();window.scrollTo(0,0);if(d.tab==='search')setTimeout(function(){var q=$('#q');if(q)q.focus()},30);return}
+  if(d.tab){S.confirmDl=null;if(d.tab===S.tab&&d.tab==='movies')S.vodCat='all';if(d.tab===S.tab&&d.tab==='series')S.serCat='all';if(d.tab===S.tab&&d.tab==='favs')S.favCat='all';S.tab=d.tab;if(d.tab!=='search')S.q=S.q;render();window.scrollTo(0,0);if(d.tab==='search')setTimeout(function(){var q=$('#q');if(q)q.focus()},30);return}
   if(d.open){var p=d.open.split(':');openItem(p[0],p.slice(1).join(':'));return}
   if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x)playLive(x);return}
   if(d.fav){var f=d.fav.split(':'),it=byId(f[0],f.slice(1).join(':'));if(it){toggleFav(f[0],it);render();if(sheet)renderSheet()}return}
