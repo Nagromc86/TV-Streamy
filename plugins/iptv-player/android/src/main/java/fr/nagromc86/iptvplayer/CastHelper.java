@@ -15,6 +15,7 @@ import com.google.android.gms.cast.MediaLoadRequestData;
 import com.google.android.gms.cast.MediaMetadata;
 import com.google.android.gms.cast.MediaSeekOptions;
 import com.google.android.gms.cast.MediaStatus;
+import com.google.android.gms.cast.MediaTrack;
 import com.google.android.gms.cast.framework.CastContext;
 import com.google.android.gms.cast.framework.CastSession;
 import com.google.android.gms.cast.framework.SessionManager;
@@ -165,7 +166,7 @@ class CastHelper {
     }
 
     static void play(Context ctx, String deviceId, String url, String title, String subtitle, String image, String mime,
-                     long startMs, boolean live, Done done) {
+                     long startMs, boolean live, String vttUrl, boolean subsOn, Done done) {
         if (!init(ctx)) {
             done.fail("Google Cast indisponible sur ce téléphone");
             return;
@@ -186,16 +187,30 @@ class CastHelper {
             if (image != null && image.startsWith("http")) {
                 md.addImage(new WebImage(Uri.parse(image)));
             }
-            MediaInfo info = new MediaInfo.Builder(url)
+            MediaInfo.Builder ib = new MediaInfo.Builder(url)
                     .setStreamType(live ? MediaInfo.STREAM_TYPE_LIVE : MediaInfo.STREAM_TYPE_BUFFERED)
                     .setContentType(mime)
-                    .setMetadata(md)
-                    .build();
-            MediaLoadRequestData req = new MediaLoadRequestData.Builder()
-                    .setMediaInfo(info)
+                    .setMetadata(md);
+            boolean subs = vttUrl != null && !vttUrl.isEmpty();
+            if (subs) {
+                List<MediaTrack> tracks = new ArrayList<>();
+                tracks.add(new MediaTrack.Builder(1, MediaTrack.TYPE_TEXT)
+                        .setName("Français")
+                        .setSubtype(MediaTrack.SUBTYPE_SUBTITLES)
+                        .setContentId(vttUrl)
+                        .setContentType("text/vtt")
+                        .setLanguage("fr")
+                        .build());
+                ib.setMediaTracks(tracks);
+            }
+            MediaLoadRequestData.Builder rb = new MediaLoadRequestData.Builder()
+                    .setMediaInfo(ib.build())
                     .setAutoplay(true)
-                    .setCurrentTime(live ? 0 : startMs)
-                    .build();
+                    .setCurrentTime(live ? 0 : startMs);
+            if (subs && subsOn) {
+                rb.setActiveTrackIds(new long[] {1});
+            }
+            MediaLoadRequestData req = rb.build();
             client.load(req).setResultCallback(res -> {
                 if (res.getStatus().isSuccess()) {
                     done.ok();
@@ -284,6 +299,12 @@ class CastHelper {
                 break;
             case "stop":
                 c.stop();
+                break;
+            case "subsOn":
+                c.setActiveMediaTracks(new long[] {1});
+                break;
+            case "subsOff":
+                c.setActiveMediaTracks(new long[] {});
                 break;
             default:
                 break;

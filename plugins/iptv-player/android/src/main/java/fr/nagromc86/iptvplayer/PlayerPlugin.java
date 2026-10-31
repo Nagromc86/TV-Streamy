@@ -215,6 +215,29 @@ public class PlayerPlugin extends Plugin {
         String mime = call.getString("mime", "video/mp4");
         long startMs = call.getData().optLong("startMs", 0L);
         boolean live = call.getBoolean("live", false);
+        boolean subsOn = call.getBoolean("subsOn", true);
+        String srtUrl = null;
+        String vttUrl = null;
+        JSArray subs = call.getArray("subtitles");
+        if (subs != null && subs.length() > 0) {
+            org.json.JSONObject first = subs.optJSONObject(0);
+            String data = first == null ? "" : first.optString("url", "");
+            int comma = data.indexOf(',');
+            if (data.startsWith("data:") && comma > 0) {
+                try {
+                    String srt = new String(android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
+                    String[] urls = SubServer.publish(srt);
+                    if (urls != null) {
+                        srtUrl = urls[0];
+                        vttUrl = urls[1];
+                    }
+                } catch (Exception ignored) {
+                    // play without subtitles
+                }
+            }
+        }
+        final String srtFinal = srtUrl;
+        final String vttFinal = vttUrl;
         if (id.startsWith("dlna:")) {
             DlnaHelper.Device dev = DlnaHelper.devices.get(id);
             if (dev == null) {
@@ -223,7 +246,7 @@ public class PlayerPlugin extends Plugin {
             }
             new Thread(() -> {
                 try {
-                    DlnaHelper.play(dev, url, title, mime, live ? 0 : startMs);
+                    DlnaHelper.play(dev, url, title, mime, live ? 0 : startMs, subsOn ? srtFinal : null);
                     dlnaActive = dev;
                     call.resolve();
                 } catch (Exception e) {
@@ -233,7 +256,7 @@ public class PlayerPlugin extends Plugin {
             return;
         }
         dlnaActive = null;
-        CastHelper.main.post(() -> CastHelper.play(getContext(), id, url, title, subtitle, image, mime, startMs, live, new CastHelper.Done() {
+        CastHelper.main.post(() -> CastHelper.play(getContext(), id, url, title, subtitle, image, mime, startMs, live, vttFinal, subsOn, new CastHelper.Done() {
             @Override
             public void ok() {
                 call.resolve();

@@ -164,17 +164,21 @@ class DlnaHelper {
         return http("POST", d.control, body, h, 8000);
     }
 
-    static void play(Device d, String url, String title, String mime, long startMs) throws IOException {
+    static void play(Device d, String url, String title, String mime, long startMs, String srtUrl) throws IOException {
         try {
             soap(d, "Stop", "");
         } catch (IOException ignored) {
             // nothing was playing
         }
+        boolean subs = srtUrl != null && !srtUrl.isEmpty();
         String didl = "<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\""
-                + " xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\"><item id=\"0\" parentID=\"-1\" restricted=\"1\">"
+                + " xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:sec=\"http://www.sec.co.kr/\"><item id=\"0\" parentID=\"-1\" restricted=\"1\">"
                 + "<dc:title>" + esc(title) + "</dc:title><upnp:class>object.item.videoItem</upnp:class>"
+                + (subs ? "<sec:CaptionInfoEx sec:type=\"srt\">" + esc(srtUrl) + "</sec:CaptionInfoEx><sec:CaptionInfo sec:type=\"srt\">" + esc(srtUrl) + "</sec:CaptionInfo>" : "")
                 + "<res protocolInfo=\"http-get:*:" + mime + ":DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000\">"
-                + esc(url) + "</res></item></DIDL-Lite>";
+                + esc(url) + "</res>"
+                + (subs ? "<res protocolInfo=\"http-get:*:text/srt:*\">" + esc(srtUrl) + "</res>" : "")
+                + "</item></DIDL-Lite>";
         soap(d, "SetAVTransportURI", "<CurrentURI>" + esc(url) + "</CurrentURI><CurrentURIMetaData>" + esc(didl) + "</CurrentURIMetaData>");
         soap(d, "Play", "<Speed>1</Speed>");
         if (startMs > 0) {

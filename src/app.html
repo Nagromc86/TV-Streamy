@@ -553,8 +553,9 @@ function castStart(o){
   if(CAST)finishCast(CAST,false);
   toast('Envoi vers « '+dev.name+' »…');
   return new Promise(function(res){
-    var c={o:o,dev:dev,state:'buffering',pos:o.startMs||0,dur:0,res:res,seen:false,t0:Date.now()};CAST=c;paintCast();
-    nat('castPlay',{id:dev.id,url:url,title:o.title,subtitle:o.subtitle||'',image:o.image||'',mime:mimeOf(url),startMs:o.startMs||0,live:!!o.live}).then(function(){castPoll()},function(e){
+    var hasSubs=!!(o.subtitles&&o.subtitles.length),subsOn=hasSubs&&(PREFS.subMode||'auto')!=='never';
+    var c={o:o,dev:dev,state:'buffering',pos:o.startMs||0,dur:0,res:res,seen:false,t0:Date.now(),subs:hasSubs,subsOn:subsOn};CAST=c;paintCast();
+    nat('castPlay',{id:dev.id,url:url,title:o.title,subtitle:o.subtitle||'',image:o.image||'',mime:mimeOf(url),startMs:o.startMs||0,live:!!o.live,subtitles:hasSubs?o.subtitles:[],subsOn:subsOn}).then(function(){castPoll()},function(e){
       if(CAST===c){CAST=null;paintCast()}toast((e&&e.message)||'Diffusion impossible.');res({});
     });
   });
@@ -580,17 +581,19 @@ function paintCast(){
   if(!c){el.hidden=true;el.innerHTML='';return}
   el.hidden=false;
   var live=c.o.live,pc=c.dur?Math.min(100,c.pos/c.dur*100):0;
-  el.innerHTML='<div class="cb-top"><span class="cb-ic">'+IC.cast+'</span><span class="cb-t"><b>'+esc(c.o.title)+'</b><small>'+esc((c.state==='buffering'?'Chargement sur ':c.state==='paused'?'En pause sur ':'Sur ')+c.dev.name)+(live?' · direct':c.seen?' · '+clock(c.pos)+(c.dur?' / '+clock(c.dur):''):'')+'</small></span></div>'+
+  el.innerHTML='<div class="cb-top"><span class="cb-ic">'+IC.cast+'</span><span class="cb-t"><b>'+esc(c.o.title)+'</b><small>'+esc((c.state==='buffering'?'Chargement sur ':c.state==='paused'?'En pause sur ':'Sur ')+c.dev.name)+(live?' · direct':c.seen?' · '+clock(c.pos)+(c.dur?' / '+clock(c.dur):''):'')+(c.subs&&c.dev.type==='dlna'&&c.subsOn?' · ST FR envoyés':'')+'</small></span></div>'+
     (live?'':'<span class="cb-bar"><i style="width:'+pc.toFixed(1)+'%"></i></span>')+
     '<div class="cb-acts">'+(live?'':'<button type="button" data-cc="back" aria-label="Reculer de 30 secondes">−30 s</button>')+
     '<button type="button" data-cc="toggle" aria-label="'+(c.state==='paused'?'Reprendre':'Pause')+'">'+(c.state==='paused'?IC.play:IC.pause)+'</button>'+
     (live?'':'<button type="button" data-cc="fwd" aria-label="Avancer de 30 secondes">+30 s</button>')+
+    (c.subs&&c.dev.type==='cast'?'<button type="button" data-cc="subs" aria-pressed="'+!!c.subsOn+'" aria-label="Sous-titres" style="'+(c.subsOn?'background:#fff;color:#111':'')+'">ST</button>':'')+
     '<button type="button" data-cc="stop" aria-label="Arrêter la diffusion">'+IC.stop+'</button></div>';
 }
 function castControl(a){
   var c=CAST;if(!c)return;
   if(a==='toggle'){var pa=c.state==='paused'?'play':'pause';c.state=pa==='pause'?'paused':'playing';paintCast();nat('castControl',{action:pa}).catch(function(e){toast((e&&e.message)||'La TV ne répond pas.')});return}
   if(a==='back'||a==='fwd'){c.pos=Math.max(0,c.pos+(a==='fwd'?30000:-30000));if(c.dur)c.pos=Math.min(c.pos,c.dur-1000);paintCast();nat('castControl',{action:'seek',ms:Math.round(c.pos)}).catch(function(){});return}
+  if(a==='subs'){c.subsOn=!c.subsOn;paintCast();nat('castControl',{action:c.subsOn?'subsOn':'subsOff'}).catch(function(){});toast(c.subsOn?'Sous-titres affichés.':'Sous-titres masqués.');return}
   if(a==='stop'){nat('castControl',{action:'stop'}).catch(function(){});finishCast(c,false);toast('Diffusion arrêtée.')}
 }
 function scanCast(){
@@ -633,7 +636,7 @@ function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
   var local=dlReady(k),info=sheet&&sheet.kind==='movie'&&sheet.item===item?sheet.info:null;
-  (S.castDev?Promise.resolve([]):getSubs(k,subMeta('movie',item,info))).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
+  getSubs(k,subMeta('movie',item,info)).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
     if(r&&(r.positionMs||r.ended))saveProgress(k,r,{kind:'movie',id:item.stream_id,name:item.name,icon:item.stream_icon});
     render();if(sheet&&sheet.kind==='movie')renderSheet();
   });
@@ -642,7 +645,7 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  (S.castDev?Promise.resolve([]):getSubs(k,subMeta('series',series,info,ep))).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
+  getSubs(k,subMeta('series',series,info,ep)).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
