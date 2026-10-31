@@ -41,6 +41,11 @@ jobs:
           ( npx cap add android && npx capacitor-assets generate --android && npx cap sync android ) > cap.log 2>&1 || fail cap.log capacitor
           # les serveurs IPTV et leurs flux sont souvent en http
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          # Android TV: appear in the TV launcher, with a banner
+          sed -i 's/<application/<application android:banner="@drawable\/tv_banner"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's#<category android:name="android.intent.category.LAUNCHER" />#<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />#' android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/res/drawable-xhdpi && cp assets/tv-banner.png android/app/src/main/res/drawable-xhdpi/tv_banner.png
+          grep -q LEANBACK_LAUNCHER android/app/src/main/AndroidManifest.xml || { echo "::error title=manifest::LEANBACK_LAUNCHER non ajouté"; grep -n "category" android/app/src/main/AndroidManifest.xml; exit 1; }
           VERSION=$(grep -o "var APP_VERSION='[0-9][^']*'" www/index.html | head -1 | cut -d"'" -f2)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/" android/app/build.gradle
@@ -73,7 +78,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.${{ github.run_number }}" tv-streamy.apk \
+          python3 tools/build_tizen.py "1.0.${{ github.run_number }}"
+          cp dist/tv-streamy.wgt tv-streamy.wgt
+          gh release create "v1.${{ github.run_number }}" tv-streamy.apk tv-streamy.wgt \
             --title "TV Streamy 1.${{ github.run_number }} ($APP_VERSION)" \
-            --notes "Appli Android TV Streamy, version du $APP_VERSION. Télécharge tv-streamy.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
+            --notes "Version du $APP_VERSION. tv-streamy.apk : téléphone, tablette et Android TV (ouvre-le pour installer ou mettre à jour). tv-streamy.wgt : TV Samsung (Tizen), à installer avec un outil comme Apps2Samsung ou Tizen Studio." \
             --latest

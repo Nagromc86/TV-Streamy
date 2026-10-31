@@ -249,6 +249,46 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 .ptile.on b{color:var(--ink)}.ptile.on .avatar{box-shadow:0 0 0 3px #fff}
 .ptile .pen{position:absolute;top:34px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}.ptile .pen svg{width:18px;height:18px}
 .swatch{width:36px;height:36px;border-radius:50%;border:0;padding:0}.swatch[aria-pressed="true"]{box-shadow:0 0 0 3px var(--surface),0 0 0 5px #fff}
+/* TV: side rail instead of bottom bar, big visible focus, no touch-only bits */
+body.tv{--navh:0px}
+body.tv #nav{top:0;bottom:0;right:auto;width:104px;padding:0;background:linear-gradient(90deg,rgba(16,16,20,.98) 70%,rgba(16,16,20,0))}
+body.tv #nav .in{grid-template-columns:none;grid-auto-rows:80px;height:auto;align-content:start;padding-top:110px;width:104px}
+body.tv #nav button{font-size:.78rem;border-radius:14px;margin:4px 10px}
+body.tv #nav button svg{width:28px;height:28px}
+body.tv main,body.tv .top .in,body.tv .bill{padding-left:124px!important}
+body.tv .bill{margin-left:0}
+body.tv .row,body.tv .chips{margin-left:0;padding-left:0;scroll-padding-inline:16px}
+body.tv main{padding-bottom:60px}
+body.tv #castbar{left:104px}
+body.tv .top.over{position:fixed}
+body.tv :focus{outline:none}
+body.tv :focus-visible,body.tv .tvf{outline:3px solid #fff!important;outline-offset:3px;border-radius:8px}
+body.tv .poster:focus .art,body.tv .wide:focus .art,body.tv .top10:focus-within .poster .art{outline:4px solid #fff;outline-offset:2px;transform:scale(1.06);transition:transform .12s}
+body.tv .poster:focus,body.tv .wide:focus{outline:none!important}
+body.tv .poster .art,body.tv .wide .art{transition:transform .12s}
+body.tv #nav button:focus{background:rgba(255,255,255,.14);color:#fff;outline:none!important}
+body.tv .btn:focus{box-shadow:0 0 0 3px var(--bg),0 0 0 6px #fff;outline:none!important;transform:scale(1.04)}
+body.tv .chip:focus{background:#fff;color:#111;outline:none!important}
+body.tv .ptile:focus .avatar{box-shadow:0 0 0 4px #fff;transform:scale(1.08)}
+body.tv .ptile:focus{outline:none!important}
+body.tv .ch:focus-within{background:var(--surface2);box-shadow:0 0 0 3px #fff}
+body.tv .bslides{scroll-behavior:auto}
+body.tv .panel{max-width:760px;margin:0 auto}
+body.tv #sheet{align-items:center}
+body.tv .panel{border-radius:14px;max-height:92vh}
+body.tv .tvhide{display:none!important}
+/* Samsung player (AVPlay draws the video under the page) */
+html.avplaying,html.avplaying body{background:transparent!important}
+html.avplaying #app,html.avplaying #nav,html.avplaying #castbar{visibility:hidden}
+#tvplayer{position:fixed;inset:0;z-index:300}
+#tvplayer .tvp{position:absolute;left:0;right:0;bottom:0;padding:40px 60px 50px 60px;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.85));transition:opacity .3s}
+#tvplayer.idle .tvp{opacity:0}
+#tvplayer h2{margin:0;font-family:var(--display);font-size:2rem}
+#tvplayer .sub{color:#ccc;margin:4px 0 16px}
+#tvplayer .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}#tvplayer .bar i{display:block;height:100%;background:var(--accent)}
+#tvplayer .times{display:flex;justify-content:space-between;color:#ddd;margin-top:8px;font-variant-numeric:tabular-nums}
+#tvplayer .hint{color:#aaa;margin-top:12px}
+#tvplayer .spin{position:absolute;left:50%;top:50%;margin:-20px 0 0 -20px;width:40px;height:40px}
 @keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.panel{animation:none}.spin,.upd i{animation-duration:3s}}
@@ -260,6 +300,7 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 <nav id="nav" hidden></nav>
 <div id="sheet" hidden></div>
 <div id="webplayer" hidden></div>
+<div id="tvplayer" hidden></div>
 <div id="toast" role="status" hidden></div>
 <script>
 (function(){
@@ -267,6 +308,9 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 var APP_VERSION='/*@@VERSION@@*/';
 var $=function(s,r){return (r||document).querySelector(s)};
 var NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+/* Samsung TV (Tizen web app) and TV mode (Android TV, Samsung, or ?tv in a browser for testing) */
+var TIZEN=typeof window.tizen!=='undefined'||/Tizen/i.test(navigator.userAgent);
+var TV=TIZEN||/[?&]tv\b/.test(location.search);
 var IC={
   cast:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><path d="M3 12a8 8 0 0 1 8 8M3 16a4 4 0 0 1 4 4"/><path d="M3 20h.01"/></svg>',
   pause:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
@@ -556,6 +600,7 @@ function b64utf8(t){return btoa(unescape(encodeURIComponent(t)))}
 function subTrack(c){return {url:'data:application/x-subrip;base64,'+b64utf8(c.srt),label:'Français · OpenSubtitles',lang:'fr'}}
 /* returns [] or [one French track]; never blocks playback for long, never fails */
 function getSubs(key,meta,quiet){
+  if(TIZEN)return Promise.resolve([]);
   return kget('sub:'+key).then(function(c){
     if(c&&c.srt)return [subTrack(c)];
     if(!osOn()||navigator.onLine===false)return [];
@@ -692,6 +737,7 @@ function play(o){
   return playInner(o);
 }
 function playInner(o){
+  if(TIZEN&&window.webapis&&webapis.avplay)return tvPlay(o);
   if(NATIVE&&S.castDev)return castStart(o);
   if(NATIVE)return window.Capacitor.nativePromise('IptvPlayer','play',o).catch(function(e){toast('Lecture impossible : '+((e&&e.message)||e));return {}});
   return new Promise(function(res){
@@ -794,7 +840,7 @@ function topHtml(){
   var a=acc(),busy=Object.keys(UPD).length;
   return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span><div class="acc">'+
     (busy?'<span class="upd" title="Mise à jour du catalogue en arrière-plan"><i></i>Mise à jour</span>':'')+
-    (a&&NATIVE?'<button type="button" class="iconbtn'+(S.castDev?' on':'')+'" data-cast aria-label="'+(S.castDev?'Diffusion sur '+esc(S.castDev.name):'Diffuser sur un écran')+'">'+IC.cast+'</button>':'')+
+    (a&&NATIVE&&!TV?'<button type="button" class="iconbtn'+(S.castDev?' on':'')+'" data-cast aria-label="'+(S.castDev?'Diffusion sur '+esc(S.castDev.name):'Diffuser sur un écran')+'">'+IC.cast+'</button>':'')+
     (a?'<button type="button" class="iconbtn" data-tab="search" aria-label="Rechercher">'+IC.search+'</button>':'')+
     (a?'<button type="button" class="pill" data-accounts'+(S.apkUpdate?' style="box-shadow:inset 0 0 0 2px var(--accent)" aria-label="Compte · mise à jour disponible"':'')+'>'+avatarHtml(prof(),22)+'<span>'+esc((prof()||{}).name||a.name)+'</span>'+(S.apkUpdate?'<span class="badge" style="padding:1px 5px">MAJ</span>':'')+'</button>':'')+'</div></div>'+
     (S.tab==='search'?'<div class="searchbar"><input id="q" type="search" placeholder="Chaîne, film, série…" value="'+esc(S.q)+'" autocomplete="off"></div>':'')+'</header>';
@@ -914,7 +960,7 @@ function billHtml(kind,cat){
   var h='<section class="bill" data-bill="'+esc(key)+'"><span class="bg" style="background-image:url(\''+esc(imgOf(items[cur].kind,items[cur].x))+'\')"></span><div class="bslides">';
   items.forEach(function(o){
     var kd=o.kind,x=o.x,id=x.stream_id||x.series_id,k=kd+':'+id,img=imgOf(kd,x),p=kd==='movie'?progressOf('movie:'+id):USER.prog['series:'+id];
-    h+='<div class="bslide" data-k="'+k+'" data-img="'+esc(img)+'"><button type="button" class="card" data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
+    h+='<div class="bslide" data-k="'+k+'" data-img="'+esc(img)+'"><button type="button" class="card"'+(TV?' tabindex="-1"':'')+' data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
       '<div class="info">'+(billBadge(o)?'<div style="margin-bottom:8px">'+billBadge(o)+'</div>':'')+'<div class="tags">'+billTags(kd,x)+'</div>'+
       '<div class="acts">'+(kd==='movie'?'<button type="button" class="btn" data-playmovie="'+esc(id)+'">'+IC.play+(p&&!p.done&&p.pos?'Reprendre':'Lecture')+'</button>':'<button type="button" class="btn" data-open="'+k+'">'+IC.play+'Regarder</button>')+
       '<button type="button" class="btn ghost" data-fav="'+k+'">'+(isFav(kd,id)?IC.check+'Ma liste':IC.plus+'Ma liste')+'</button></div></div></div>';
@@ -1175,7 +1221,8 @@ function profSheetHtml(){
     '<div class="acts"><button type="button" class="btn ghost" data-close>Annuler</button></div></div>';
   return h;
 }
-function render(){
+function render(){keepFocus(renderInner)}
+function renderInner(){
   var app=$('#app'),nav=$('#nav');
   if(!S.accounts.length){app.innerHTML=welcomeHtml();nav.hidden=true;return}
   if(S.pickProfile||!S.profileId){app.innerHTML=pickerHtml();nav.hidden=true;return}
@@ -1210,7 +1257,8 @@ function parseM3uLink(v){
 }
 function openSheet(s){sheet=s;renderSheet()}
 function closeSheet(){if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
-function renderSheet(){
+function renderSheet(){keepFocus(renderSheetInner)}
+function renderSheetInner(){
   var el=$('#sheet');if(!sheet){closeSheet();return}
   var h='<div class="panel" role="dialog" aria-modal="true">';
   if(sheet.kind==='accounts'){
@@ -1493,13 +1541,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&sheet)close
 
 /* Android back button */
 if(NATIVE){
-  try{window.Capacitor.addListener('App','backButton',function(){
-    if(!$('#webplayer').hidden)return;
-    if(sheet){closeSheet();return}
-    if(S.pickProfile&&S.profileId){S.pickProfile=false;S.profEdit=false;render();return}
-    if(S.tab!=='home'){S.tab='home';render();window.scrollTo(0,0);return}
-    window.Capacitor.nativePromise('App','exitApp',{});
-  })}catch(e){}
+  try{window.Capacitor.addListener('App','backButton',function(){if(!goBack())exitApp()})}catch(e){}
 }
 
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')dailyRefresh()});
@@ -1666,6 +1708,174 @@ function submitSync(f){
     SYNC.salt=salt;SYNC.key=b64e(raw);syncKey=key;return kset('sync',SYNC);
   }).then(function(){closeSheet();toast('Synchro activée.');if(!nw){S.profileId=null}return syncNow(true).then(function(){if(!S.profileId){if(S.profiles.length===1)return useProfile(S.profiles[0].id);S.pickProfile=true;render()}})}).catch(function(e){SYNC=null;syncKey=null;bad(errText(e));b.disabled=false;b.textContent=nw?'Créer mon compte et synchroniser':'Se connecter et synchroniser'});
 }
+
+/* ---------- Samsung TV player: AVPlay (plays TS, HLS, MP4, MKV with the TV's own decoder) ---------- */
+var TVP=null;
+function tvPlay(o){
+  return new Promise(function(res){
+    var av=webapis.avplay,el=$('#tvplayer');
+    if(TVP)tvStop();
+    TVP={o:o,res:res,pos:o.startMs||0,dur:0,ended:false,paused:false,buffering:true,urls:[o.url,o.fallbackUrl].filter(Boolean),u:0};
+    document.documentElement.classList.add('avplaying');
+    el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'OK : infos · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ▲ ▼ : 1 min · Retour : quitter')+'</div></div>';
+    tvShowUi();tvOpen();
+  });
+}
+function tvOpen(){
+  var av=webapis.avplay,t=TVP,u=t.urls[t.u];
+  try{av.close()}catch(e){}
+  try{
+    av.open(u);
+    av.setDisplayRect(0,0,1920,1080);
+    try{av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX')}catch(e){}
+    if(!t.o.live)try{av.setStreamingProperty('PREBUFFER_MODE','5000')}catch(e){}
+    av.setListener({
+      onbufferingstart:function(){t.buffering=true;tvPaint()},
+      onbufferingcomplete:function(){t.buffering=false;tvPaint()},
+      oncurrentplaytime:function(ms){t.pos=ms;tvPaint()},
+      onstreamcompleted:function(){t.ended=true;tvStop()},
+      onerror:function(e){tvFail(e)},
+      onevent:function(){},onsubtitlechange:function(){},ondrmevent:function(){}
+    });
+    av.prepareAsync(function(){
+      try{t.dur=av.getDuration()||0}catch(e){}
+      if(t.pos>0&&!t.o.live){try{av.seekTo(Math.floor(t.pos))}catch(e){}}
+      av.play();t.buffering=false;tvPaint();
+    },function(e){tvFail(e)});
+  }catch(e){tvFail(e)}
+}
+function tvFail(e){
+  var t=TVP;if(!t)return;
+  if(t.u<t.urls.length-1){t.u++;tvOpen();return}
+  toast('Lecture impossible : '+((e&&(e.name||e.message))||e||'erreur du lecteur'));tvStop();
+}
+function tvPaint(){
+  var t=TVP,el=$('#tvplayer');if(!t||el.hidden)return;
+  var sp=el.querySelector('.spin');if(sp)sp.hidden=!t.buffering;
+  var i=el.querySelector('.bar i');if(i&&t.dur)i.style.width=Math.min(100,t.pos/t.dur*100).toFixed(1)+'%';
+  var a=el.querySelector('.t1'),b=el.querySelector('.t2');if(a)a.textContent=clock(t.pos)+(t.paused?' · pause':'');if(b&&t.dur)b.textContent=clock(t.dur);
+}
+var tvUiT=null;
+function tvShowUi(){var el=$('#tvplayer');el.classList.remove('idle');clearTimeout(tvUiT);tvUiT=setTimeout(function(){if(TVP&&!TVP.paused)el.classList.add('idle')},4000)}
+function tvStop(){
+  var t=TVP,el=$('#tvplayer');if(!t)return;TVP=null;
+  try{var p=webapis.avplay.getCurrentTime();if(p)t.pos=p}catch(e){}
+  try{webapis.avplay.stop()}catch(e){}try{webapis.avplay.close()}catch(e){}
+  document.documentElement.classList.remove('avplaying');el.hidden=true;el.innerHTML='';
+  t.res({positionMs:t.pos,durationMs:t.dur,ended:t.ended});
+  keepFocus(function(){});
+}
+function tvKey(e){
+  var t=TVP,av=window.webapis&&webapis.avplay,k=e.key,c=e.keyCode;if(!t||!av)return;
+  e.preventDefault();tvShowUi();
+  if(c===10009||k==='Escape'||c===413||k==='MediaStop'){tvStop();return}
+  var seek=function(d){if(t.o.live||!t.dur)return;var to=Math.max(0,Math.min(t.dur-2000,t.pos+d));try{if(d>0)av.jumpForward(d);else av.jumpBackward(-d)}catch(x){try{av.seekTo(to)}catch(y){}}t.pos=to;tvPaint()};
+  if(k==='Enter'||c===13||c===10252||k==='MediaPlayPause'||c===415||c===19||k==='MediaPlay'||k==='MediaPause'){
+    if(t.o.live&&(k==='Enter'||c===13))return;
+    try{if(t.paused){av.play();t.paused=false}else{av.pause();t.paused=true}}catch(x){}tvPaint();return}
+  if(c===39||k==='ArrowRight'){seek(10000);return}
+  if(c===37||k==='ArrowLeft'){seek(-10000);return}
+  if(c===38||k==='ArrowUp'){seek(60000);return}
+  if(c===40||k==='ArrowDown'){seek(-60000);return}
+  if(c===417||k==='MediaFastForward'){seek(30000);return}
+  if(c===412||k==='MediaRewind'){seek(-30000);return}
+}
+/* Samsung remote: media keys must be registered to be received */
+if(TIZEN){try{tizen.tvinputdevice.registerKeyBatch(['MediaPlayPause','MediaPlay','MediaPause','MediaStop','MediaFastForward','MediaRewind'])}catch(e){}
+  document.addEventListener('visibilitychange',function(){if(document.hidden&&TVP){try{webapis.avplay.suspend()}catch(e){}}else if(TVP){try{webapis.avplay.restore()}catch(e){}}});}
+/* big screens: scale the interface so it reads from the sofa */
+function tvScale(){if(!TV)return;var w=window.screen&&screen.width>window.innerWidth?window.innerWidth:window.innerWidth;document.documentElement.style.zoom=w>1300?(w/1150).toFixed(3):''}
+tvScale();window.addEventListener('resize',tvScale);
+
+/* ---------- remote control: arrows move the focus to the nearest item in that direction ---------- */
+var FOCUSABLE='button:not([disabled]):not([tabindex="-1"]),a[href],input:not([type=hidden]):not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])';
+function visibleEl(el){if(!el||el.hidden)return false;var r=el.getBoundingClientRect();if(!r.width||!r.height)return false;var st=getComputedStyle(el);return st.visibility!=='hidden'&&st.display!=='none'}
+function navScope(){
+  if(!$('#tvplayer').hidden)return $('#tvplayer');
+  if(sheet&&!$('#sheet').hidden)return $('#sheet');
+  return document.body;
+}
+function focusables(){
+  var sc=navScope();
+  return [].filter.call(sc.querySelectorAll(FOCUSABLE),function(el){
+    if(!visibleEl(el)||el.closest('[hidden]')||(sc===document.body&&el.closest('#sheet,#tvplayer')))return false;
+    /* only the suggestion currently shown in the carousel */
+    var sl=el.closest('.bslide');if(sl){var r=sl.getBoundingClientRect(),w=window.innerWidth;if(r.left<-80||r.right>w+80)return false}
+    return true;
+  });
+}
+function moveFocus(dir){
+  var cur=document.activeElement,L=focusables();
+  if(!L.length)return false;
+  if(!cur||cur===document.body||L.indexOf(cur)<0){focusEl(L[0]);return true}
+  var a=cur.getBoundingClientRect(),ax=a.left+a.width/2,ay=a.top+a.height/2,best=null,bs=1e9;
+  var inNav=!!cur.closest('#nav'),vert=dir==='up'||dir==='down';
+  L.forEach(function(el){
+    if(el===cur)return;
+    /* up/down stay in the side menu or in the page; left/right switch between them */
+    if(vert&&!!el.closest('#nav')!==inNav)return;
+    var b=el.getBoundingClientRect(),bx=b.left+b.width/2,by=b.top+b.height/2,dx=bx-ax,dy=by-ay,main,side,overlap;
+    if(dir==='right'){if(b.left<a.right-4&&dx<=4)return;main=Math.max(0,b.left-a.right);side=Math.abs(dy);overlap=b.bottom>a.top&&b.top<a.bottom}
+    else if(dir==='left'){if(b.right>a.left+4&&dx>=-4)return;main=Math.max(0,a.left-b.right);side=Math.abs(dy);overlap=b.bottom>a.top&&b.top<a.bottom}
+    else if(dir==='down'){if(b.top<a.bottom-4&&dy<=4)return;main=Math.max(0,b.top-a.bottom);side=Math.abs(dx);overlap=b.right>a.left&&b.left<a.right}
+    else{if(b.bottom>a.top+4&&dy>=-4)return;main=Math.max(0,a.top-b.bottom);side=Math.abs(dx);overlap=b.right>a.left&&b.left<a.right}
+    /* stay in the same row / column when possible */
+    var sc=main+side*(overlap?0.3:2.5)+(overlap?0:60)-(el.matches('.btn:not(.ghost)')?60:0);
+    if(sc<bs){bs=sc;best=el}
+  });
+  /* entering the side menu: land on the current tab */
+  if(best&&best.closest('#nav')&&!cur.closest('#nav')){var curTab=document.querySelector('#nav [aria-current="page"]');if(curTab)best=curTab}
+  if(best){focusEl(best);return true}
+  return false;
+}
+function focusEl(el){
+  try{el.focus({preventScroll:true})}catch(e){el.focus()}
+  var row=el.closest('.row,.chips,.bslides');
+  if(row){var r=el.getBoundingClientRect(),rr=row.getBoundingClientRect();if(r.left<rr.left+10)row.scrollLeft-=rr.left+24-r.left;else if(r.right>rr.right-10)row.scrollLeft+=r.right-rr.right+24}
+  var box=el.closest('.panel')||null,vr=el.getBoundingClientRect();
+  if(box){var br=box.getBoundingClientRect();if(vr.top<br.top+20)box.scrollTop-=br.top+40-vr.top;else if(vr.bottom>br.bottom-20)box.scrollTop+=vr.bottom-br.bottom+40}
+  else if(!el.closest('#nav')){var top=110,bot=innerHeight-40;if(vr.top<top)window.scrollBy(0,vr.top-top-20);else if(vr.bottom>bot)window.scrollBy(0,vr.bottom-bot+20)}
+}
+/* keep the focus on "the same" item when the screen is redrawn */
+function focusKey(el){if(!el||!el.attributes)return null;for(var i=0;i<el.attributes.length;i++){var n=el.attributes[i].name;if(n.indexOf('data-')===0&&n!=='data-confirm')return '['+n+'="'+String(el.attributes[i].value).replace(/"/g,'\\"')+'"]'}return el.id?'#'+el.id:null}
+var autoEl=null;
+function keepFocus(fn){
+  if(!TV)return fn();
+  var k=document.activeElement===autoEl?null:focusKey(document.activeElement);fn();
+  setTimeout(function(){
+    var sc=navScope(),a=document.activeElement;
+    if(a&&a!==autoEl&&a!==document.body&&document.contains(a)&&sc.contains(a)&&visibleEl(a))return;
+    var el=k&&sc.querySelector(k);
+    if(el&&visibleEl(el)){try{el.focus({preventScroll:true})}catch(e){}return}
+    /* first useful item: the main button of a sheet or of the billboard, else the first item of the page */
+    var L=focusables(),pick=L.filter(function(x){return x.matches('.btn:not(.ghost)')&&!x.closest('.top')})[0]||L.filter(function(x){return !x.closest('#nav')&&!x.closest('.top')&&!x.matches('[data-close].x,.iconbtn.x')})[0]||L[0];
+    if(pick){focusEl(pick);autoEl=pick.closest('.top,#nav')?pick:null}
+  },0);
+}
+/* back: closes the sheet, the profile picker, returns home, then leaves the app */
+function goBack(){
+  if(!$('#tvplayer').hidden){tvStop();return true}
+  if(!$('#webplayer').hidden)return true;
+  if(sheet){closeSheet();if(TV)keepFocus(function(){});return true}
+  if(S.pickProfile&&S.profileId){S.pickProfile=false;S.profEdit=false;render();return true}
+  if(S.tab!=='home'){S.tab='home';render();window.scrollTo(0,0);return true}
+  return false;
+}
+function exitApp(){if(NATIVE)window.Capacitor.nativePromise('App','exitApp',{});else if(TIZEN){try{tizen.application.getCurrentApplication().exit()}catch(e){}}}
+document.addEventListener('keydown',function(e){
+  var k=e.key,c=e.keyCode;
+  if(!$('#tvplayer').hidden){tvKey(e);return}
+  if(c===10009||k==='Escape'||k==='GoBack'||k==='BrowserBack'){e.preventDefault();if(!goBack())exitApp();return}
+  if(!TV)return;
+  var dir={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[k]||{38:'up',40:'down',37:'left',39:'right'}[c];
+  if(!dir)return;
+  var a=document.activeElement;
+  if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&(dir==='left'||dir==='right')){var v=a.value||'';try{if(dir==='left'&&a.selectionStart>0)return;if(dir==='right'&&a.selectionEnd<v.length)return}catch(x){}}
+  if(a&&a.tagName==='SELECT'&&(dir==='up'||dir==='down'))return;
+  if(moveFocus(dir))e.preventDefault();
+},true);
+if(TV)document.body.classList.add('tv');
+if(NATIVE)nat('deviceInfo').then(function(r){if(r&&r.tv&&!TV){TV=true;document.body.classList.add('tv');tvScale();render()}},function(){});
 
 /* ---------- start ---------- */
 function refreshTrends(){loadTrends(false).then(function(t){if(t&&DATA&&!sheet){softRender()}})}

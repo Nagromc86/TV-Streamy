@@ -413,6 +413,22 @@ public class PlayerPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** Tells the app whether it runs on a TV (Android TV, Google TV...). */
+    @PluginMethod
+    public void deviceInfo(PluginCall call) {
+        boolean tv = false;
+        try {
+            android.app.UiModeManager um = (android.app.UiModeManager) getContext().getSystemService(Context.UI_MODE_SERVICE);
+            tv = um != null && um.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
+            tv = tv || getContext().getPackageManager().hasSystemFeature("android.software.leanback");
+        } catch (Exception ignored) {
+            // phone
+        }
+        JSObject r = new JSObject();
+        r.put("tv", tv);
+        call.resolve(r);
+    }
+
     @ActivityCallback
     private void onPlayerClosed(PluginCall call, ActivityResult result) {
         if (call == null) {
