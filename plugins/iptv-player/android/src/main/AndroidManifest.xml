@@ -7,6 +7,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <queries>
+        <package android:name="com.samsung.android.smartmirroring" />
+        <intent>
+            <action android:name="com.samsung.android.smartmirroring.CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.CAST_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.WIFI_DISPLAY_SETTINGS" />
+        </intent>
+    </queries>
     <application>
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"

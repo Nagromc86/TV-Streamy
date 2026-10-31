@@ -611,10 +611,14 @@ function castControl(a){
   if(a==='subs'){c.subsOn=!c.subsOn;paintCast();nat('castControl',{action:c.subsOn?'subsOn':'subsOff'}).catch(function(){});toast(c.subsOn?'Sous-titres affichés.':'Sous-titres masqués.');return}
   if(a==='stop'){nat('castControl',{action:'stop'}).catch(function(){});finishCast(c,false);toast('Diffusion arrêtée.')}
 }
+var scanTok=0;
 function scanCast(){
-  S.castScanning=true;if(sheet&&sheet.kind==='cast')renderSheet();
-  nat('castScan').then(function(r){S.castDevs=r.devices||[]},function(){S.castDevs=[]}).then(function(){S.castScanning=false;if(sheet&&sheet.kind==='cast')renderSheet()});
+  var tok=++scanTok;S.castScanning=true;S.castErr='';if(sheet&&sheet.kind==='cast')renderSheet();
+  var end=function(){if(tok!==scanTok)return;S.castScanning=false;if(sheet&&sheet.kind==='cast')renderSheet()};
+  setTimeout(end,15000);
+  nat('castScan').then(function(r){if(tok===scanTok)S.castDevs=r.devices||[]},function(e){if(tok===scanTok){S.castDevs=S.castDevs||[];S.castErr=(e&&e.message)||'recherche impossible'}}).then(end);
 }
+function stopScan(){scanTok++;S.castScanning=false;nat('castStopScan').catch(function(){});if(sheet&&sheet.kind==='cast')renderSheet()}
 function castSheetHtml(){
   var h='<div class="grab"></div><div class="in gut"><h2>Diffuser sur un écran</h2><p class="hint" style="margin:0">Le téléphone et l\'écran doivent être sur le même Wi-Fi. Une fois l\'écran choisi, les vidéos que tu lances y sont envoyées et le téléphone sert de télécommande.</p>';
   var L=S.castDevs||[];
@@ -622,10 +626,12 @@ function castSheetHtml(){
     var on=S.castDev&&S.castDev.id===d.id;
     h+='<button type="button" class="castdev" data-castdev="'+esc(d.id)+'" aria-pressed="'+!!on+'"><span class="di">'+(d.type==='cast'?IC.cast:IC.tv)+'</span><span><b>'+esc(d.name)+'</b><small>'+(d.type==='cast'?'Chromecast / Google TV':'TV compatible DLNA')+(d.model?' · '+esc(d.model):'')+'</small></span>'+(on?'<span style="color:var(--accent2)">'+IC.check+'</span>':'<span></span>')+'</button>';
   });
-  if(S.castScanning)h+='<div class="loading" style="padding:18px 0"><div class="spin"></div><p style="margin:0">Recherche des écrans sur ton Wi-Fi…</p></div>';
+  if(S.castScanning)h+='<div class="loading" style="padding:18px 0"><div class="spin"></div><p style="margin:0">Recherche des écrans sur ton Wi-Fi…<br><span class="hint">Quelques secondes</span></p></div>';
+  else if(S.castErr)h+='<p class="err">Recherche impossible : '+esc(S.castErr)+'</p>';
   else if(!L.length)h+='<div class="empty"><p>Aucun écran trouvé. Vérifie que la TV est allumée et sur le même Wi-Fi que le téléphone. Sur une Samsung, la fonction s\'appelle souvent « Partage de contenu » ou « DLNA » dans les réglages Connexion de la TV.</p></div>';
-  h+='<div class="acts"><button type="button" class="btn ghost" data-castscan'+(S.castScanning?' disabled':'')+'>'+IC.refresh+'Rechercher à nouveau</button>'+(S.castDev?'<button type="button" class="btn danger" data-castoff>Ne plus diffuser</button>':'')+'</div>';
+  h+='<div class="acts">'+(S.castScanning?'<button type="button" class="btn ghost" data-castcancel>'+IC.x+'Arrêter la recherche</button>':'<button type="button" class="btn ghost" data-castscan>'+IC.refresh+'Rechercher à nouveau</button>')+(S.castDev?'<button type="button" class="btn danger" data-castoff>Ne plus diffuser</button>':'')+'</div>';
   h+='<h3 style="margin:8px 0 0;font-size:1rem">Autre solution</h3><button type="button" class="castdev" data-mirror><span class="di">'+IC.phone+'</span><span><b>Dupliquer l\'écran du téléphone</b><small>Smart View sur Samsung, « Caster l\'écran » ailleurs : tout l\'écran s\'affiche sur la TV, quelle que soit l\'appli.</small></span><span></span></button>';
+  if(S.mirrorHelp)h+='<div class="offline" style="line-height:1.5"><b>Pour dupliquer l\'écran :</b><br>1. Fais glisser deux fois du haut de l\'écran vers le bas pour ouvrir les réglages rapides.<br>2. Touche <b>Smart View</b> (Samsung), <b>Caster</b>, <b>Diffuser l\'écran</b> ou <b>Partage d\'écran</b> selon le téléphone. Si tu ne le vois pas, touche le crayon pour l\'ajouter.<br>3. Choisis ta TV. Reviens ensuite dans TV Streamy et lance la vidéo en plein écran.</div>';
   return h+'<div class="acts"><button type="button" class="btn" data-close>Fermer</button></div></div>';
 }
 
@@ -1301,7 +1307,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1341,7 +1347,8 @@ document.addEventListener('click',function(e){
   if(t.hasAttribute('data-castscan')){scanCast();return}
   if(d.castdev){var cd=(S.castDevs||[]).filter(function(x){return x.id===d.castdev})[0];if(cd){S.castDev=cd;closeSheet();paintTop();toast('Les vidéos seront envoyées sur « '+cd.name+' ». Lance une vidéo.')}return}
   if(t.hasAttribute('data-castoff')){S.castDev=null;if(CAST){nat('castControl',{action:'disconnect'}).catch(function(){});finishCast(CAST,false)}closeSheet();paintTop();toast('Les vidéos sont de nouveau lues sur le téléphone.');return}
-  if(t.hasAttribute('data-mirror')){nat('castMirror').catch(function(e){toast((e&&e.message)||'Ouvre Smart View depuis les réglages rapides.')});return}
+  if(t.hasAttribute('data-castcancel')){stopScan();return}
+  if(t.hasAttribute('data-mirror')){nat('castMirror').then(function(r){if(!r||!r.opened){S.mirrorHelp=true;renderSheet()}},function(){S.mirrorHelp=true;renderSheet()});return}
   if(d.cc){castControl(d.cc);return}
   if(d.bdot){var bs=document.querySelector('.bslides');billTouch=Date.now();if(bs)bs.scrollTo({left:(+d.bdot)*bs.clientWidth,behavior:'smooth'});return}
   if(d.groups){openSheet({kind:'groups',sec:d.groups,back:sheet&&sheet.kind==='accounts'});return}

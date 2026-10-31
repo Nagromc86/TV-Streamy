@@ -36,6 +36,7 @@ jobs:
           # en cas d'échec, la fin du journal est remontée en annotation
           fail() { MSG=$(tail -60 "$1" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g'); echo "::error title=$2::$MSG"; exit 1; }
           ( npm install --no-audit --no-fund ) > npm.log 2>&1 || fail npm.log npm
+          python3 tools/check_plugin.py > check.log 2>&1 || fail check.log plugin
           python3 tools/build.py node_modules
           ( npx cap add android && npx capacitor-assets generate --android && npx cap sync android ) > cap.log 2>&1 || fail cap.log capacitor
           # les serveurs IPTV et leurs flux sont souvent en http

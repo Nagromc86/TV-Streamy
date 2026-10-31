@@ -204,6 +204,215 @@ public class PlayerPlugin extends Plugin {
         }
     }
 
+    /* ---------- send to a screen on the same Wi-Fi: Chromecast / Google TV and DLNA TVs ---------- */
+
+    private DlnaHelper.Device dlnaActive;
+
+    @PluginMethod
+    public void castScan(PluginCall call) {
+        CastHelper.main.post(() -> CastHelper.startScan(getContext()));
+        new Thread(() -> {
+            java.util.List<DlnaHelper.Device> dl = DlnaHelper.discover(getContext(), 2500);
+            CastHelper.main.post(() -> {
+                JSArray out = new JSArray();
+                for (String[] c : CastHelper.devices()) {
+                    JSObject o = new JSObject();
+                    o.put("id", c[0]);
+                    o.put("name", c[1]);
+                    o.put("model", c[2]);
+                    o.put("type", "cast");
+                    out.put(o);
+                }
+                for (DlnaHelper.Device x : dl) {
+                    JSObject o = new JSObject();
+                    o.put("id", x.id);
+                    o.put("name", x.name);
+                    o.put("model", x.model);
+                    o.put("type", "dlna");
+                    out.put(o);
+                }
+                JSObject ret = new JSObject();
+                ret.put("devices", out);
+                call.resolve(ret);
+            });
+        }).start();
+    }
+
+    @PluginMethod
+    public void castStopScan(PluginCall call) {
+        CastHelper.main.post(CastHelper::stopScan);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void castPlay(PluginCall call) {
+        String id = call.getString("id", "");
+        String url = call.getString("url", "");
+        String title = call.getString("title", "");
+        String subtitle = call.getString("subtitle", "");
+        String image = call.getString("image", "");
+        String mime = call.getString("mime", "video/mp4");
+        long startMs = call.getData().optLong("startMs", 0L);
+        boolean live = call.getBoolean("live", false);
+        boolean subsOn = call.getBoolean("subsOn", true);
+        String srtUrl = null;
+        String vttUrl = null;
+        JSArray subs = call.getArray("subtitles");
+        if (subs != null && subs.length() > 0) {
+            org.json.JSONObject first = subs.optJSONObject(0);
+            String data = first == null ? "" : first.optString("url", "");
+            int comma = data.indexOf(',');
+            if (data.startsWith("data:") && comma > 0) {
+                try {
+                    String srt = new String(android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
+                    String[] urls = SubServer.publish(srt);
+                    if (urls != null) {
+                        srtUrl = urls[0];
+                        vttUrl = urls[1];
+                    }
+                } catch (Exception ignored) {
+                    // play without subtitles
+                }
+            }
+        }
+        final String srtFinal = srtUrl;
+        final String vttFinal = vttUrl;
+        if (id.startsWith("dlna:")) {
+            DlnaHelper.Device dev = DlnaHelper.devices.get(id);
+            if (dev == null) {
+                call.reject("TV introuvable, relance la recherche");
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    DlnaHelper.play(dev, url, title, mime, live ? 0 : startMs, subsOn ? srtFinal : null);
+                    dlnaActive = dev;
+                    call.resolve();
+                } catch (Exception e) {
+                    call.reject("Envoi vers la TV impossible : " + e.getMessage());
+                }
+            }).start();
+            return;
+        }
+        dlnaActive = null;
+        CastHelper.main.post(() -> CastHelper.play(getContext(), id, url, title, subtitle, image, mime, startMs, live, vttFinal, subsOn, new CastHelper.Done() {
+            @Override
+            public void ok() {
+                call.resolve();
+            }
+
+            @Override
+            public void fail(String why) {
+                call.reject(why);
+            }
+        }));
+    }
+
+    @PluginMethod
+    public void castStatus(PluginCall call) {
+        DlnaHelper.Device dev = dlnaActive;
+        if (dev != null) {
+            new Thread(() -> {
+                JSObject ret = new JSObject();
+                try {
+                    String st = DlnaHelper.state(dev);
+                    long[] pos = DlnaHelper.position(dev);
+                    ret.put("state", "PLAYING".equals(st) ? "playing" : "PAUSED_PLAYBACK".equals(st) ? "paused"
+                            : "TRANSITIONING".equals(st) ? "buffering" : "STOPPED".equals(st) || "NO_MEDIA_PRESENT".equals(st) ? "idle" : "buffering");
+                    ret.put("positionMs", pos[0]);
+                    ret.put("durationMs", pos[1]);
+                } catch (Exception e) {
+                    ret.put("state", "unreachable");
+                }
+                call.resolve(ret);
+            }).start();
+            return;
+        }
+        CastHelper.main.post(() -> {
+            Object[] st = CastHelper.status();
+            JSObject ret = new JSObject();
+            ret.put("state", st[0]);
+            ret.put("positionMs", st[1]);
+            ret.put("durationMs", st[2]);
+            call.resolve(ret);
+        });
+    }
+
+    @PluginMethod
+    public void castControl(PluginCall call) {
+        String action = call.getString("action", "");
+        long ms = call.getData().optLong("ms", 0L);
+        DlnaHelper.Device dev = dlnaActive;
+        if (dev != null) {
+            new Thread(() -> {
+                try {
+                    switch (action) {
+                        case "pause":
+                            DlnaHelper.soap(dev, "Pause", "");
+                            break;
+                        case "play":
+                            DlnaHelper.soap(dev, "Play", "<Speed>1</Speed>");
+                            break;
+                        case "seek":
+                            DlnaHelper.seek(dev, ms);
+                            break;
+                        case "stop":
+                        case "disconnect":
+                            DlnaHelper.soap(dev, "Stop", "");
+                            dlnaActive = null;
+                            break;
+                        default:
+                            break;
+                    }
+                    call.resolve();
+                } catch (Exception e) {
+                    if ("stop".equals(action) || "disconnect".equals(action)) {
+                        dlnaActive = null;
+                    }
+                    call.reject("La TV ne répond pas : " + e.getMessage());
+                }
+            }).start();
+            return;
+        }
+        CastHelper.main.post(() -> {
+            CastHelper.control(action, ms);
+            call.resolve();
+        });
+    }
+
+    /** Screen mirroring: Samsung Smart View, else Android's "Cast" screen, only if this phone has it. */
+    @PluginMethod
+    public void castMirror(PluginCall call) {
+        android.content.pm.PackageManager pm = getContext().getPackageManager();
+        java.util.List<Intent> tries = new java.util.ArrayList<>();
+        Intent smart = pm.getLaunchIntentForPackage("com.samsung.android.smartmirroring");
+        if (smart != null) {
+            tries.add(smart);
+        }
+        Intent sv = new Intent("com.samsung.android.smartmirroring.CAPTURE");
+        tries.add(sv);
+        tries.add(new Intent("android.settings.CAST_SETTINGS"));
+        tries.add(new Intent("android.settings.WIFI_DISPLAY_SETTINGS"));
+        for (Intent i : tries) {
+            if (i.resolveActivity(pm) == null) {
+                continue;
+            }
+            try {
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+                return;
+            } catch (Exception ignored) {
+                // try the next one
+            }
+        }
+        JSObject ret = new JSObject();
+        ret.put("opened", false);
+        call.resolve(ret);
+    }
+
     @ActivityCallback
     private void onPlayerClosed(PluginCall call, ActivityResult result) {
         if (call == null) {
