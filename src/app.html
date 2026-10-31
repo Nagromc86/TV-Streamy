@@ -41,6 +41,21 @@ svg{flex:none}
 .upd i{width:12px;height:12px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--ink);animation:spin 1s linear infinite}
 .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:var(--ink)}
 .iconbtn svg{width:20px;height:20px}
+.iconbtn.on{background:var(--accent);color:#fff}
+#castbar{position:fixed;left:0;right:0;bottom:calc(var(--navh) + env(safe-area-inset-bottom,0px));z-index:55;background:#23232c;border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-left,0px)) 8px;display:flex;flex-direction:column;gap:6px}
+#castbar .cb-top{display:flex;align-items:center;gap:10px;min-width:0}
+#castbar .cb-ic{color:var(--accent2);display:flex}#castbar .cb-ic svg{width:22px;height:22px}
+#castbar .cb-t{min-width:0;flex:1}#castbar b{display:block;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#castbar small{display:block;color:var(--muted);font-size:.78rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#castbar .cb-bar{display:block;height:3px;border-radius:2px;background:var(--line);overflow:hidden}#castbar .cb-bar i{display:block;height:100%;background:var(--accent)}
+#castbar .cb-acts{display:flex;justify-content:center;gap:10px}
+#castbar .cb-acts button{border:0;background:rgba(255,255,255,.1);color:var(--ink);border-radius:999px;min-width:52px;height:40px;padding:0 14px;font-weight:700;font-size:.85rem;display:inline-flex;align-items:center;justify-content:center}
+#castbar .cb-acts button svg{width:18px;height:18px}
+body.casting main{padding-bottom:calc(var(--navh) + 140px + env(safe-area-inset-bottom,0px))}
+.castdev{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:var(--surface2);border-radius:10px;padding:12px;color:var(--ink)}
+.castdev .di{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center}.castdev .di svg{width:20px;height:20px}
+.castdev b{display:block}.castdev small{display:block;color:var(--muted);font-size:.8rem}
+.castdev[aria-pressed="true"]{box-shadow:inset 0 0 0 2px var(--accent)}.castdev[aria-pressed="true"] .di{background:var(--accent)}
 .searchbar{display:flex;gap:8px;padding-bottom:10px}
 .searchbar input{flex:1;min-width:0;font:inherit;font-size:16px;background:var(--surface2);color:var(--ink);border:0;border-radius:8px;padding:11px 14px}
 
@@ -240,6 +255,10 @@ var APP_VERSION='/*@@VERSION@@*/';
 var $=function(s,r){return (r||document).querySelector(s)};
 var NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 var IC={
+  cast:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><path d="M3 12a8 8 0 0 1 8 8M3 16a4 4 0 0 1 4 4"/><path d="M3 20h.01"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
+  phone:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>',
   filter:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>',
   home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>',
   tv:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 2l4 4 4-4"/></svg>',
@@ -523,8 +542,78 @@ function checkUpdate(manual){
 function openExternal(url){var a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},1000)}
 
 /* ---------- playback ---------- */
+/* ---------- wireless: Chromecast / Google TV and DLNA TVs on the same Wi-Fi ---------- */
+var CAST=null,castT=null;
+function extOf(u){var m=/\.([a-z0-9]{2,4})(?:\?|$)/i.exec(u||'');return m?m[1].toLowerCase():''}
+function mimeOf(u){return {mp4:'video/mp4',m4v:'video/mp4',mkv:'video/x-matroska',webm:'video/webm',ts:'video/mp2t',m3u8:'application/x-mpegURL',avi:'video/x-msvideo',mov:'video/quicktime'}[extOf(u)]||'video/mp4'}
+function clock(ms){var s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')}
+function castStart(o){
+  var dev=S.castDev,url=o.castUrl||o.url;
+  if(o.live){var c=[o.url,o.fallbackUrl].filter(Boolean),want=dev.type==='cast'?'m3u8':'ts';url=c.filter(function(u){return extOf(u)===want})[0]||c[0]}
+  if(CAST)finishCast(CAST,false);
+  toast('Envoi vers « '+dev.name+' »…');
+  return new Promise(function(res){
+    var c={o:o,dev:dev,state:'buffering',pos:o.startMs||0,dur:0,res:res,seen:false,t0:Date.now()};CAST=c;paintCast();
+    nat('castPlay',{id:dev.id,url:url,title:o.title,subtitle:o.subtitle||'',image:o.image||'',mime:mimeOf(url),startMs:o.startMs||0,live:!!o.live}).then(function(){castPoll()},function(e){
+      if(CAST===c){CAST=null;paintCast()}toast((e&&e.message)||'Diffusion impossible.');res({});
+    });
+  });
+}
+function finishCast(c,ended){if(c.done)return;c.done=true;if(CAST===c)CAST=null;clearTimeout(castT);paintCast();c.res({positionMs:c.pos,durationMs:c.dur,ended:!!ended})}
+function castPoll(){
+  clearTimeout(castT);var c=CAST;if(!c)return;
+  nat('castStatus').then(function(r){
+    if(CAST!==c)return;
+    var st=r.state;
+    if(st==='playing'||st==='paused'){c.seen=true;c.miss=0;if(r.positionMs)c.pos=r.positionMs;if(r.durationMs)c.dur=r.durationMs}
+    if(st!=='unreachable')c.state=st;
+    if(st==='finished'){finishCast(c,true);return}
+    if(st==='error'){toast('La TV n\'a pas pu lire cette vidéo.');finishCast(c,false);return}
+    if((st==='idle'||st==='none')&&(c.seen||Date.now()-c.t0>30000)){finishCast(c,!!(c.dur&&c.pos>c.dur*0.94));return}
+    if(st==='unreachable'){c.miss=(c.miss||0)+1;if(c.miss>8){toast('La TV ne répond plus.');finishCast(c,false);return}}
+    paintCast();castT=setTimeout(castPoll,1500);
+  },function(){castT=setTimeout(castPoll,3000)});
+}
+function paintCast(){
+  var el=$('#castbar');if(!el){el=document.createElement('div');el.id='castbar';el.setAttribute('role','region');el.setAttribute('aria-label','Télécommande de la TV');document.body.appendChild(el)}
+  var c=CAST;document.body.classList.toggle('casting',!!c);
+  if(!c){el.hidden=true;el.innerHTML='';return}
+  el.hidden=false;
+  var live=c.o.live,pc=c.dur?Math.min(100,c.pos/c.dur*100):0;
+  el.innerHTML='<div class="cb-top"><span class="cb-ic">'+IC.cast+'</span><span class="cb-t"><b>'+esc(c.o.title)+'</b><small>'+esc((c.state==='buffering'?'Chargement sur ':c.state==='paused'?'En pause sur ':'Sur ')+c.dev.name)+(live?' · direct':c.seen?' · '+clock(c.pos)+(c.dur?' / '+clock(c.dur):''):'')+'</small></span></div>'+
+    (live?'':'<span class="cb-bar"><i style="width:'+pc.toFixed(1)+'%"></i></span>')+
+    '<div class="cb-acts">'+(live?'':'<button type="button" data-cc="back" aria-label="Reculer de 30 secondes">−30 s</button>')+
+    '<button type="button" data-cc="toggle" aria-label="'+(c.state==='paused'?'Reprendre':'Pause')+'">'+(c.state==='paused'?IC.play:IC.pause)+'</button>'+
+    (live?'':'<button type="button" data-cc="fwd" aria-label="Avancer de 30 secondes">+30 s</button>')+
+    '<button type="button" data-cc="stop" aria-label="Arrêter la diffusion">'+IC.stop+'</button></div>';
+}
+function castControl(a){
+  var c=CAST;if(!c)return;
+  if(a==='toggle'){var pa=c.state==='paused'?'play':'pause';c.state=pa==='pause'?'paused':'playing';paintCast();nat('castControl',{action:pa}).catch(function(e){toast((e&&e.message)||'La TV ne répond pas.')});return}
+  if(a==='back'||a==='fwd'){c.pos=Math.max(0,c.pos+(a==='fwd'?30000:-30000));if(c.dur)c.pos=Math.min(c.pos,c.dur-1000);paintCast();nat('castControl',{action:'seek',ms:Math.round(c.pos)}).catch(function(){});return}
+  if(a==='stop'){nat('castControl',{action:'stop'}).catch(function(){});finishCast(c,false);toast('Diffusion arrêtée.')}
+}
+function scanCast(){
+  S.castScanning=true;if(sheet&&sheet.kind==='cast')renderSheet();
+  nat('castScan').then(function(r){S.castDevs=r.devices||[]},function(){S.castDevs=[]}).then(function(){S.castScanning=false;if(sheet&&sheet.kind==='cast')renderSheet()});
+}
+function castSheetHtml(){
+  var h='<div class="grab"></div><div class="in gut"><h2>Diffuser sur un écran</h2><p class="hint" style="margin:0">Le téléphone et l\'écran doivent être sur le même Wi-Fi. Une fois l\'écran choisi, les vidéos que tu lances y sont envoyées et le téléphone sert de télécommande.</p>';
+  var L=S.castDevs||[];
+  L.forEach(function(d){
+    var on=S.castDev&&S.castDev.id===d.id;
+    h+='<button type="button" class="castdev" data-castdev="'+esc(d.id)+'" aria-pressed="'+!!on+'"><span class="di">'+(d.type==='cast'?IC.cast:IC.tv)+'</span><span><b>'+esc(d.name)+'</b><small>'+(d.type==='cast'?'Chromecast / Google TV':'TV compatible DLNA')+(d.model?' · '+esc(d.model):'')+'</small></span>'+(on?'<span style="color:var(--accent2)">'+IC.check+'</span>':'<span></span>')+'</button>';
+  });
+  if(S.castScanning)h+='<div class="loading" style="padding:18px 0"><div class="spin"></div><p style="margin:0">Recherche des écrans sur ton Wi-Fi…</p></div>';
+  else if(!L.length)h+='<div class="empty"><p>Aucun écran trouvé. Vérifie que la TV est allumée et sur le même Wi-Fi que le téléphone. Sur une Samsung, la fonction s\'appelle souvent « Partage de contenu » ou « DLNA » dans les réglages Connexion de la TV.</p></div>';
+  h+='<div class="acts"><button type="button" class="btn ghost" data-castscan'+(S.castScanning?' disabled':'')+'>'+IC.refresh+'Rechercher à nouveau</button>'+(S.castDev?'<button type="button" class="btn danger" data-castoff>Ne plus diffuser</button>':'')+'</div>';
+  h+='<h3 style="margin:8px 0 0;font-size:1rem">Autre solution</h3><button type="button" class="castdev" data-mirror><span class="di">'+IC.phone+'</span><span><b>Dupliquer l\'écran du téléphone</b><small>Smart View sur Samsung, « Caster l\'écran » ailleurs : tout l\'écran s\'affiche sur la TV, quelle que soit l\'appli.</small></span><span></span></button>';
+  return h+'<div class="acts"><button type="button" class="btn" data-close>Fermer</button></div></div>';
+}
+
 function play(o){
   o.subMode=PREFS.subMode||'auto';
+  if(NATIVE&&S.castDev)return castStart(o);
   if(NATIVE)return window.Capacitor.nativePromise('IptvPlayer','play',o).catch(function(e){toast('Lecture impossible : '+((e&&e.message)||e));return {}});
   return new Promise(function(res){
     var el=$('#webplayer');
@@ -538,13 +627,13 @@ function playLive(item){
   var ex=liveExt();
   USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);saveUser();
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
-  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(){if(S.tab==='home'||S.tab==='live')render()});
+  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(){if(S.tab==='home'||S.tab==='live')render()});
 }
 function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
   var local=dlReady(k),info=sheet&&sheet.kind==='movie'&&sheet.item===item?sheet.info:null;
-  getSubs(k,subMeta('movie',item,info)).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
+  (S.castDev?Promise.resolve([]):getSubs(k,subMeta('movie',item,info))).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
     if(r&&(r.positionMs||r.ended))saveProgress(k,r,{kind:'movie',id:item.stream_id,name:item.name,icon:item.stream_icon});
     render();if(sheet&&sheet.kind==='movie')renderSheet();
   });
@@ -553,7 +642,7 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  getSubs(k,subMeta('series',series,info,ep)).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
+  (S.castDev?Promise.resolve([]):getSubs(k,subMeta('series',series,info,ep))).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
@@ -626,6 +715,7 @@ function topHtml(){
   var a=acc(),busy=Object.keys(UPD).length;
   return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span><div class="acc">'+
     (busy?'<span class="upd" title="Mise à jour du catalogue en arrière-plan"><i></i>Mise à jour</span>':'')+
+    (a&&NATIVE?'<button type="button" class="iconbtn'+(S.castDev?' on':'')+'" data-cast aria-label="'+(S.castDev?'Diffusion sur '+esc(S.castDev.name):'Diffuser sur un écran')+'">'+IC.cast+'</button>':'')+
     (a?'<button type="button" class="iconbtn" data-tab="search" aria-label="Rechercher">'+IC.search+'</button>':'')+
     (a?'<button type="button" class="pill" data-accounts'+(S.apkUpdate?' style="box-shadow:inset 0 0 0 2px var(--accent)" aria-label="Compte · mise à jour disponible"':'')+'>'+IC.user+'<span>'+esc(a.name)+'</span>'+(S.apkUpdate?'<span class="badge" style="padding:1px 5px">MAJ</span>':'')+'</button>':'')+'</div></div>'+
     (S.tab==='search'?'<div class="searchbar"><input id="q" type="search" placeholder="Chaîne, film, série…" value="'+esc(S.q)+'" autocomplete="off"></div>':'')+'</header>';
@@ -978,7 +1068,7 @@ function parseM3uLink(v){
   return q.username&&q.password?{server:m[1],username:q.username,password:q.password}:null;
 }
 function openSheet(s){sheet=s;renderSheet()}
-function closeSheet(){sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
+function closeSheet(){if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 function renderSheet(){
   var el=$('#sheet');if(!sheet){closeSheet();return}
   var h='<div class="panel" role="dialog" aria-modal="true">';
@@ -1015,6 +1105,8 @@ function renderSheet(){
       '<div class="acts"><button type="button" class="btn ghost" data-checkupd'+(S.updChecking?' disabled':'')+'>'+IC.refresh+(S.updChecking?'Recherche…':'Rechercher une mise à jour')+'</button>'+
       (S.apkUpdate?'<button type="button" class="btn red" data-getapk>'+IC.dl+'Télécharger la mise à jour'+(S.apkUpdate.tag?' ('+esc(S.apkUpdate.tag)+')':'')+'</button><p class="hint" style="margin:0;flex-basis:100%">Ouvre ensuite le fichier tv-streamy.apk pour l\'installer par-dessus : tes comptes et ta liste sont conservés.</p>':'')+'</div>';
     h+='<div class="acts"><button type="button" class="btn ghost" data-close>Fermer</button></div></div>';
+  }else if(sheet.kind==='cast'){
+    h+=castSheetHtml();
   }else if(sheet.kind==='groups'){
     var gs=groupsOf(sheet.sec),hg=hidG(sheet.sec),hc=hidC(sheet.sec),unit={live:'chaînes',vod:'films',series:'séries'}[sheet.sec];
     sheet.open=sheet.open||{};if(gs.length===1)sheet.open[gs[0].name]=true;
@@ -1136,7 +1228,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-gopen],[data-bdot],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1161,6 +1253,12 @@ document.addEventListener('click',function(e){
   if(d.more){S.limit[d.more]=(S.limit[d.more]||60)+60;var y=window.scrollY;render();window.scrollTo(0,y);return}
   if(t.hasAttribute('data-checkupd')){checkUpdate(true);return}
   if(t.hasAttribute('data-getapk')){openExternal(APK_URL);toast('Téléchargement de la mise à jour…');return}
+  if(t.hasAttribute('data-cast')){openSheet({kind:'cast'});scanCast();return}
+  if(t.hasAttribute('data-castscan')){scanCast();return}
+  if(d.castdev){var cd=(S.castDevs||[]).filter(function(x){return x.id===d.castdev})[0];if(cd){S.castDev=cd;closeSheet();paintTop();toast('Les vidéos seront envoyées sur « '+cd.name+' ». Lance une vidéo.')}return}
+  if(t.hasAttribute('data-castoff')){S.castDev=null;if(CAST){nat('castControl',{action:'disconnect'}).catch(function(){});finishCast(CAST,false)}closeSheet();paintTop();toast('Les vidéos sont de nouveau lues sur le téléphone.');return}
+  if(t.hasAttribute('data-mirror')){nat('castMirror').catch(function(e){toast((e&&e.message)||'Ouvre Smart View depuis les réglages rapides.')});return}
+  if(d.cc){castControl(d.cc);return}
   if(d.bdot){var bs=document.querySelector('.bslides');billTouch=Date.now();if(bs)bs.scrollTo({left:(+d.bdot)*bs.clientWidth,behavior:'smooth'});return}
   if(d.groups){openSheet({kind:'groups',sec:d.groups,back:sheet&&sheet.kind==='accounts'});return}
   if(d.gopen){sheet.open=sheet.open||{};sheet.open[d.gopen]=!sheet.open[d.gopen];renderSheet();return}
