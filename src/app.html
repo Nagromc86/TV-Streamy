@@ -303,8 +303,8 @@ function kget(k){return idb().then(function(db){return new Promise(function(res,
 function kset(k,v){return idb().then(function(db){return new Promise(function(res,rej){var tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=function(){res()};tx.onerror=function(){rej(tx.error)}})}).catch(function(){try{localStorage.setItem('iptv:'+k,JSON.stringify(v))}catch(e){}})}
 function kdel(k){return idb().then(function(db){return new Promise(function(res){var tx=db.transaction('kv','readwrite');tx.objectStore('kv').delete(k);tx.oncomplete=res;tx.onerror=res})}).catch(function(){})}
 var userTimer=null;
-function saveUser(){clearTimeout(userTimer);userTimer=setTimeout(function(){if(S.activeId)kset('user:'+S.activeId,USER)},300)}
-function saveAccounts(){return kset('accounts',{list:S.accounts,active:S.activeId})}
+function saveUser(){clearTimeout(userTimer);userTimer=setTimeout(function(){if(S.activeId)kset('user:'+S.activeId,USER)},300);syncSoon()}
+function saveAccounts(){syncSoon();return kset('accounts',{list:S.accounts,active:S.activeId,del:S.accDel||{}})}
 
 /* ---------- Xtream API ---------- */
 function acc(){return S.accounts.filter(function(a){return a.id===S.activeId})[0]||null}
@@ -400,7 +400,8 @@ function fkey(kind,id){return kind+':'+id}
 function isFav(kind,id){return !!USER.favs[fkey(kind,id)]}
 function toggleFav(kind,item){
   var k=fkey(kind,item.stream_id||item.series_id);
-  if(USER.favs[k])delete USER.favs[k];else USER.favs[k]={kind:kind,id:item.stream_id||item.series_id,at:Date.now()};
+  USER.favDel=USER.favDel||{};
+  if(USER.favs[k]){delete USER.favs[k];USER.favDel[k]=Date.now()}else USER.favs[k]={kind:kind,id:item.stream_id||item.series_id,at:Date.now()};
   saveUser();
 }
 function byId(kind,id){
@@ -658,7 +659,7 @@ function playInner(o){
 function liveExt(){var a=acc();return a&&a.format==='hls'?['m3u8','ts']:['ts','m3u8']}
 function playLive(item){
   var ex=liveExt();
-  USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);saveUser();
+  USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
   play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(){if(S.tab==='home'||S.tab==='live')render()});
 }
@@ -1102,7 +1103,7 @@ function viewSearch(){
 }
 function welcomeHtml(){
   return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
-    '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur ce téléphone.</p>'+accountForm({})+'</section></main>';
+    '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur ce téléphone.</p>'+accountForm({})+'<div class="acts" style="margin-top:18px"><button type="button" class="btn ghost" data-syncsetup="login">'+IC.refresh+'Déjà utilisé sur un autre appareil ? Récupérer mes comptes</button></div></section></main>';
 }
 function navHtml(){
   var t=[['home','Accueil',IC.home],['live','Direct',IC.tv],['movies','Films',IC.film],['series','Séries',IC.series],['favs','Ma liste',IC.star]];
@@ -1155,6 +1156,7 @@ function renderSheet(){
         '<button type="button" class="iconbtn" data-editacc="'+esc(a.id)+'" aria-label="Modifier">'+'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>'+'</button></div>';
     });
     h+='<div class="acts"><button type="button" class="btn" data-addacc>'+IC.plus+'Ajouter un compte</button></div>';
+    h+=syncHtml();
     if(DATA){
       h+='<h3 style="margin:8px 0 0;font-size:1rem">Catalogue</h3><p class="hint" style="margin:0">Mis à jour automatiquement une fois par jour, en arrière-plan. Le filtre masque des groupes (par langue ou pays) partout : listes, accueil, recherche. Tu peux aussi forcer une mise à jour :</p>';
       [['live','TV en direct',' chaînes'],['vod','Films',' films'],['series','Séries',' séries']].forEach(function(r){
@@ -1181,6 +1183,8 @@ function renderSheet(){
       '<div class="acts"><button type="button" class="btn ghost" data-checkupd'+(S.updChecking?' disabled':'')+'>'+IC.refresh+(S.updChecking?'Recherche…':'Rechercher une mise à jour')+'</button>'+
       (S.apkUpdate?'<button type="button" class="btn red" data-getapk>'+IC.dl+'Télécharger la mise à jour'+(S.apkUpdate.tag?' ('+esc(S.apkUpdate.tag)+')':'')+'</button><p class="hint" style="margin:0;flex-basis:100%">Ouvre ensuite le fichier tv-streamy.apk pour l\'installer par-dessus : tes comptes et ta liste sont conservés.</p>':'')+'</div>';
     h+='<div class="acts"><button type="button" class="btn ghost" data-close>Fermer</button></div></div>';
+  }else if(sheet.kind==='sync'){
+    h+=syncSheetHtml();
   }else if(sheet.kind==='cast'){
     h+=castSheetHtml();
   }else if(sheet.kind==='groups'){
@@ -1298,6 +1302,7 @@ function submitAccount(form){
     var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');
     var i=S.accounts.findIndex(function(x){return x.id===a.id});
     var changed=i<0||S.accounts[i].server!==a.server||S.accounts[i].username!==a.username||S.accounts[i].password!==a.password;
+    a.at=Date.now();
     if(i<0)S.accounts.push(a);else S.accounts[i]=a;
     closeSheet();
     if(changed){kdel('cat:'+a.id);return switchAccount(a.id)}
@@ -1307,7 +1312,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1316,6 +1321,11 @@ document.addEventListener('click',function(e){
       startDownload('ep:'+de.id,streamUrl('episode',de),de.container_extension,{kind:'ep',id:de.id,title:cleanName(ds.name)+' · '+lb,icon:ds.cover,
         ep:{id:de.id,season:de.season,episode_num:de.episode_num,title:de.title,container_extension:de.container_extension},series:{series_id:ds.series_id,name:ds.name,cover:ds.cover},subMeta:subMeta('series',ds,sheet.info&&sheet.info.info,de)})}
     return}
+  if(d.syncsetup){openSheet({kind:'sync',mode:d.syncsetup});return}
+  if(d.syncmode){sheet.mode=d.syncmode;renderSheet();return}
+  if(t.hasAttribute('data-syncnow')){syncNow(true);return}
+  if(t.hasAttribute('data-syncout')){if(t.getAttribute('data-confirm')!=='1'){t.setAttribute('data-confirm','1');t.textContent='Confirmer : désactiver la synchro ici';return}SYNC=null;syncKey=null;kdel('sync');renderSheet();toast('Synchro désactivée sur cet appareil. Tes données restent ici.');return}
+  if(t.hasAttribute('data-syncreset')){var em=($('#sy-email')||{}).value||'';if(!/^\S+@\S+\.\S+$/.test(em.trim())){toast('Indique d\'abord ton e-mail.');return}FBS.resetPassword(em.trim()).then(function(){toast('E-mail de réinitialisation envoyé à '+em.trim()+'. Ta phrase secrète, elle, ne change pas.')},function(e){toast(errText(e))});return}
   if(d.fcat){S.favCat=d.fcat;if(S.tab!=='favs')S.tab='favs';render();window.scrollTo(0,0);return}
   if(d.dlgroup){S.dlOpen=S.dlOpen||{};S.dlOpen[d.dlgroup]=!S.dlOpen[d.dlgroup];var y0=window.scrollY;render();window.scrollTo(0,y0);return}
   if(d.dlseries!==undefined){S.favCat='dl';if(d.dlseries){S.dlOpen=S.dlOpen||{};S.dlOpen[d.dlseries]=true}render();window.scrollTo(0,0);return}
@@ -1360,7 +1370,7 @@ document.addEventListener('click',function(e){
   if(d.useacc){closeSheet();switchAccount(d.useacc);return}
   if(d.delacc){
     if(t.getAttribute('data-confirm')!=='1'){t.setAttribute('data-confirm','1');t.textContent='Confirmer la suppression';return}
-    var id=d.delacc;S.accounts=S.accounts.filter(function(x){return x.id!==id});kdel('cat:'+id);kdel('user:'+id);
+    var id=d.delacc;S.accounts=S.accounts.filter(function(x){return x.id!==id});S.accDel=S.accDel||{};S.accDel[id]=Date.now();kdel('cat:'+id);kdel('user:'+id);
     closeSheet();
     if(S.activeId===id){S.activeId=S.accounts[0]?S.accounts[0].id:null;DATA=null;saveAccounts();if(S.activeId)switchAccount(S.activeId);else render()}else{saveAccounts();render()}
     return;
@@ -1373,28 +1383,28 @@ document.addEventListener('click',function(e){
   if(d.season){sheet.season=d.season;renderSheet();return}
 });
 function groupsChanged(sec){
-  saveUser();var k=kindOf(sec),ck=k==='live'?'liveCat':k==='movie'?'vodCat':'serCat';
+  USER.hiddenAt=Date.now();saveUser();var k=kindOf(sec),ck=k==='live'?'liveCat':k==='movie'?'vodCat':'serCat';
   if(S[ck]!=='all'&&S[ck]!=='fav'&&!visCats(k).some(function(c){return String(c.category_id)===String(S[ck])}))S[ck]='all';
   renderSheet();clearTimeout(groupsChanged.t);groupsChanged.t=setTimeout(function(){var y=window.scrollY;render();window.scrollTo(0,y)},250);
 }
 document.addEventListener('change',function(e){
   if(e.target.hasAttribute&&e.target.hasAttribute('data-hcat')&&sheet&&sheet.kind==='groups'){var ci=e.target.getAttribute('data-hcat');USER.hiddenCats=USER.hiddenCats||{};var hcs=USER.hiddenCats[sheet.sec]=USER.hiddenCats[sheet.sec]||{};if(e.target.checked)delete hcs[ci];else hcs[ci]=1;groupsChanged(sheet.sec);return}
-  if(e.target.hasAttribute&&e.target.hasAttribute('data-grp')&&sheet&&sheet.kind==='groups'){var g=e.target.getAttribute('data-grp');USER.hidden=USER.hidden||{};var hs=USER.hidden[sheet.sec]=USER.hidden[sheet.sec]||{};if(e.target.checked)delete hs[g];else hs[g]=1;groupsChanged(sheet.sec);return}if(e.target.id==='subMode'){PREFS.subMode=e.target.value;kset('prefs',PREFS);toast('Réglage des sous-titres enregistré.')}if(e.target.id==='allowMobile'){PREFS.allowMobile=e.target.checked;kset('prefs',PREFS);toast(PREFS.allowMobile?'Les téléchargements utiliseront aussi les données mobiles.':'Les téléchargements attendront le Wi-Fi.')}});
+  if(e.target.hasAttribute&&e.target.hasAttribute('data-grp')&&sheet&&sheet.kind==='groups'){var g=e.target.getAttribute('data-grp');USER.hidden=USER.hidden||{};var hs=USER.hidden[sheet.sec]=USER.hidden[sheet.sec]||{};if(e.target.checked)delete hs[g];else hs[g]=1;groupsChanged(sheet.sec);return}if(e.target.id==='subMode'){PREFS.subMode=e.target.value;savePrefs();toast('Réglage des sous-titres enregistré.')}if(e.target.id==='allowMobile'){PREFS.allowMobile=e.target.checked;kset('prefs',PREFS);toast(PREFS.allowMobile?'Les téléchargements utiliseront aussi les données mobiles.':'Les téléchargements attendront le Wi-Fi.')}});
 window.addEventListener('online',function(){render()});window.addEventListener('offline',function(){render()});
-document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target);if(e.target.id==='tmdbform')submitTmdb(e.target)});
+document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target);if(e.target.id==='syncform')submitSync(e.target);if(e.target.id==='tmdbform')submitTmdb(e.target)});
 function submitTmdb(f){
-  var k=$('#tmdb-key').value.trim(),err=$('#tmdberr'),ok=$('#tmdbok');err.hidden=true;ok.hidden=true;PREFS.tmdb=k;kset('prefs',PREFS);TREND=null;kdel('trend');
+  var k=$('#tmdb-key').value.trim(),err=$('#tmdberr'),ok=$('#tmdbok');err.hidden=true;ok.hidden=true;PREFS.tmdb=k;savePrefs();TREND=null;kdel('trend');
   if(!k){ok.textContent='TMDB désactivé : suggestions à partir de ton catalogue.';ok.hidden=false;softRender();return}
   var b=f.querySelector('[type=submit]');b.disabled=true;b.textContent='Test…';
   loadTrends(true).then(function(t){ok.textContent='Top chargés. Dans ton catalogue : '+PLAT.map(function(pl){return pl.name+' '+platTop(pl.k,'mix').length}).join(' · ')+' titres.';ok.hidden=false;var y=window.scrollY;render();window.scrollTo(0,y)}).catch(function(e){err.textContent='TMDB : '+errText(e);err.hidden=false}).then(function(){b.disabled=false;b.textContent='Enregistrer et tester'});
 }
 function submitOs(f){
   var k=$('#os-key').value.trim(),u=$('#os-user').value.trim(),pw=$('#os-pass').value,err=$('#oserr'),ok=$('#osok');err.hidden=true;ok.hidden=true;
-  if(!k){PREFS.os=null;kset('prefs',PREFS);ok.textContent='OpenSubtitles désactivé.';ok.hidden=false;return}
+  if(!k){PREFS.os=null;savePrefs();ok.textContent='OpenSubtitles désactivé.';ok.hidden=false;return}
   PREFS.os={key:k,user:u,pass:pw};
   var b=f.querySelector('[type=submit]');b.disabled=true;b.textContent='Test…';
   osReq('/infos/formats').then(function(){return u?osLogin(true):null}).then(function(){
-    kset('prefs',PREFS);subAvail={};
+    savePrefs();subAvail={};
     ok.textContent=u?'Connecté'+(PREFS.os.allowed?' : '+PREFS.os.allowed+' sous-titres par jour.':'.'):'Clé valide. Ajoute ton identifiant pour avoir plus de téléchargements par jour.';ok.hidden=false;
   }).catch(function(e){err.textContent='OpenSubtitles : '+errText(e);err.hidden=false}).then(function(){b.disabled=false;b.textContent='Enregistrer et tester'});
 }
@@ -1416,13 +1426,155 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 setInterval(dailyRefresh,60*60*1000);
 window.addEventListener('online',function(){dailyRefresh()});
 
+/* ---------- sync between devices: Firebase, end-to-end encrypted ----------
+   Everything is encrypted on the device (AES-GCM, key derived from a passphrase that never leaves it).
+   Firebase only stores an unreadable blob. Another backend (Google Drive…) only has to provide signIn / pull / push. */
+var FB={apiKey:'AIzaSyC6l1ooFC1rZAUaGJBBFNTH2Pi_V83ZouY',projectId:'tv-streamy'};
+var SYNC=null,syncKey=null,syncBusy=false,syncAgain=false,syncT=null,syncErr='',syncApplying=false;
+function b64e(buf){var b=new Uint8Array(buf),s='';for(var i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s)}
+function b64d(s){var b=atob(s),u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+function deriveKey(pass,salt){return crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']).then(function(base){return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:210000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},true,['encrypt','decrypt'])})}
+function encryptJson(key,obj){var iv=crypto.getRandomValues(new Uint8Array(12));return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(JSON.stringify(obj))).then(function(ct){return b64e(iv)+'.'+b64e(ct)})}
+function decryptJson(key,str){var p=String(str).split('.');return crypto.subtle.decrypt({name:'AES-GCM',iv:b64d(p[0])},key,b64d(p[1])).then(function(pt){return JSON.parse(new TextDecoder().decode(pt))})}
+function canon(o){if(Array.isArray(o))return '['+o.map(canon).join(',')+']';if(o&&typeof o==='object')return '{'+Object.keys(o).filter(function(k){return o[k]!==undefined}).sort().map(function(k){return JSON.stringify(k)+':'+canon(o[k])}).join(',')+'}';return JSON.stringify(o===undefined?null:o)}
+var FBE={EMAIL_EXISTS:'Un compte existe déjà avec cet e-mail : choisis « J\'ai déjà un compte ».',INVALID_LOGIN_CREDENTIALS:'E-mail ou mot de passe incorrect.',INVALID_PASSWORD:'Mot de passe incorrect.',EMAIL_NOT_FOUND:'Aucun compte avec cet e-mail.',INVALID_EMAIL:'Adresse e-mail invalide.',MISSING_PASSWORD:'Mot de passe manquant.',TOO_MANY_ATTEMPTS_TRY_LATER:'Trop d\'essais, réessaie dans quelques minutes.',OPERATION_NOT_ALLOWED:'La connexion par e-mail n\'est pas activée dans Firebase (Sécurité › Authentication › Mode de connexion).',ADMIN_ONLY_OPERATION:'La création de comptes est désactivée dans Firebase.',USER_DISABLED:'Ce compte est désactivé.'};
+function fbErr(j,status){var e=j&&j.error||{},m=e.message||('HTTP '+status);if(/^WEAK_PASSWORD/.test(m))return 'Mot de passe trop court (6 caractères minimum).';if(e.status==='PERMISSION_DENIED')return 'Firestore refuse l\'accès : vérifie que les règles ont bien été publiées.';if(e.status==='NOT_FOUND'&&/database/i.test(m))return 'Base Firestore introuvable : vérifie qu\'elle est bien créée.';return FBE[m.split(' ')[0]]||m}
+function fbFetch(url,opts){return withTimeout(fetch(url,opts),20000).then(function(r){return r.text().then(function(t){var j={};try{j=t?JSON.parse(t):{}}catch(x){}if(!r.ok){var e=new Error(fbErr(j,r.status));e.status=r.status;e.code=j&&j.error&&j.error.status;throw e}return j})})}
+var FBS={
+  signIn:function(email,pass,create){return fbFetch('https://identitytoolkit.googleapis.com/v1/accounts:'+(create?'signUp':'signInWithPassword')+'?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass,returnSecureToken:true})}).then(function(r){return {uid:r.localId,idToken:r.idToken,refresh:r.refreshToken,exp:Date.now()+(+r.expiresIn||3600)*1000-60000}})},
+  resetPassword:function(email){return fbFetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requestType:'PASSWORD_RESET',email:email})})},
+  token:function(){
+    if(SYNC.idToken&&Date.now()<SYNC.exp)return Promise.resolve(SYNC.idToken);
+    return fbFetch('https://securetoken.googleapis.com/v1/token?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(SYNC.refresh)})
+      .then(function(r){SYNC.idToken=r.id_token;SYNC.refresh=r.refresh_token||SYNC.refresh;SYNC.exp=Date.now()+(+r.expires_in||3600)*1000-60000;kset('sync',SYNC);return SYNC.idToken});
+  },
+  url:function(){return 'https://firestore.googleapis.com/v1/projects/'+FB.projectId+'/databases/(default)/documents/users/'+SYNC.uid+'/sync/state'},
+  pull:function(){return FBS.token().then(function(tk){return fbFetch(FBS.url(),{headers:{Authorization:'Bearer '+tk}}).then(function(d){var f=d.fields||{};return {blob:f.blob&&f.blob.stringValue,salt:f.salt&&f.salt.stringValue,ver:d.updateTime}},function(e){if(e.status===404&&e.code!=='PERMISSION_DENIED')return null;throw e})})},
+  push:function(blob,ver){return FBS.token().then(function(tk){
+    var pre=ver?'currentDocument.updateTime='+encodeURIComponent(ver):'currentDocument.exists=false';
+    return fbFetch(FBS.url()+'?'+pre,{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{blob:{stringValue:blob},salt:{stringValue:SYNC.salt},v:{integerValue:'1'},at:{integerValue:String(Date.now())}}})}).then(function(d){return d.updateTime});
+  })}
+};
+/* what is shared: accounts, favourites (+ deletions), resume points, recent channels, hidden groups, a few settings. Downloads stay on each device. */
+function userPart(u){u=u||{};return {favs:u.favs||{},favDel:u.favDel||{},prog:u.prog||{},recent:u.recent||[],recentAt:u.recentAt||0,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{},hiddenAt:u.hiddenAt||0}}
+function localState(){
+  return Promise.all(S.accounts.map(function(a){return a.id===S.activeId?Promise.resolve(USER):kget('user:'+a.id)})).then(function(us){
+    var users={};S.accounts.forEach(function(a,i){users[a.id]=userPart(us[i])});
+    return {v:1,accounts:S.accounts.map(function(a){return {id:a.id,name:a.name,server:a.server,username:a.username,password:a.password,format:a.format,info:a.info,maxConn:a.maxConn,at:a.at||0}}),
+      accDel:S.accDel||{},users:users,prefs:{subMode:PREFS.subMode||'auto',tmdb:PREFS.tmdb||'',os:PREFS.os?{key:PREFS.os.key,user:PREFS.os.user,pass:PREFS.os.pass}:null,at:PREFS.at||0}};
+  });
+}
+function newer(x,y){return ((x&&x.at)||0)>=((y&&y.at)||0)?x:y}
+function maxMap(a,b){var o=Object.assign({},a||{});Object.keys(b||{}).forEach(function(k){o[k]=Math.max(o[k]||0,b[k]||0)});return o}
+function mergeMap(a,b){var o=Object.assign({},a||{});Object.keys(b||{}).forEach(function(k){o[k]=o[k]?newer(o[k],b[k]):b[k]});return o}
+function mergeUser(x,y){
+  x=userPart(x);y=userPart(y);var old=Date.now()-120*864e5;
+  var favDel=maxMap(x.favDel,y.favDel),favs=mergeMap(x.favs,y.favs);
+  Object.keys(favs).forEach(function(k){if(favDel[k]&&favDel[k]>=(favs[k].at||0))delete favs[k]});
+  Object.keys(favDel).forEach(function(k){if(favDel[k]<old)delete favDel[k]});
+  var prog=mergeMap(x.prog,y.prog),pk=Object.keys(prog);
+  if(pk.length>2000)pk.sort(function(a,b){return (prog[b].at||0)-(prog[a].at||0)}).slice(2000).forEach(function(k){delete prog[k]});
+  var r=x.recentAt>=y.recentAt?x:y,h=x.hiddenAt>=y.hiddenAt?x:y;
+  return {favs:favs,favDel:favDel,prog:prog,recent:r.recent,recentAt:r.recentAt,hidden:h.hidden,hiddenCats:h.hiddenCats,hiddenAt:h.hiddenAt};
+}
+function mergeState(L,R){
+  if(!R)return L;
+  var accDel=maxMap(L.accDel,R.accDel),acc={},order=[];
+  (L.accounts||[]).concat(R.accounts||[]).forEach(function(a){if(!acc[a.id])order.push(a.id);acc[a.id]=acc[a.id]?newer(acc[a.id],a):a});
+  var accounts=order.map(function(id){return acc[id]}).filter(function(a){return !(accDel[a.id]&&accDel[a.id]>=(a.at||0))});
+  var users={};accounts.forEach(function(a){users[a.id]=mergeUser((L.users||{})[a.id],(R.users||{})[a.id])});
+  return {v:1,accounts:accounts,accDel:accDel,users:users,prefs:newer(L.prefs,R.prefs)};
+}
+function applyState(M){
+  syncApplying=true;
+  var before=S.accounts.map(function(a){return a.id}).join(','),activeGone=S.activeId&&!M.accounts.some(function(a){return a.id===S.activeId});
+  S.accounts=M.accounts.map(function(a){var cur=S.accounts.filter(function(x){return x.id===a.id})[0]||{};return Object.assign({},cur,a)});
+  S.accDel=M.accDel;
+  var jobs=M.accounts.map(function(a){
+    var part=M.users[a.id];
+    if(a.id===S.activeId){Object.assign(USER,part);return kset('user:'+a.id,USER)}
+    return kget('user:'+a.id).then(function(u){return kset('user:'+a.id,Object.assign({favs:{},prog:{},recent:[],downloads:{}},u||{},part))});
+  });
+  var pr=M.prefs||{};
+  if(pr.at>(PREFS.at||0)){PREFS.subMode=pr.subMode;PREFS.tmdb=pr.tmdb;var tok=PREFS.os&&PREFS.os.user===(pr.os&&pr.os.user)?PREFS.os:{};PREFS.os=pr.os?Object.assign({},tok,pr.os):null;PREFS.at=pr.at;jobs.push(kset('prefs',PREFS))}
+  if(activeGone||!S.activeId)S.activeId=S.accounts[0]?S.accounts[0].id:null;
+  jobs.push(kset('accounts',{list:S.accounts,active:S.activeId,del:S.accDel}));
+  return Promise.all(jobs).then(function(){
+    syncApplying=false;
+    if(activeGone||(!DATA&&S.activeId&&before!==S.accounts.map(function(a){return a.id}).join(','))){if(S.activeId)switchAccount(S.activeId);else{DATA=null;render()}}
+    else softRender();
+  },function(){syncApplying=false});
+}
+function syncNow(manual){
+  if(!SYNC||!syncKey)return Promise.resolve();
+  if(syncBusy){syncAgain=true;return Promise.resolve()}
+  if(navigator.onLine===false){if(manual)toast('Pas de connexion : la synchro se fera plus tard.');return Promise.resolve()}
+  syncBusy=true;clearTimeout(syncT);
+  var tries=0;
+  var run=function(){
+    return Promise.all([localState(),FBS.pull()]).then(function(r){
+      var L=r[0],rem=r[1];
+      return (rem&&rem.blob?decryptJson(syncKey,rem.blob).catch(function(){throw new Error('la phrase secrète ne correspond pas aux données en ligne')}):Promise.resolve(null)).then(function(R){
+        var M=mergeState(L,R),mc=canon(M),job=Promise.resolve();
+        if(mc!==canon(L))job=applyState(M);
+        if(!R||mc!==canon(R))job=job.then(function(){return encryptJson(syncKey,M)}).then(function(blob){return FBS.push(blob,rem&&rem.ver)});
+        return job;
+      });
+    }).catch(function(e){if((e.code==='FAILED_PRECONDITION'||e.code==='ALREADY_EXISTS'||e.status===409)&&tries++<3)return run();throw e});
+  };
+  return run().then(function(){SYNC.last=Date.now();syncErr='';kset('sync',SYNC);if(manual)toast('Synchronisé.')},function(e){syncErr=errText(e);if(manual)toast('Synchro impossible : '+syncErr)})
+    .then(function(){syncBusy=false;if(sheet&&sheet.kind==='accounts')renderSheet();if(syncAgain){syncAgain=false;syncSoon()}});
+}
+function syncSoon(){if(!SYNC||syncApplying)return;clearTimeout(syncT);syncT=setTimeout(function(){syncNow(false)},4000)}
+function savePrefs(){PREFS.at=Date.now();kset('prefs',PREFS);syncSoon()}
+function syncHtml(){
+  if(!SYNC)return '<h3 style="margin:8px 0 0;font-size:1rem">Synchro entre appareils</h3><p class="hint" style="margin:0">Retrouve tes comptes, favoris, reprises de lecture et filtres sur tous tes appareils. Tout est chiffré sur l\'appareil avec ta phrase secrète.</p><div class="acts"><button type="button" class="btn ghost" data-syncsetup="new">'+IC.refresh+'Activer la synchro</button></div>';
+  var t=SYNC.last?new Date(SYNC.last):null;
+  return '<h3 style="margin:8px 0 0;font-size:1rem">Synchro entre appareils</h3><div class="updrow"><span><b>'+esc(SYNC.email)+'</b><small>'+(syncBusy?'Synchronisation…':t?'Dernière synchro '+(sameDay(+t)?'aujourd\'hui':t.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' à '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'):'Pas encore synchronisé')+'</small>'+(syncErr?'<small style="color:var(--accent2)">'+esc(syncErr)+'</small>':'')+'</span><button type="button" class="btn ghost" data-syncnow'+(syncBusy?' disabled':'')+'>'+IC.refresh+'Synchro</button></div>'+
+    '<div class="acts"><button type="button" class="btn ghost" data-syncout>Désactiver sur cet appareil</button></div>';
+}
+function syncSheetHtml(){
+  var nw=sheet.mode!=='login';
+  return '<div class="grab"></div><div class="in gut"><h2>Synchro entre appareils</h2><p class="hint" style="margin:0">Tes comptes Xtream, favoris, reprises de lecture, filtres et réglages sont retrouvés sur tous tes appareils. Ils sont chiffrés ici avec ta <b>phrase secrète</b> avant d\'être envoyés : personne d\'autre, pas même Google, ne peut les lire. Les vidéos téléchargées restent sur chaque appareil.</p>'+
+    '<div class="tabs"><button type="button" class="chip" data-syncmode="new" aria-pressed="'+nw+'">Premier appareil</button><button type="button" class="chip" data-syncmode="login" aria-pressed="'+!nw+'">J\'ai déjà un compte</button></div>'+
+    '<form class="form" id="syncform"><div class="fld"><label for="sy-email">E-mail</label><input id="sy-email" type="email" autocomplete="email" autocapitalize="off" value="'+esc(sheet.email||'')+'"></div>'+
+    '<div class="fld"><label for="sy-pass">Mot de passe du compte</label><input id="sy-pass" type="password" autocomplete="'+(nw?'new-password':'current-password')+'"><span class="hint">'+(nw?'6 caractères minimum. Sert à te connecter.':'Celui choisi sur ton premier appareil.')+'</span></div>'+
+    '<div class="fld"><label for="sy-phrase">Phrase secrète</label><input id="sy-phrase" type="password" autocomplete="off"><span class="hint">'+(nw?'8 caractères minimum, différente du mot de passe. Elle chiffre tes données et ne quitte jamais l\'appareil : <b>note-la</b>, elle sera demandée sur chaque nouvel appareil et ne peut pas être récupérée.':'La même que sur ton premier appareil.')+'</span></div>'+
+    (nw?'<div class="fld"><label for="sy-phrase2">Confirme la phrase secrète</label><input id="sy-phrase2" type="password" autocomplete="off"></div>':'')+
+    '<p class="err" id="syerr" hidden></p><p class="okmsg" id="syok" hidden></p><div class="acts"><button type="submit" class="btn">'+(nw?'Créer mon compte et synchroniser':'Se connecter et synchroniser')+'</button>'+(nw?'':'<button type="button" class="btn ghost" data-syncreset>Mot de passe oublié</button>')+'</div></form>'+
+    '<div class="acts"><button type="button" class="btn ghost" data-close>Annuler</button></div></div>';
+}
+function submitSync(f){
+  var nw=sheet.mode!=='login',email=$('#sy-email').value.trim(),pass=$('#sy-pass').value,ph=$('#sy-phrase').value,err=$('#syerr'),b=f.querySelector('[type=submit]');
+  var bad=function(m){err.textContent=m;err.hidden=false};err.hidden=true;sheet.email=email;
+  if(!/^\S+@\S+\.\S+$/.test(email))return bad('Indique une adresse e-mail valide.');
+  if(pass.length<6)return bad('Mot de passe : 6 caractères minimum.');
+  if(ph.length<8)return bad('Phrase secrète : 8 caractères minimum.');
+  if(nw&&ph!==$('#sy-phrase2').value)return bad('Les deux phrases secrètes sont différentes.');
+  if(ph===pass)return bad('Choisis une phrase secrète différente du mot de passe.');
+  if(!(window.crypto&&crypto.subtle))return bad('Le chiffrement n\'est pas disponible sur cet appareil.');
+  b.disabled=true;b.textContent='Connexion…';
+  var auth,key,salt;
+  FBS.signIn(email,pass,nw).then(function(a){auth=a;SYNC={email:email,uid:a.uid,idToken:a.idToken,refresh:a.refresh,exp:a.exp};b.textContent='Chiffrement…';return FBS.pull()}).then(function(rem){
+    salt=rem&&rem.salt?rem.salt:b64e(crypto.getRandomValues(new Uint8Array(16)));
+    return deriveKey(ph,b64d(salt)).then(function(k){key=k;if(rem&&rem.blob)return decryptJson(k,rem.blob).catch(function(){throw new Error('Phrase secrète incorrecte : ce n\'est pas celle utilisée sur ton premier appareil.')})});
+  }).then(function(){return crypto.subtle.exportKey('raw',key)}).then(function(raw){
+    SYNC.salt=salt;SYNC.key=b64e(raw);syncKey=key;return kset('sync',SYNC);
+  }).then(function(){closeSheet();toast('Synchro activée.');return syncNow(true)}).catch(function(e){SYNC=null;syncKey=null;bad(errText(e));b.disabled=false;b.textContent=nw?'Créer mon compte et synchroniser':'Se connecter et synchroniser'});
+}
+
 /* ---------- start ---------- */
 function refreshTrends(){loadTrends(false).then(function(t){if(t&&DATA&&!sheet){softRender()}})}
 setTimeout(refreshTrends,1200);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')refreshTrends()});
 if(NATIVE)setTimeout(function(){checkUpdate(false)},5000);
 render();
 kget('prefs').then(function(p){if(p)PREFS=Object.assign(PREFS,p)});
+var syncReady=kget('sync').then(function(c){if(c&&c.key&&window.crypto&&crypto.subtle){SYNC=c;return crypto.subtle.importKey('raw',b64d(c.key),{name:'AES-GCM'},true,['encrypt','decrypt']).then(function(k){syncKey=k})}}).catch(function(){});
+setTimeout(function(){syncReady.then(function(){syncNow(false)})},2500);
+setInterval(function(){if(!document.hidden)syncNow(false)},60000);
+document.addEventListener('visibilitychange',function(){if(!SYNC)return;if(document.visibilityState==='visible')syncNow(false);else if(syncT){syncNow(false)}});
 kget('accounts').then(function(r){
+  if(r&&r.del)S.accDel=r.del;
   if(r&&r.list&&r.list.length){S.accounts=r.list;S.activeId=r.active&&r.list.some(function(a){return a.id===r.active})?r.active:r.list[0].id;return switchAccount(S.activeId)}
   render();
 });
