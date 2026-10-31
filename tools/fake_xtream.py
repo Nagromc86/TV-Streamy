@@ -81,7 +81,7 @@ class H(BaseHTTPRequestHandler):
         a = q.get('action', '')
         if a == '':
             return self.send({'user_info': {'username': 'demo', 'auth': 1, 'status': 'Active', 'exp_date': str(NOW + 200 * 86400),
-                                            'max_connections': '2', 'active_cons': '0', 'allowed_output_formats': ['m3u8', 'ts']},
+                                            'max_connections': '1', 'active_cons': '0', 'allowed_output_formats': ['m3u8', 'ts']},
                               'server_info': {'url': 'localhost', 'port': '8899', 'timestamp_now': NOW}})
         cat = q.get('category_id')
         if a == 'get_live_categories': return self.send(LIVE_CATS)

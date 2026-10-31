@@ -236,6 +236,7 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 #webplayer .bar{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top,0px))}
 #webplayer .bar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .welcome h1{font-family:var(--display);font-weight:800;font-size:2.1rem;line-height:1.02;margin:24px 0 8px;letter-spacing:-.02em}
+@media (max-width:440px){.brand{font-size:1.1rem;gap:5px}.brand svg{width:22px;height:22px}.top .in{gap:6px}.acc{gap:6px}.iconbtn{width:36px;height:36px}.pill{padding:6px 10px;max-width:42vw}}
 @keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.panel{animation:none}.spin,.upd i{animation-duration:3s}}
@@ -383,7 +384,12 @@ function loadCatalog(){
     });
   }).then(function(){S.loading='';render()});
 }
+function refreshAccountInfo(a){
+  if(!a||navigator.onLine===false)return;
+  api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){a.maxConn=+ui.max_connections||1;var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');saveAccounts()}},function(){});
+}
 function switchAccount(id){
+  setTimeout(function(){refreshAccountInfo(S.accounts.filter(function(x){return x.id===id})[0])},4000);
   S.activeId=id;DATA=null;USER={favs:{},prog:{},recent:[],downloads:{}};epgCache={};S.liveCat=S.vodCat=S.serCat='all';S.limit={};
   saveAccounts();
   return kget('user:'+id).then(function(u){if(u)USER=Object.assign({favs:{},prog:{},recent:[],downloads:{}},u);pollDownloads()}).then(function(){return loadCatalog()});
@@ -417,16 +423,21 @@ function dlOf(k){return (USER.downloads||{})[k]||null}
 function dlReady(k){var d=dlOf(k);return d&&d.status==='done'&&d.localUri?d:null}
 function safeFile(s){return String(s||'video').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9._ -]+/g,' ').replace(/\s+/g,' ').trim().slice(0,60)||'video'}
 function size(b){if(!b)return '';var g=b/1073741824;return g>=1?g.toFixed(1).replace('.',',')+' Go':b<1048576?'< 1 Mo':Math.round(b/1048576)+' Mo'}
-function startDownload(k,url,ext,meta){
-  if(!NATIVE){toast('Le téléchargement fonctionne dans l\'appli Android.');return}
+function maxConn(){var a=acc();return Math.max(1,+(a&&a.maxConn)||1)}
+function dlActive(d){return d&&(d.status==='queued'||d.status==='pending'||d.status==='running')}
+function startDownload(k,url,ext,meta,quiet){
+  if(!NATIVE){toast('Le téléchargement fonctionne dans l\'appli Android.');return Promise.resolve()}
   var file=safeFile(meta.title)+' - '+k.replace(':','-')+'.'+(ext||'mp4');
-  nat('download',{url:url,fileName:file,title:meta.title,allowMobile:!!PREFS.allowMobile}).then(function(r){
-    USER.downloads[k]=Object.assign({},meta,{dlId:r.id,file:file,status:'pending',bytes:0,total:0,at:Date.now()});saveUser();
-    toast(PREFS.allowMobile?'Téléchargement lancé.':'Téléchargement lancé. Il se fait en Wi-Fi (réglable dans le compte).');
+  var before=Object.keys(USER.downloads||{}).filter(function(x){return dlActive(USER.downloads[x])}).length;
+  return nat('download',{url:url,fileName:file,title:meta.title,allowMobile:!!PREFS.allowMobile,conns:Math.min(4,maxConn())}).then(function(r){
+    USER.downloads[k]=Object.assign({},meta,{dlId:r.id,file:file,status:'queued',bytes:0,total:0,at:Date.now()});saveUser();
+    if(!quiet)toast((before?'Ajouté à la file d\'attente ('+before+' avant).':'Téléchargement lancé.')+(PREFS.allowMobile?'':' Il se fait en Wi-Fi (réglable dans le compte).'));
     refreshUi();pollDownloads();
     if(meta.subMeta)getSubs(k,meta.subMeta,true);
   },function(e){toast((e&&e.message)||'Téléchargement impossible.')});
 }
+function pauseDl(k){var d=dlOf(k);if(!d)return;d.status='paused';saveUser();refreshUi();nat('pauseDownload',{id:d.dlId}).catch(function(){})}
+function resumeDl(k){var d=dlOf(k);if(!d)return;d.status='queued';d.error='';saveUser();refreshUi();nat('resumeDownload',{id:d.dlId}).then(pollDownloads,function(){})}
 function removeDownload(k){
   var d=dlOf(k);if(!d)return;
   (NATIVE?nat('removeDownload',{id:d.dlId}):Promise.resolve()).catch(function(){}).then(function(){delete USER.downloads[k];saveUser();refreshUi();toast('Téléchargement supprimé.')});
@@ -443,22 +454,26 @@ function pollDownloads(){
     keys.forEach(function(k){
       var d=USER.downloads[k],x=by[d.dlId];
       if(!x){if(d.status==='done'&&d.localUri)return;delete USER.downloads[k];changed=true;return}
-      if(d.status!==x.status||d.bytes!==x.bytes||d.localUri!==x.localUri){changed=true}
-      d.status=x.status;d.bytes=x.bytes;d.total=x.total>0?x.total:d.total;d.localUri=x.localUri||d.localUri;d.reason=x.reason;
-      if(x.status==='pending'||x.status==='running'||x.status==='paused')active=true;
+      if(d.status!==x.status||d.bytes!==x.bytes||d.localUri!==x.localUri||d.wait!==x.wait){changed=true}
+      d.status=x.status==='pending'?'queued':x.status;d.bytes=x.bytes;d.total=x.total>0?x.total:d.total;d.localUri=x.localUri||d.localUri;d.reason=x.reason;d.wait=x.wait||'';d.speed=x.speed||0;d.error=x.error||'';
+      if(dlActive(d)||(x.status==='paused'&&!/^e/.test(d.dlId)))active=true;
     });
     if(changed){saveUser();refreshUi()}
-    if(active)pollT=setTimeout(pollDownloads,2000);
+    if(active)pollT=setTimeout(pollDownloads,1500);
   },function(){});
 }
 function refreshUi(){if(sheet)renderSheet();if(S.tab==='favs'||S.tab==='home'||S.tab==='movies')render()}
+function spd(b){return b>=1048576?(b/1048576).toFixed(1).replace('.',',')+' Mo/s':Math.round(b/1024)+' Ko/s'}
+function eta(sec){sec=Math.round(sec);if(sec>=3600)return Math.floor(sec/3600)+' h '+String(Math.floor(sec/60)%60).padStart(2,'0');return Math.max(1,Math.round(sec/60))+' min'}
 function dlLabel(d){
   if(!d)return '';
   if(d.status==='done')return 'Téléchargé'+(d.total?' · '+size(d.total):'');
-  if(d.status==='failed')return 'Échec du téléchargement';
-  if(d.status==='paused')return PREFS.allowMobile?'En pause (connexion)':'En attente du Wi-Fi';
+  if(d.status==='failed')return 'Échec'+(d.error?' : '+d.error:'')+' · touche Réessayer';
+  if(d.status==='paused')return 'En pause'+(d.total?' · '+Math.floor(d.bytes/d.total*100)+' %':'');
   var pc=d.total?Math.floor(d.bytes/d.total*100):0;
-  return d.status==='pending'?'En attente…':'Téléchargement '+pc+' %'+(d.total?' · '+size(d.total):'');
+  if(d.status==='running')return pc+' %'+(d.speed?' · '+spd(d.speed):'')+(d.speed&&d.total?' · reste '+eta((d.total-d.bytes)/d.speed):'')+(d.total?' · '+size(d.total):'');
+  var w={queue:'En file d\'attente',hold:'En pause pendant la lecture',wifi:'En attente du Wi-Fi',network:'En attente de connexion',retry:'Connexion perdue, nouvel essai…'}[d.wait]||'En attente…';
+  return w+(pc?' · '+pc+' %':'');
 }
 
 /* ---------- French subtitles from OpenSubtitles (optional, needs a free account) ---------- */
@@ -616,6 +631,15 @@ function castSheetHtml(){
 
 function play(o){
   o.subMode=PREFS.subMode||'auto';
+  var stream=!/^(file|content):/.test(o.url)||!!(NATIVE&&S.castDev);
+  var busy=Object.keys(USER.downloads||{}).some(function(k){return dlActive(USER.downloads[k])});
+  if(NATIVE&&stream&&busy&&maxConn()<=1){
+    nat('holdDownloads',{hold:true}).catch(function(){});toast('Téléchargements en pause pendant la lecture (ton abonnement autorise un seul écran).');
+    return playInner(o).then(function(r){nat('holdDownloads',{hold:false}).then(pollDownloads,function(){});return r},function(e){nat('holdDownloads',{hold:false}).catch(function(){});throw e});
+  }
+  return playInner(o);
+}
+function playInner(o){
   if(NATIVE&&S.castDev)return castStart(o);
   if(NATIVE)return window.Capacitor.nativePromise('IptvPlayer','play',o).catch(function(e){toast('Lecture impossible : '+((e&&e.message)||e));return {}});
   return new Promise(function(res){
@@ -995,13 +1019,16 @@ function viewGrid(kind){
   return h+'</div>'+(pg.more?moreHtml(key):'')+(!L.length?'<div class="empty"><p>'+(S[catKey]==='fav'?'Ajoute des titres à ta liste depuis leur fiche.':'Rien dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
 function downloadsHtml(){
-  var L=Object.keys(USER.downloads||{}).map(function(k){return Object.assign({k:k},USER.downloads[k])}).sort(function(a,b){return b.at-a.at});
+  var rk={running:0,queued:1,pending:1,paused:2,failed:3,done:4};
+  var L=Object.keys(USER.downloads||{}).map(function(k){return Object.assign({k:k},USER.downloads[k])}).sort(function(a,b){var r=(rk[a.status]||0)-(rk[b.status]||0);if(r)return r;return a.status==='done'?b.at-a.at:a.at-b.at});
   if(!L.length)return '';
   var h='<section class="sec"><div class="sech"><h2>Téléchargements</h2>'+(freeBytes?'<span class="muted" style="font-size:.8rem">'+size(freeBytes)+' libres</span>':'')+'</div><div>';
   L.forEach(function(d){
     var pc=d.total?Math.floor(d.bytes/d.total*100):0,done=d.status==='done';
     h+='<div class="dlrow"><span class="art">'+(d.icon?'<img loading="lazy" src="'+esc(d.icon)+'" alt="" onerror="this.remove()">':'')+'</span><span style="min-width:0"><b>'+esc(d.title)+'</b><small class="'+(done?'ok':'')+'">'+esc(dlLabel(d))+'</small>'+(!done&&d.status!=='failed'?'<span class="dlbar"><i style="width:'+pc+'%"></i></span>':'')+'</span>'+
-      '<span class="dlacts">'+(done?'<button type="button" class="iconbtn" data-dlplay="'+esc(d.k)+'" aria-label="Regarder">'+IC.play+'</button>':'')+
+      '<span class="dlacts">'+(done?'<button type="button" class="iconbtn" data-dlplay="'+esc(d.k)+'" aria-label="Regarder">'+IC.play+'</button>':
+        dlActive(d)?'<button type="button" class="iconbtn" data-dlpause="'+esc(d.k)+'" aria-label="Mettre en pause">'+IC.pause+'</button>':
+        '<button type="button" class="iconbtn" data-dlresume="'+esc(d.k)+'" aria-label="'+(d.status==='failed'?'Réessayer':'Reprendre')+'">'+IC.refresh+'</button>')+
       (S.confirmDl===d.k?'<button type="button" class="epdl warn" data-dlrm="'+esc(d.k)+'">Supprimer ?</button>':'<button type="button" class="iconbtn" data-dlask="'+esc(d.k)+'" aria-label="Supprimer">'+IC.x+'</button>')+'</span></div>';
   });
   return h+'</div><p class="hint">Les fichiers restent dans l\'appli et se regardent sans connexion. Ils sont supprimés si tu désinstalles l\'appli.</p></section>';
@@ -1090,6 +1117,7 @@ function renderSheet(){
         h+='<div class="updrow"><span><b>'+r[1]+' · '+nf(visList(r[0]).length)+r[2]+'</b><small>'+esc(updLabel(r[0]))+(nh?' · '+nh+' masqué'+(nh>1?'s':''):'')+'</small></span><span class="acts" style="flex-wrap:nowrap"><button type="button" class="btn ghost" data-groups="'+r[0]+'" aria-label="Filtrer les groupes">'+IC.filter+'</button><button type="button" class="btn ghost" data-refresh="'+r[0]+'"'+(UPD[r[0]]?' disabled':'')+'>'+IC.refresh+(UPD[r[0]]?'En cours':'Actualiser')+'</button></span></div>';
       });
     }
+    if(NATIVE){var mc=maxConn();h+='<p class="hint" style="margin:0">Téléchargements : un à la fois, reprise automatique après une coupure'+(mc>1?', jusqu\'à '+Math.min(4,mc)+' connexions en parallèle':'')+'. Ton abonnement autorise '+mc+' écran'+(mc>1?'s':'')+(mc<=1?' : la file se met en pause pendant que tu regardes une vidéo en ligne.':'.')+'</p>'}
     if(NATIVE)h+='<label class="chk"><input type="checkbox" id="allowMobile"'+(PREFS.allowMobile?' checked':'')+'><span>Télécharger aussi en données mobiles (4G/5G)<br><span class="hint" style="font-weight:400">Sinon, les téléchargements attendent le Wi-Fi.</span></span></label>';
     var o=PREFS.os||{};
     h+='<h3 style="margin:8px 0 0;font-size:1rem">Suggestions</h3><form class="form" id="tmdbform"><p class="hint" style="margin:0">Pour afficher les Top Netflix, Prime Video et Disney+ du moment en France (seulement les titres présents dans ton catalogue), l\'appli utilise TMDB : compte gratuit. Sans clé : nouveautés et mieux notés de ton catalogue.</p>'+
@@ -1154,6 +1182,8 @@ function renderSheet(){
     if(!sheet.loading)checkSubs('series:'+s.series_id,subMeta('series',s,inf));
     if(sheet.loading)h+='<p class="hint">Chargement des épisodes…</p>';
     if(seasons.length){
+      var sEps=eps[sheet.season]||[],sTodo=sEps.filter(function(ep){return !dlOf('ep:'+ep.id)});
+      if(NATIVE&&sEps.length>1)h+=sTodo.length?'<button type="button" class="btn ghost" data-dlseason="'+esc(sheet.season)+'" style="align-self:flex-start">'+IC.dl+'Télécharger la saison '+esc(sheet.season)+' ('+sTodo.length+' épisode'+(sTodo.length>1?'s':'')+')</button>':'<p class="okmsg" style="margin:0">Saison '+esc(sheet.season)+' téléchargée ou en cours.</p>';
       h+='<div class="tabs">'+seasons.map(function(n){return '<button type="button" class="chip" data-season="'+esc(n)+'" aria-pressed="'+(String(n)===String(sheet.season))+'">Saison '+esc(n)+'</button>'}).join('')+'</div><div>';
       (eps[sheet.season]||[]).forEach(function(ep){
         var pe=progressOf('ep:'+ep.id),pc=pe&&pe.dur&&!pe.done?Math.min(100,pe.pos/pe.dur*100):0,ei=ep.info||{};
@@ -1219,6 +1249,7 @@ function submitAccount(form){
     var ui=r&&r.user_info;
     if(!ui||String(ui.auth)!=='1')throw new Error('identifiant ou mot de passe refusé par le serveur.');
     if(ui.status&&ui.status!=='Active')throw new Error('abonnement « '+ui.status+' ».');
+    a.maxConn=+ui.max_connections||1;
     var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');
     var i=S.accounts.findIndex(function(x){return x.id===a.id});
     var changed=i<0||S.accounts[i].server!==a.server||S.accounts[i].username!==a.username||S.accounts[i].password!==a.password;
@@ -1231,7 +1262,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1239,6 +1270,14 @@ document.addEventListener('click',function(e){
     if(de&&ds){var lb='S'+String(de.season).padStart(2,'0')+'E'+String(de.episode_num).padStart(2,'0');
       startDownload('ep:'+de.id,streamUrl('episode',de),de.container_extension,{kind:'ep',id:de.id,title:cleanName(ds.name)+' · '+lb,icon:ds.cover,
         ep:{id:de.id,season:de.season,episode_num:de.episode_num,title:de.title,container_extension:de.container_extension},series:{series_id:ds.series_id,name:ds.name,cover:ds.cover},subMeta:subMeta('series',ds,sheet.info&&sheet.info.info,de)})}
+    return}
+  if(d.dlpause){pauseDl(d.dlpause);return}
+  if(d.dlresume){resumeDl(d.dlresume);return}
+  if(d.dlseason&&sheet&&sheet.kind==='series'){var ss=sheet.item,se=(sheet.info.episodes||{})[d.dlseason]||[],todo=se.filter(function(ep){return !dlOf('ep:'+ep.id)});
+    todo.reduce(function(pr,de){de.season=de.season||d.dlseason;var lb='S'+String(de.season).padStart(2,'0')+'E'+String(de.episode_num).padStart(2,'0');
+      return pr.then(function(){return startDownload('ep:'+de.id,streamUrl('episode',de),de.container_extension,{kind:'ep',id:de.id,title:cleanName(ss.name)+' · '+lb,icon:ss.cover,
+        ep:{id:de.id,season:de.season,episode_num:de.episode_num,title:de.title,container_extension:de.container_extension},series:{series_id:ss.series_id,name:ss.name,cover:ss.cover},subMeta:subMeta('series',ss,sheet.info&&sheet.info.info,de)},true)})},Promise.resolve())
+      .then(function(){toast(todo.length+' épisode'+(todo.length>1?'s':'')+' ajouté'+(todo.length>1?'s':'')+' à la file : ils se téléchargent un par un.');renderSheet()});
     return}
   if(d.dlask){if(sheet)sheet.confirmDl=d.dlask;else S.confirmDl=d.dlask;if(sheet)renderSheet();else render();return}
   if(d.dlrm){if(sheet)sheet.confirmDl=null;S.confirmDl=null;removeDownload(d.dlrm);return}
