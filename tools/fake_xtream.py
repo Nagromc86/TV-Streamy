@@ -47,6 +47,21 @@ SERIES.append(dict(SERIES[0], category_id='21'))
 SERIES.append(dict(SERIES[1], series_id=7100, name='VOSTFR ★ Brigade Nord'))
 VOD.append(dict(VOD[6], stream_id=5100, name='VOSTFR | Comète (2016) [4K]'))
 
+import os
+if os.environ.get('BIG'):
+    # catalogue the size of a real provider: 22k channels, 89k films, 27k series in ~460 categories
+    groups = ['FR', 'AR', 'MA', 'VIP', 'EN', 'DE', 'ES', 'IT', 'TR', 'PT']
+    LIVE_CATS = [{'category_id': str(100 + i), 'category_name': '%s ◉ Chaînes %d' % (groups[i % 10], i), 'parent_id': 0} for i in range(460)]
+    LIVE = [{'num': i, 'name': '%s | Chaîne %d' % (groups[i % 10], i), 'stream_type': 'live', 'stream_id': 100000 + i, 'stream_icon': '',
+             'epg_channel_id': 'c%d' % i, 'added': str(NOW - i * 60), 'category_id': str(100 + i % 460), 'tv_archive': 0} for i in range(22000)]
+    VOD_CATS = [{'category_id': str(1000 + i), 'category_name': '%s ★ Films %d' % (groups[i % 10], i), 'parent_id': 0} for i in range(300)]
+    VOD = [{'num': i, 'name': '%s | Film numéro %d (%d)' % (groups[i % 10], i, 1980 + i % 45), 'stream_type': 'movie', 'stream_id': 200000 + i,
+            'stream_icon': 'http://localhost:8899/img/%d.svg' % (i % 50), 'rating': str(round(4 + (i * 0.37) % 5, 1)), 'added': str(NOW - i * 300),
+            'category_id': str(1000 + i % 300), 'container_extension': 'mkv'} for i in range(89000)]
+    SER_CATS = [{'category_id': str(3000 + i), 'category_name': '%s ◉ Séries %d' % (groups[i % 10], i), 'parent_id': 0} for i in range(104)]
+    SERIES = [{'num': i, 'name': '%s ★ Série numéro %d' % (groups[i % 10], i), 'series_id': 400000 + i, 'cover': 'http://localhost:8899/img/%d.svg' % (i % 50),
+               'plot': '', 'genre': 'Drame', 'releaseDate': '2015-01-01', 'last_modified': str(NOW - i * 500), 'rating': str(round(5 + (i * 0.29) % 4, 1)),
+               'category_id': str(3000 + i % 104)} for i in range(27000)]
 VOD2 = dict(VOD[0], stream_id=5900, name='Film Exclusif Bonus (2020)', stream_icon='http://localhost:8899/img/5900.svg')
 LIVE2 = dict(LIVE[0], stream_id=1900, name='FR | Chaîne Bonus', epg_channel_id='bonus.fr')
 
