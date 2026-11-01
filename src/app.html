@@ -292,6 +292,12 @@ html.avplaying #app,html.avplaying #nav,html.avplaying #castbar{visibility:hidde
 .accs{display:block;color:var(--muted);font-size:.72rem;font-weight:600;margin-top:3px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .xres{min-width:0}
 .ch .n b .accs{font-weight:600}
+.setsec{border-radius:12px;background:var(--surface2)}
+.sethead{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;background:none;color:var(--ink);text-align:left;padding:14px 14px;border-radius:12px}
+.sethead b{display:block;font-size:1rem}.sethead small{display:block;color:var(--muted);font-size:.8rem;margin-top:2px}
+.sethead svg{width:22px;height:22px;flex:none;transition:transform .2s;color:var(--muted)}.sethead[aria-expanded="true"] svg{transform:rotate(180deg)}
+.setbody{display:flex;flex-direction:column;gap:12px;padding:0 14px 16px}
+.setbody .updrow,.setbody .accrow{background:var(--surface)}
 @keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.panel{animation:none}.spin,.upd i{animation-duration:3s}}
@@ -601,7 +607,9 @@ function subMeta(kind,x,info,ep){
   return {kind:kind,title:title,year:year(i.releasedate||i.release_date||i.releaseDate||x.releaseDate||x.name),tmdb:i.tmdb_id||i.tmdb||x.tmdb||x.tmdb_id||'',imdb:i.imdb_id||'',season:ep&&ep.season,episode:ep&&ep.episode_num};
 }
 function b64utf8(t){return btoa(unescape(encodeURIComponent(t)))}
-function subTrack(c){return {url:'data:application/x-subrip;base64,'+b64utf8(c.srt),label:'Français · OpenSubtitles',lang:'fr'}}
+function subTrack(c){return {url:'data:application/x-subrip;base64,'+b64utf8(c.srt),label:'Français · OpenSubtitles',lang:'fr',offset:c.offset||0}}
+/* the delay chosen in the player is remembered for this film / episode */
+function keepSubOffset(k,subs,r){if(!subs||!subs.length||!r||typeof r.subOffsetMs!=='number'||r.subOffsetMs===(subs[0].offset||0))return;kget('sub:'+k).then(function(c){if(c){c.offset=r.subOffsetMs;kset('sub:'+k,c)}})}
 /* returns [] or [one French track]; never blocks playback for long, never fails */
 function getSubs(key,meta,quiet){
   if(TIZEN)return Promise.resolve([]);
@@ -665,7 +673,7 @@ function castStart(o){
   return new Promise(function(res){
     var hasSubs=!!(o.subtitles&&o.subtitles.length),subsOn=hasSubs&&curSubMode()!=='never';
     var c={o:o,dev:dev,state:'buffering',pos:o.startMs||0,dur:0,res:res,seen:false,t0:Date.now(),subs:hasSubs,subsOn:subsOn};CAST=c;paintCast();
-    nat('castPlay',{id:dev.id,url:url,title:o.title,subtitle:o.subtitle||'',image:o.image||'',mime:mimeOf(url),startMs:o.startMs||0,live:!!o.live,subtitles:hasSubs?o.subtitles:[],subsOn:subsOn}).then(function(){castPoll()},function(e){
+    nat('castPlay',{id:dev.id,url:url,title:o.title,subtitle:o.subtitle||'',image:o.image||'',mime:mimeOf(url),startMs:o.startMs||0,live:!!o.live,subtitles:hasSubs?o.subtitles:[],subsOn:subsOn,subOffset:o.subOffset||0}).then(function(){castPoll()},function(e){
       if(CAST===c){CAST=null;paintCast()}toast((e&&e.message)||'Diffusion impossible.');res({});
     });
   });
@@ -762,7 +770,7 @@ function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
   var local=dlReady(k),info=sheet&&sheet.kind==='movie'&&sheet.item===item?sheet.info:null;
-  getSubs(k,subMeta('movie',item,info)).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
+  getSubs(k,subMeta('movie',item,info)).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,subs,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended))saveProgress(k,r,{kind:'movie',id:item.stream_id,name:item.name,icon:item.stream_icon});
     render();if(sheet&&sheet.kind==='movie')renderSheet();
   });
@@ -771,7 +779,7 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  getSubs(k,subMeta('series',series,info,ep)).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs})}).then(function(r){
+  getSubs(k,subMeta('series',series,info,ep)).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,subs,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
@@ -1337,39 +1345,47 @@ function renderSheetInner(){
   var h='<div class="panel" role="dialog" aria-modal="true">';
   if(sheet.kind==='accounts'){
     var cp=prof();
-    h+='<div class="grab"></div><div class="in gut"><div class="updrow" style="background:none;padding:0">'+'<span style="display:flex;align-items:center;gap:12px">'+avatarHtml(cp,44)+'<span><b>'+esc(cp?cp.name:'')+'</b><small>Profil actuel</small></span></span><button type="button" class="btn ghost" data-profswitch>Changer de profil</button></div><h2>Comptes</h2>';
+    h+='<div class="grab"></div><div class="in gut"><div class="updrow" style="background:none;padding:0">'+'<span style="display:flex;align-items:center;gap:12px">'+avatarHtml(cp,44)+'<span><b>'+esc(cp?cp.name:'')+'</b><small>Profil actuel</small></span></span><button type="button" class="btn ghost" data-profswitch>Changer de profil</button></div><h2>Réglages</h2>';
+    var act=S.accounts.filter(function(a){return a.id===S.activeId})[0];
+    h+=secOpen('acc','Listes de lecture',S.accounts.length+' liste'+(S.accounts.length>1?'s':'')+(act?' · active : '+esc(act.name):''));
     S.accounts.forEach(function(a){
       h+='<div class="accrow'+(a.id===S.activeId?' on':'')+'"><div class="n"><b>'+esc(a.name)+'</b><small>'+esc(a.server)+' · '+esc(a.username)+'</small>'+(a.info?'<small>'+esc(a.info)+'</small>':'')+'</div>'+
         (a.id===S.activeId?'<span class="livetag" style="color:var(--accent)">Actif</span>':'<button type="button" class="btn ghost" data-useacc="'+esc(a.id)+'">Utiliser</button>')+
         '<button type="button" class="iconbtn" data-editacc="'+esc(a.id)+'" aria-label="Modifier">'+'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>'+'</button></div>';
     });
-    h+='<div class="acts"><button type="button" class="btn" data-addacc>'+IC.plus+'Ajouter un compte</button></div>';
-    h+=syncHtml();
+    h+='<div class="acts"><button type="button" class="btn" data-addacc>'+IC.plus+'Ajouter un compte</button></div>'+secClose;
+    h+=secOpen('sync','Synchro entre appareils',SYNC?esc(SYNC.email)+(syncErr?' · erreur':''):'Désactivée')+syncHtml()+secClose;
     if(DATA){
-      h+='<h3 style="margin:8px 0 0;font-size:1rem">Catalogue</h3><p class="hint" style="margin:0">Mis à jour automatiquement une fois par jour, en arrière-plan. Le filtre masque des groupes (par langue ou pays) partout : listes, accueil, recherche. Tu peux aussi forcer une mise à jour :</p>';
+      var nhAll=hidCount('live')+hidCount('vod')+hidCount('series');
+      h+=secOpen('cat','Catalogue et filtres','Mise à jour chaque jour'+(nhAll?' · '+nhAll+' masqué'+(nhAll>1?'s':''):''))+'<p class="hint" style="margin:0">Mis à jour automatiquement une fois par jour, en arrière-plan. Le filtre masque des groupes (par langue ou pays) partout : listes, accueil, recherche. Tu peux aussi forcer une mise à jour :</p>';
       [['live','TV en direct',' chaînes'],['vod','Films',' films'],['series','Séries',' séries']].forEach(function(r){
         var nh=hidCount(r[0]);
         h+='<div class="updrow"><span><b>'+r[1]+' · '+nf(visList(r[0]).length)+r[2]+'</b><small>'+esc(updLabel(r[0]))+(nh?' · '+nh+' masqué'+(nh>1?'s':''):'')+'</small></span><span class="acts" style="flex-wrap:nowrap"><button type="button" class="btn ghost" data-groups="'+r[0]+'" aria-label="Filtrer les groupes">'+IC.filter+'</button><button type="button" class="btn ghost" data-refresh="'+r[0]+'"'+(UPD[r[0]]?' disabled':'')+'>'+IC.refresh+(UPD[r[0]]?'En cours':'Actualiser')+'</button></span></div>';
       });
+      h+=secClose;
     }
-    if(NATIVE){var mc=maxConn();h+='<p class="hint" style="margin:0">Téléchargements : un à la fois, reprise automatique après une coupure'+(mc>1?', jusqu\'à '+Math.min(4,mc)+' connexions en parallèle':'')+'. Ton abonnement autorise '+mc+' écran'+(mc>1?'s':'')+(mc<=1?' : la file se met en pause pendant que tu regardes une vidéo en ligne.':'.')+'</p>'}
+    if(NATIVE){var mc=maxConn();h+=secOpen('dl','Téléchargements',PREFS.allowMobile?'Wi-Fi et données mobiles':'Wi-Fi uniquement');h+='<p class="hint" style="margin:0">Téléchargements : un à la fois, reprise automatique après une coupure'+(mc>1?', jusqu\'à '+Math.min(4,mc)+' connexions en parallèle':'')+'. Ton abonnement autorise '+mc+' écran'+(mc>1?'s':'')+(mc<=1?' : la file se met en pause pendant que tu regardes une vidéo en ligne.':'.')+'</p>'}
     if(NATIVE)h+='<label class="chk"><input type="checkbox" id="allowMobile"'+(PREFS.allowMobile?' checked':'')+'><span>Télécharger aussi en données mobiles (4G/5G)<br><span class="hint" style="font-weight:400">Sinon, les téléchargements attendent le Wi-Fi.</span></span></label>';
+    if(NATIVE)h+=secClose;
     var o=PREFS.os||{};
-    h+='<h3 style="margin:8px 0 0;font-size:1rem">Suggestions</h3><form class="form" id="tmdbform"><p class="hint" style="margin:0">Pour afficher les Top Netflix, Prime Video et Disney+ du moment en France (seulement les titres présents dans ton catalogue), l\'appli utilise TMDB : compte gratuit. Sans clé : nouveautés et mieux notés de ton catalogue.</p>'+
+    h+=secOpen('tmdb','The Movie Database (suggestions)',PREFS.tmdb?'Activé · Top Netflix, Prime Video, Disney+':'Non configuré')+'<form class="form" id="tmdbform"><p class="hint" style="margin:0">Pour afficher les Top Netflix, Prime Video et Disney+ du moment en France (seulement les titres présents dans ton catalogue), l\'appli utilise TMDB : compte gratuit. Sans clé : nouveautés et mieux notés de ton catalogue.</p>'+
       '<div class="fld"><label for="tmdb-key">Clé API TMDB</label><input id="tmdb-key" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(PREFS.tmdb||'')+'" placeholder="Clé API ou jeton de lecture"></div>'+
       '<p class="err" id="tmdberr" hidden></p><p class="okmsg" id="tmdbok"'+(PREFS.tmdb&&TREND?'':' hidden')+'>'+(TREND?esc('Top Netflix, Prime Video et Disney+ chargés.'):'')+'</p>'+
-      '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>';
-    h+='<h3 style="margin:8px 0 0;font-size:1rem">Sous-titres</h3>'+
+      '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
+    h+=secOpen('subs','Sous-titres',{auto:'Si la vidéo n\'est pas en français',always:'Toujours',never:'Jamais'}[curSubMode()]+' · réglage du profil')+
       '<div class="fld"><label for="subMode">Afficher les sous-titres français</label><select id="subMode"><option value="auto"'+(curSubMode()==='auto'?' selected':'')+'>Seulement si la vidéo n\'est pas en français</option><option value="always"'+(curSubMode()==='always'?' selected':'')+'>Toujours</option><option value="never"'+(curSubMode()==='never'?' selected':'')+'>Jamais (activables avec CC)</option></select></div>'+
+      '<p class="hint" style="margin:0">Pendant la lecture, le bouton « Sous-titres » du lecteur permet de les décaler s\'ils sont en avance ou en retard.</p>'+secClose+
+      secOpen('os','OpenSubtitles',o.key?'Activé'+(o.user?' · '+esc(o.user):''):'Non configuré')+
       '<form class="form" id="osform"><p class="hint" style="margin:0">Quand une vidéo n\'a pas de sous-titres, l\'appli peut les chercher sur OpenSubtitles (compte gratuit, environ 20 par jour). Ils sont gardés sur le téléphone, aussi pour les téléchargements.</p>'+
       '<div class="fld"><label for="os-key">Clé API OpenSubtitles</label><input id="os-key" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(o.key||'')+'" placeholder="Laisse vide pour ne pas l\'utiliser"></div>'+
       '<div class="fld"><label for="os-user">Identifiant OpenSubtitles</label><input id="os-user" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(o.user||'')+'"></div>'+
       '<div class="fld"><label for="os-pass">Mot de passe OpenSubtitles</label><input id="os-pass" type="password" value="'+esc(o.pass||'')+'"></div>'+
       '<p class="err" id="oserr" hidden></p><p class="okmsg" id="osok"'+(o.key&&o.remaining!=null?'':' hidden')+'>'+(o.remaining!=null?esc(o.remaining+' téléchargement'+(o.remaining>1?'s':'')+' restant'+(o.remaining>1?'s':'')+' aujourd\'hui'):'')+'</p>'+
-      '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>';
-    h+='<h3 style="margin:8px 0 0;font-size:1rem">Appli</h3><p class="hint" style="margin:0">Version de l\'appli : '+esc(APP_VERSION)+'</p>'+
+      '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
+    h+=secOpen('app','Appli et mises à jour','Version '+esc(APP_VERSION)+(S.apkUpdate?' · mise à jour disponible':''))+'<p class="hint" style="margin:0">Version de l\'appli : '+esc(APP_VERSION)+'</p>'+
       '<div class="acts"><button type="button" class="btn ghost" data-checkupd'+(S.updChecking?' disabled':'')+'>'+IC.refresh+(S.updChecking?'Recherche…':'Rechercher une mise à jour')+'</button>'+
       (S.apkUpdate?'<button type="button" class="btn red" data-getapk>'+IC.dl+'Télécharger la mise à jour'+(S.apkUpdate.tag?' ('+esc(S.apkUpdate.tag)+')':'')+'</button><p class="hint" style="margin:0;flex-basis:100%">Ouvre ensuite le fichier tv-streamy.apk pour l\'installer par-dessus : tes comptes et ta liste sont conservés.</p>':'')+'</div>';
+    h+=secClose;
     h+='<div class="acts"><button type="button" class="btn ghost" data-close>Fermer</button></div></div>';
   }else if(sheet.kind==='prof'){
     h+=profSheetHtml();
@@ -1502,7 +1518,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1526,6 +1542,7 @@ document.addEventListener('click',function(e){
   if(d.xopen||d.xplay){var parts=(d.xopen||d.xplay).split('|'),xacc=parts[0],what=parts[1];closeSheet();
     toast('Liste « '+accName(xacc)+' » activée.');
     switchAccount(xacc).then(function(){if(d.xopen){var w=what.split(':');openItem(w[0],w.slice(1).join(':'))}else{var ch=byId('live',what);if(ch)playLive(ch)}});return}
+  if(d.setsec){S.setOpen[d.setsec]=!S.setOpen[d.setsec];var sb=t.nextElementSibling;if(sb)sb.hidden=!S.setOpen[d.setsec];t.setAttribute('aria-expanded',!!S.setOpen[d.setsec]);return}
   if(d.syncsetup){openSheet({kind:'sync',mode:d.syncsetup});return}
   if(d.syncmode){sheet.mode=d.syncmode;renderSheet();return}
   if(t.hasAttribute('data-syncnow')){syncNow(true);return}
@@ -1743,10 +1760,14 @@ function syncNow(manual){
 }
 function syncSoon(){if(!SYNC||syncApplying)return;clearTimeout(syncT);syncT=setTimeout(function(){syncNow(false)},4000)}
 function savePrefs(){PREFS.at=Date.now();kset('prefs',PREFS);syncSoon()}
+/* settings: one fold-out section per topic, remembered while the app is open */
+S.setOpen={acc:true};
+function secOpen(id,title,sum){var o=!!S.setOpen[id];return '<section class="setsec"><button type="button" class="sethead" data-setsec="'+id+'" aria-expanded="'+o+'"><span><b>'+title+'</b>'+(sum?'<small>'+sum+'</small>':'')+'</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="setbody"'+(o?'':' hidden')+'>'}
+var secClose='</div></section>';
 function syncHtml(){
-  if(!SYNC)return '<h3 style="margin:8px 0 0;font-size:1rem">Synchro entre appareils</h3><p class="hint" style="margin:0">Retrouve tes comptes, favoris, reprises de lecture et filtres sur tous tes appareils. Tout est chiffré sur l\'appareil avec ta phrase secrète.</p><div class="acts"><button type="button" class="btn ghost" data-syncsetup="new">'+IC.refresh+'Activer la synchro</button></div>';
+  if(!SYNC)return '<p class="hint" style="margin:0">Retrouve tes comptes, favoris, reprises de lecture et filtres sur tous tes appareils. Tout est chiffré sur l\'appareil avec ta phrase secrète.</p><div class="acts"><button type="button" class="btn ghost" data-syncsetup="new">'+IC.refresh+'Activer la synchro</button></div>';
   var t=SYNC.last?new Date(SYNC.last):null;
-  return '<h3 style="margin:8px 0 0;font-size:1rem">Synchro entre appareils</h3><div class="updrow"><span><b>'+esc(SYNC.email)+'</b><small>'+(syncBusy?'Synchronisation…':t?'Dernière synchro '+(sameDay(+t)?'aujourd\'hui':t.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' à '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'):'Pas encore synchronisé')+'</small>'+(syncErr?'<small style="color:var(--accent2)">'+esc(syncErr)+'</small>':'')+'</span><button type="button" class="btn ghost" data-syncnow'+(syncBusy?' disabled':'')+'>'+IC.refresh+'Synchro</button></div>'+
+  return '<div class="updrow"><span><b>'+esc(SYNC.email)+'</b><small>'+(syncBusy?'Synchronisation…':t?'Dernière synchro '+(sameDay(+t)?'aujourd\'hui':t.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' à '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'):'Pas encore synchronisé')+'</small>'+(syncErr?'<small style="color:var(--accent2)">'+esc(syncErr)+'</small>':'')+'</span><button type="button" class="btn ghost" data-syncnow'+(syncBusy?' disabled':'')+'>'+IC.refresh+'Synchro</button></div>'+
     '<div class="acts"><button type="button" class="btn ghost" data-syncout>Désactiver sur cet appareil</button></div>';
 }
 function syncSheetHtml(){

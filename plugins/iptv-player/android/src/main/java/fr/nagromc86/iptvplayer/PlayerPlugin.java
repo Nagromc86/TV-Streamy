@@ -46,6 +46,7 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_LIVE, call.getBoolean("live", false));
         intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", ""));
         intent.putExtra(PlayerActivity.EXTRA_SUB_MODE, call.getString("subMode", "auto"));
+        intent.putExtra(PlayerActivity.EXTRA_SUB_OFFSET, call.getData().optLong("subOffset", 0L));
         JSArray subs = call.getArray("subtitles");
         if (subs != null && subs.length() > 0) {
             String[] urls = new String[subs.length()];
@@ -265,7 +266,7 @@ public class PlayerPlugin extends Plugin {
             if (data.startsWith("data:") && comma > 0) {
                 try {
                     String srt = new String(android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
-                    String[] urls = SubServer.publish(srt);
+                    String[] urls = SubServer.publish(srt, call.getData().optLong("subOffset", 0L));
                     if (urls != null) {
                         srtUrl = urls[0];
                         vttUrl = urls[1];
@@ -441,6 +442,7 @@ public class PlayerPlugin extends Plugin {
             ret.put("positionMs", data.getLongExtra(PlayerActivity.RESULT_POSITION, 0L));
             ret.put("durationMs", data.getLongExtra(PlayerActivity.RESULT_DURATION, 0L));
             ret.put("ended", data.getBooleanExtra(PlayerActivity.RESULT_ENDED, false));
+            ret.put("subOffsetMs", data.getLongExtra(PlayerActivity.RESULT_SUB_OFFSET, 0L));
             String error = data.getStringExtra(PlayerActivity.RESULT_ERROR);
             if (error != null) {
                 ret.put("error", error);
