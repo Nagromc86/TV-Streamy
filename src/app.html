@@ -858,7 +858,7 @@ function moreHtml(key){return '<button type="button" class="morebtn" data-more="
 /* ---------- views ---------- */
 function topHtml(){
   var a=acc(),busy=Object.keys(UPD).length;
-  return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#e50914"/><path d="M8.6 4.6l3.4 3.4 3.4-3.4" fill="none" stroke="#f5c518" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="8.4" width="16" height="11.2" rx="2.8" fill="#f5c518"/><path d="M10.4 11.6v5l4.3-2.5z" fill="#e50914"/></svg>TV Streamy</span><div class="acc">'+
+  return '<header class="top gut'+(BILL&&DATA?' over':' solid')+'" id="topbar"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#f5c518"/><path d="M8.6 4.6l3.4 3.4 3.4-3.4" fill="none" stroke="#e50914" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="8.4" width="16" height="11.2" rx="2.8" fill="#e50914"/><path d="M10.4 11.6v5l4.3-2.5z" fill="#f5c518"/></svg>TV Streamy</span><div class="acc">'+
     (busy?'<span class="upd" title="Mise à jour du catalogue en arrière-plan"><i></i>Mise à jour</span>':'')+
     (a&&NATIVE&&!TV?'<button type="button" class="iconbtn'+(S.castDev?' on':'')+'" data-cast aria-label="'+(S.castDev?'Diffusion sur '+esc(S.castDev.name):'Diffuser sur un écran')+'">'+IC.cast+'</button>':'')+
     (a?'<button type="button" class="iconbtn" data-tab="search" aria-label="Rechercher">'+IC.search+'</button>':'')+
@@ -1292,7 +1292,7 @@ function elsewhereHtml(kind,x){
   return out.length?'<div><p class="hint" style="margin:0 0 6px">Aussi dans tes autres listes</p><div class="tabs" style="flex-wrap:wrap">'+out.join('')+'</div></div>':'';
 }
 function welcomeHtml(){
-  return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#e50914"/><path d="M8.6 4.6l3.4 3.4 3.4-3.4" fill="none" stroke="#f5c518" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="8.4" width="16" height="11.2" rx="2.8" fill="#f5c518"/><path d="M10.4 11.6v5l4.3-2.5z" fill="#e50914"/></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
+  return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#f5c518"/><path d="M8.6 4.6l3.4 3.4 3.4-3.4" fill="none" stroke="#e50914" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="8.4" width="16" height="11.2" rx="2.8" fill="#e50914"/><path d="M10.4 11.6v5l4.3-2.5z" fill="#f5c518"/></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
     '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur ce téléphone.</p>'+accountForm({})+'<div class="acts" style="margin-top:18px"><button type="button" class="btn ghost" data-syncsetup="login">'+IC.refresh+'Déjà utilisé sur un autre appareil ? Récupérer mes comptes</button></div></section></main>';
 }
 function navHtml(){
@@ -1303,7 +1303,7 @@ function navHtml(){
 function softRender(){if(sheet&&sheet.kind!=='accounts'){paintTop();return}var y=window.scrollY;render();window.scrollTo(0,y)}
 function pickerHtml(){
   var edit=S.profEdit,cur=prof();
-  var h='<main class="gut picker"><div class="brand" style="margin:24px auto 0;justify-content:center;display:flex">'+'<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#e50914"/><path d="M8.6 4.6l3.4 3.4 3.4-3.4" fill="none" stroke="#f5c518" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="8.4" width="16" height="11.2" rx="2.8" fill="#f5c518"/><path d="M10.4 11.6v5l4.3-2.5z" fill="#e50914"/></svg>TV Streamy</div>'+
+  var h='<main class="gut picker"><div class="brand" style="margin:24px auto 0;justify-content:center;display:flex">'+'<svg viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="5.5" fill="#f5c518"/><path d="M8.6 4.6l3.4 3.4 3.4-3.4" fill="none" stroke="#e50914" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="8.4" width="16" height="11.2" rx="2.8" fill="#e50914"/><path d="M10.4 11.6v5l4.3-2.5z" fill="#f5c518"/></svg>TV Streamy</div>'+
     '<h1>'+(edit?'Gérer les profils':'Qui regarde ?')+'</h1><div class="pgrid">';
   S.profiles.forEach(function(pp){h+='<button type="button" class="ptile'+(pp.id===S.profileId?' on':'')+'" data-'+(edit?'profedit':'profuse')+'="'+esc(pp.id)+'">'+avatarHtml(pp,96)+(edit?'<span class="pen">'+'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>'+'</span>':'')+'<b>'+esc(pp.name)+'</b></button>'});
   if(S.profiles.length<8)h+='<button type="button" class="ptile" data-profnew><span class="avatar add" style="width:96px;height:96px">'+IC.plus+'</span><b>Ajouter</b></button>';
