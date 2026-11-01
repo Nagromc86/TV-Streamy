@@ -47,6 +47,9 @@ SERIES.append(dict(SERIES[0], category_id='21'))
 SERIES.append(dict(SERIES[1], series_id=7100, name='VOSTFR ★ Brigade Nord'))
 VOD.append(dict(VOD[6], stream_id=5100, name='VOSTFR | Comète (2016) [4K]'))
 
+VOD2 = dict(VOD[0], stream_id=5900, name='Film Exclusif Bonus (2020)', stream_icon='http://localhost:8899/img/5900.svg')
+LIVE2 = dict(LIVE[0], stream_id=1900, name='FR | Chaîne Bonus', epg_channel_id='bonus.fr')
+
 def b64(s):
     return base64.b64encode(s.encode()).decode()
 
@@ -76,8 +79,13 @@ class H(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(body))); self.end_headers(); return self.wfile.write(body)
         if u.path != '/player_api.php':
             return self.send({'error': 'not found'}, 404)
-        if q.get('username') != 'demo' or q.get('password') != 'demo':
+        user = q.get('username')
+        if (user, q.get('password')) not in (('demo', 'demo'), ('demo2', 'demo2')):
             return self.send({'user_info': {'auth': 0}})
+        # second playlist "demo2": part of the same catalogue plus its own titles
+        VODL = VOD if user == 'demo' else [x for x in VOD if x['stream_id'] % 2 == 0] + [VOD2]
+        SERL = SERIES if user == 'demo' else SERIES[2:4]
+        LIVEL = LIVE if user == 'demo' else LIVE[:5] + [LIVE2]
         a = q.get('action', '')
         if a == '':
             return self.send({'user_info': {'username': 'demo', 'auth': 1, 'status': 'Active', 'exp_date': str(NOW + 200 * 86400),
@@ -85,13 +93,13 @@ class H(BaseHTTPRequestHandler):
                               'server_info': {'url': 'localhost', 'port': '8899', 'timestamp_now': NOW}})
         cat = q.get('category_id')
         if a == 'get_live_categories': return self.send(LIVE_CATS)
-        if a == 'get_live_streams': return self.send([x for x in LIVE if not cat or x['category_id'] == cat])
+        if a == 'get_live_streams': return self.send([x for x in LIVEL if not cat or x['category_id'] == cat])
         if a == 'get_vod_categories': return self.send(VOD_CATS)
-        if a == 'get_vod_streams': return self.send([x for x in VOD if not cat or x['category_id'] == cat])
+        if a == 'get_vod_streams': return self.send([x for x in VODL if not cat or x['category_id'] == cat])
         if a == 'get_series_categories': return self.send(SER_CATS)
-        if a == 'get_series': return self.send([x for x in SERIES if not cat or x['category_id'] == cat])
+        if a == 'get_series': return self.send([x for x in SERL if not cat or x['category_id'] == cat])
         if a == 'get_vod_info':
-            v = next((x for x in VOD if str(x['stream_id']) == q.get('vod_id')), None)
+            v = next((x for x in VOD + [VOD2] if str(x['stream_id']) == q.get('vod_id')), None)
             if not v: return self.send([])
             return self.send({'info': {'name': v['name'], 'plot': 'Résumé de test pour « %s ».' % v['name'], 'genre': 'Aventure',
                                        'director': 'Jeanne Martin', 'cast': 'Paul Durand, Léa Petit', 'duration': '01:52:00',

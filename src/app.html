@@ -289,6 +289,9 @@ html.avplaying #app,html.avplaying #nav,html.avplaying #castbar{visibility:hidde
 #tvplayer .times{display:flex;justify-content:space-between;color:#ddd;margin-top:8px;font-variant-numeric:tabular-nums}
 #tvplayer .hint{color:#aaa;margin-top:12px}
 #tvplayer .spin{position:absolute;left:50%;top:50%;margin:-20px 0 0 -20px;width:40px;height:40px}
+.accs{display:block;color:var(--muted);font-size:.72rem;font-weight:600;margin-top:3px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xres{min-width:0}
+.ch .n b .accs{font-weight:600}
 @keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.panel{animation:none}.spin,.upd i{animation-duration:3s}}
@@ -478,6 +481,7 @@ function refreshAccountInfo(a){
   api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){a.maxConn=+ui.max_connections||1;var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');saveAccounts()}},function(){});
 }
 function switchAccount(id){
+  XCAT={};XLOAD={};
   setTimeout(function(){refreshAccountInfo(S.accounts.filter(function(x){return x.id===id})[0])},4000);
   S.activeId=id;DATA=null;USER={favs:{},prog:{},recent:[],downloads:{}};epgCache={};S.liveCat=S.vodCat=S.serCat='all';S.limit={};
   saveAccounts();
@@ -1182,15 +1186,85 @@ function viewFavs(){
   if(live.length){h+='<section class="sec"><div class="sech"><h2>Chaînes</h2></div><div class="chlist">';live.forEach(function(x){h+=chHtml(x)});h+='</div></section>'}
   return h;
 }
+/* ---------- search across all playlists ---------- */
+var XCAT={},XLOAD={};
+/* catalogues of the other accounts (cached ones load instantly, never-opened ones on request) */
+function otherAccounts(){return S.accounts.filter(function(a){return a.id!==S.activeId})}
+function loadXCats(){
+  otherAccounts().forEach(function(a){
+    if(XCAT[a.id]||XLOAD[a.id])return;XLOAD[a.id]='cache';
+    Promise.all([kget('cat:'+a.id),kget(ukey(a.id))]).then(function(r){
+      var c=r[0],u=r[1]||{};
+      XLOAD[a.id]=c?'':'missing';
+      if(c){['live','vod','series'].forEach(function(k){(c[k]||[]).forEach(function(x){if(!x._n)x._n=norm(x.name)})});XCAT[a.id]={cat:c,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{}}}
+      if(S.tab==='search')softRender();
+    });
+  });
+}
+function fetchXCat(a){
+  XLOAD[a.id]='loading';softRender();
+  var d={upd:{},live:[],liveCats:[],vod:[],vodCats:[],series:[],serCats:[]};
+  Promise.all(['live','vod','series'].map(function(sec){return fetchSection(a,sec).then(function(r){var c=SECT[sec].calls;r[1].forEach(function(x){x._n=norm(x.name)});d[c[0][0]]=r[0];d[c[1][0]]=r[1];d.upd[sec]=Date.now()})}))
+    .then(function(){return kset('cat:'+a.id,d)}).then(function(){XLOAD[a.id]='';XCAT[a.id]={cat:d,hidden:{},hiddenCats:{}};softRender()},function(e){XLOAD[a.id]='missing';toast(a.name+' : '+errText(e));softRender()});
+}
+/* same filter as the lists: groups hidden by the profile in that account */
+function xVisible(xc,kind){
+  var c=xc.cat,L=kind==='live'?c.live:kind==='movie'?c.vod:c.series,cats=kind==='live'?c.liveCats:kind==='movie'?c.vodCats:c.serCats,sec=secOf(kind);
+  var hg=xc.hidden[sec]||{},hc=xc.hiddenCats[sec]||{},bad={};
+  (cats||[]).forEach(function(x){if(hg[grpOf(x.category_name)]||hc[x.category_id])bad[x.category_id]=1});
+  return dedupe((L||[]).filter(function(x){return !bad[x.category_id]}));
+}
+function accName(id){var a=S.accounts.filter(function(x){return x.id===id})[0];return a?a.name:'?'}
 function viewSearch(){
-  var q=norm(S.q).trim();
-  if(q.length<2)return '<div class="empty" style="margin-top:12px"><p>Tape au moins 2 lettres : nom d\'une chaîne, d\'un film ou d\'une série.</p></div>';
+  var q=norm(S.q).trim(),multi=S.accounts.length>1;
+  if(multi)loadXCats();
+  if(q.length<2)return '<div class="empty" style="margin-top:12px"><p>Tape au moins 2 lettres : nom d\'une chaîne, d\'un film ou d\'une série.'+(multi?' La recherche porte sur tes '+S.accounts.length+' listes.':'')+'</p></div>';
   var words=q.split(/\s+/),m=function(x){return words.every(function(w){return x._n.indexOf(w)>=0})};
-  var live=visList('live').filter(m).slice(0,30),mv=visList('movie').filter(m).slice(0,40),se=visList('series').filter(m).slice(0,40),h='';
-  if(live.length){h+='<section class="sec"><div class="sech"><h2>Chaînes</h2></div><div class="chlist">';live.forEach(function(x){h+=chHtml(x)});h+='</div></section>'}
-  if(mv.length){h+='<section class="sec"><div class="sech"><h2>Films</h2></div><div class="grid">';mv.forEach(function(x){h+=posterHtml('movie',x)});h+='</div></section>'}
-  if(se.length){h+='<section class="sec"><div class="sech"><h2>Séries</h2></div><div class="grid">';se.forEach(function(x){h+=posterHtml('series',x)});h+='</div></section>'}
-  return h||'<div class="empty" style="margin-top:12px"><p>Aucun résultat pour « '+esc(S.q)+' ».</p></div>';
+  /* every playlist: [accountId, kind, item] */
+  var srcs=[{id:S.activeId,get:function(k){return visList(k)}}];
+  if(multi)otherAccounts().forEach(function(a){var xc=XCAT[a.id];if(xc)srcs.push({id:a.id,get:function(k){return xVisible(xc,k)}})});
+  var groups={live:{},movie:{},series:{}},order={live:[],movie:[],series:[]};
+  srcs.forEach(function(src){
+    [['live',30],['movie',60],['series',60]].forEach(function(kk){
+      src.get(kk[0]).filter(m).slice(0,kk[1]).forEach(function(x){
+        var v=verParts(x.name),key=v.key+'|'+(kk[0]==='live'?'':year(x.releaseDate||x.name));
+        var g=groups[kk[0]][key];if(!g){g=groups[kk[0]][key]=[];order[kk[0]].push(key)}
+        if(!g.some(function(e){return e.acc===src.id}))g.push({acc:src.id,x:x});
+      });
+    });
+  });
+  var tag=function(g){return multi?'<small class="accs">'+g.map(function(e){return esc(accName(e.acc))}).join(' · ')+'</small>':''};
+  var h='';
+  if(multi){
+    var miss=otherAccounts().filter(function(a){return XLOAD[a.id]==='missing'||XLOAD[a.id]==='loading'});
+    if(miss.length)h+='<div class="offline" style="margin-top:10px">'+miss.map(function(a){return XLOAD[a.id]==='loading'?'Chargement de « '+esc(a.name)+' »…':'La liste « '+esc(a.name)+' » n\'a jamais été ouverte sur cet appareil. <button type="button" class="btn ghost" data-xload="'+esc(a.id)+'" style="min-height:34px;padding:4px 12px;margin-left:6px">Inclure dans la recherche</button>'}).join('<br>')+'</div>';
+  }
+  var L=order.live.map(function(k){return groups.live[k]});
+  if(L.length){h+='<section class="sec"><div class="sech"><h2>Chaînes</h2></div><div class="chlist">';L.forEach(function(g){
+    var mine=g.filter(function(e){return e.acc===S.activeId})[0];
+    if(mine)h+=chHtml(mine.x).replace('</b>','</b>'+tag(g));
+    else{var e=g[0],x=e.x;h+='<div class="ch"><button type="button" class="logo" data-xplay="'+esc(e.acc)+'|'+esc(x.stream_id)+'">'+(x.stream_icon?'<img loading="lazy" src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'<span class="ph">'+initials(x.name)+'</span>')+'</button><button type="button" class="n" data-xplay="'+esc(e.acc)+'|'+esc(x.stream_id)+'"><b>'+esc(cleanName(x.name))+tag(g)+'</b></button><span></span></div>'}
+  });h+='</div></section>'}
+  [['movie','Films'],['series','Séries']].forEach(function(kt){
+    var G=order[kt[0]].map(function(k){return groups[kt[0]][k]});if(!G.length)return;
+    h+='<section class="sec"><div class="sech"><h2>'+kt[1]+'</h2></div><div class="grid">';
+    G.forEach(function(g){
+      var mine=g.filter(function(e){return e.acc===S.activeId})[0],e=mine||g[0],t=posterHtml(kt[0],e.x,{labeled:multi});
+      if(!mine)t=t.replace('data-open="'+kt[0]+':','data-xopen="'+esc(e.acc)+'|'+kt[0]+':');
+      h+=multi?'<div class="xres">'+t+tag(g)+'</div>':t;
+    });
+    h+='</div></section>';
+  });
+  return h||'<div class="empty" style="margin-top:12px"><p>Aucun résultat pour « '+esc(S.q)+' »'+(multi?' dans tes listes':'')+'.</p></div>';
+}
+/* on a film / series sheet: the same title in the other playlists */
+function elsewhereHtml(kind,x){
+  if(S.accounts.length<2)return '';loadXCats();
+  var v=verParts(x.name),key=v.key,yr=year(x.releaseDate||x.name),out=[];
+  otherAccounts().forEach(function(a){var xc=XCAT[a.id];if(!xc)return;
+    var hit=xVisible(xc,kind).filter(function(y){var w=verParts(y.name);return w.key===key&&(!yr||!year(y.releaseDate||y.name)||year(y.releaseDate||y.name)===yr)})[0];
+    if(hit)out.push('<button type="button" class="chip" data-xopen="'+esc(a.id)+'|'+kind+':'+esc(hit.stream_id||hit.series_id)+'">'+esc(a.name)+'</button>')});
+  return out.length?'<div><p class="hint" style="margin:0 0 6px">Aussi dans tes autres listes</p><div class="tabs" style="flex-wrap:wrap">'+out.join('')+'</div></div>':'';
 }
 function welcomeHtml(){
   return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="2.5" y="7" width="19" height="13" rx="3.5" fill="currentColor"/><path d="M10 10.6v5.8l5-2.9z" fill="#101014"/></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
@@ -1331,7 +1405,7 @@ function renderSheetInner(){
       ((info.director||info.cast||info.actors)?'<p class="hint">'+(info.director?'Réalisation : '+esc(info.director)+'<br>':'')+((info.cast||info.actors)?'Avec : '+esc(info.cast||info.actors):'')+'</p>':'')+
       '<div class="acts">'+(p&&!p.done?'<button type="button" class="btn" data-playmovie="'+esc(x.stream_id)+'">'+IC.play+'Reprendre à '+dur(p.pos)+'</button><button type="button" class="btn ghost" data-playmovie="'+esc(x.stream_id)+'" data-start="1">Depuis le début</button>':'<button type="button" class="btn" data-playmovie="'+esc(x.stream_id)+'">'+IC.play+'Lecture</button>')+
       '<button type="button" class="btn ghost" data-fav="movie:'+esc(x.stream_id)+'">'+(isFav('movie',x.stream_id)?IC.starOn+'Dans mes favoris':IC.star+'Ajouter aux favoris')+'</button>'+movieDlHtml(x)+'</div>'+
-      (p&&p.done?'<p class="okmsg">Déjà vu.</p>':'')+versionsHtml('movie',x)+'</div>';
+      (p&&p.done?'<p class="okmsg">Déjà vu.</p>':'')+versionsHtml('movie',x)+elsewhereHtml('movie',x)+'</div>';
     if(!sheet.loading)checkSubs('movie:'+x.stream_id,subMeta('movie',x,info));
   }else if(sheet.kind==='series'){
     var s=sheet.item,si=sheet.info||{},inf=si.info||{},eps=si.episodes||{},seasons=Object.keys(eps).sort(function(a,b){return a-b});
@@ -1343,7 +1417,7 @@ function renderSheetInner(){
       '<div class="meta">'+(rs>0?'<b>★ '+rs.toFixed(1)+'</b>':'')+(year(inf.releaseDate||s.releaseDate)?'<span>'+year(inf.releaseDate||s.releaseDate)+'</span>':'')+(seasons.length?'<span>'+seasons.length+' saison'+(seasons.length>1?'s':'')+'</span>':'')+((inf.genre||s.genre)?'<span>'+esc(inf.genre||s.genre)+'</span>':'')+subAvailHtml('series:'+s.series_id)+'</div>'+
       ((inf.plot||s.plot)?'<p class="plot">'+esc(inf.plot||s.plot)+'</p>':'')+
       '<div class="acts">'+(nextEp?'<button type="button" class="btn" data-playep="'+esc(nextEp.ep.id)+'">'+IC.play+(nextEp.resume?'Reprendre ':'Regarder ')+esc(nextEp.label)+'</button>':'')+
-      '<button type="button" class="btn ghost" data-fav="series:'+esc(s.series_id)+'">'+(isFav('series',s.series_id)?IC.starOn+'Dans mes favoris':IC.star+'Ajouter aux favoris')+'</button></div>'+versionsHtml('series',s);
+      '<button type="button" class="btn ghost" data-fav="series:'+esc(s.series_id)+'">'+(isFav('series',s.series_id)?IC.starOn+'Dans mes favoris':IC.star+'Ajouter aux favoris')+'</button></div>'+versionsHtml('series',s)+elsewhereHtml('series',s);
     if(!sheet.loading)checkSubs('series:'+s.series_id,subMeta('series',s,inf));
     if(sheet.loading)h+='<p class="hint">Chargement des épisodes…</p>';
     if(seasons.length){
@@ -1428,7 +1502,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1448,6 +1522,10 @@ document.addEventListener('click',function(e){
     var did=d.profdel;S.profiles=S.profiles.filter(function(x){return x.id!==did});S.profDel[did]=Date.now();S.accounts.forEach(function(a){kdel(ukey(a.id,did))});saveProfiles();closeSheet();
     if(S.profileId===did){S.profileId=S.profiles.length===1?S.profiles[0].id:null;S.pickProfile=!S.profileId;kset('profileActive',S.profileId);loadUser().then(render)}else render();
     toast('Profil supprimé.');return}
+  if(d.xload){var xa=S.accounts.filter(function(a){return a.id===d.xload})[0];if(xa)fetchXCat(xa);return}
+  if(d.xopen||d.xplay){var parts=(d.xopen||d.xplay).split('|'),xacc=parts[0],what=parts[1];closeSheet();
+    toast('Liste « '+accName(xacc)+' » activée.');
+    switchAccount(xacc).then(function(){if(d.xopen){var w=what.split(':');openItem(w[0],w.slice(1).join(':'))}else{var ch=byId('live',what);if(ch)playLive(ch)}});return}
   if(d.syncsetup){openSheet({kind:'sync',mode:d.syncsetup});return}
   if(d.syncmode){sheet.mode=d.syncmode;renderSheet();return}
   if(t.hasAttribute('data-syncnow')){syncNow(true);return}
