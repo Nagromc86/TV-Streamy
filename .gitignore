@@ -2,3 +2,4 @@ node_modules/
 /android/
 /www/
 /dist/
+package-lock.json

@@ -36,6 +36,7 @@ import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
@@ -66,6 +67,8 @@ public class PlayerActivity extends Activity {
     static final String RESULT_ERROR = "error";
     static final String EXTRA_SUB_OFFSET = "subOffset";
     static final String RESULT_SUB_OFFSET = "subOffsetMs";
+    static final String RESULT_USED_FALLBACK = "usedFallback";
+    private boolean fallbackWorked;
 
     /** The player currently open (full screen or in its floating window). */
     static PlayerActivity current;
@@ -90,6 +93,9 @@ public class PlayerActivity extends Activity {
     private final List<CharSequence> cueTexts = new ArrayList<>();
     private long subOffset;
     private boolean extOn = true;
+    private FrameLayout rootView;
+    private LinearLayout actionsRow;
+    private boolean frenchAudio;
     private int lastCue = -2;
     private TextView subView;
     private TextView subButton;
@@ -168,6 +174,8 @@ public class PlayerActivity extends Activity {
             actions.addView(pipButton);
         }
         root.addView(actions);
+        rootView = root;
+        actionsRow = actions;
         setContentView(root);
         current = this;
         hideSystemUi();
@@ -193,7 +201,16 @@ public class PlayerActivity extends Activity {
         DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http));
         DefaultRenderersFactory renderers = new DefaultRenderersFactory(this).setEnableDecoderFallback(true);
 
-        player = new ExoPlayer.Builder(this, renderers).setMediaSourceFactory(sources).build();
+        ExoPlayer.Builder pb = new ExoPlayer.Builder(this, renderers).setMediaSourceFactory(sources);
+        if (!live) {
+            // films and episodes: start after 1 s of video instead of 2.5 s; after a stall, still wait for 5 s
+            // so playback does not stop and go. Live TV keeps the default, steadier start.
+            pb.setLoadControl(new DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(DefaultLoadControl.DEFAULT_MIN_BUFFER_MS, DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                            1000, DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
+                    .build());
+        }
+        player = pb.build();
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                 .setPreferredAudioLanguage("fr")
                 .setPreferredTextLanguage("fr")
@@ -204,6 +221,9 @@ public class PlayerActivity extends Activity {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_READY && triedFallback) {
+                    fallbackWorked = true;
+                }
                 if (state == Player.STATE_ENDED && !live) {
                     ended = true;
                     finishWithResult();
@@ -229,6 +249,7 @@ public class PlayerActivity extends Activity {
                 tracksChecked = true;
                 if ("auto".equals(subMode) && audioIsFrench(tracks)) {
                     // French audio: keep subtitles available (CC / Sous-titres button) but don't show them
+                    frenchAudio = true;
                     extOn = false;
                     refreshSub();
                     player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
@@ -507,6 +528,29 @@ public class PlayerActivity extends Activity {
         subHandler.post(subTick);
     }
 
+    /** OpenSubtitles file found after the video already started: draw it from now on. */
+    void addExternalSubs(String dataUri, long offsetMs) {
+        runOnUiThread(() -> {
+            if (isFinishing() || !cueTimes.isEmpty() || rootView == null) {
+                return;
+            }
+            parseSrt(dataUri);
+            if (cueTimes.isEmpty()) {
+                return;
+            }
+            subOffset = offsetMs;
+            extOn = !"never".equals(subMode) && !frenchAudio;
+            buildSubOverlay(rootView);
+            if (subButton != null && actionsRow != null) {
+                subButton.setVisibility(playerView.isControllerFullyVisible() && !inPip ? View.VISIBLE : View.GONE);
+                actionsRow.addView(subButton, 0);
+            }
+            if (extOn) {
+                Toast.makeText(this, "Sous-titres français ajoutés", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private final Runnable hidePanel = () -> {
         if (subPanel != null) {
             subPanel.setVisibility(View.GONE);
@@ -743,6 +787,7 @@ public class PlayerActivity extends Activity {
         }
         data.putExtra(RESULT_ENDED, ended);
         data.putExtra(RESULT_SUB_OFFSET, subOffset);
+        data.putExtra(RESULT_USED_FALLBACK, fallbackWorked);
         if (lastError != null) {
             data.putExtra(RESULT_ERROR, lastError);
         }

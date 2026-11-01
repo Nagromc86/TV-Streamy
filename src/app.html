@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c0e13">
 <title>TV Streamy</title>
-<style>/*@@FONTS@@*/</style>
+<style>/*@@FONTS@@*/#nextep{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:160;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card,#1b1b20);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#nextep div{flex:1 1 180px;display:flex;flex-direction:column;gap:2px}#nextep small{color:var(--muted)}
+</style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
 :root{
@@ -450,8 +452,11 @@ var SECT={live:{label:'TV',calls:[['liveCats','get_live_categories'],['live','ge
   series:{label:'Séries',calls:[['serCats','get_series_categories'],['series','get_series']]}};
 var UPD={};
 function sameDay(t){return t&&new Date(t).toDateString()===new Date().toDateString()}
-function fetchSection(a,sec){return Promise.all(SECT[sec].calls.map(function(c){return api(a,'action='+c[1]).then(function(r){return Array.isArray(r)?r:[]})}))}
-function applySection(sec,r){var c=SECT[sec].calls;r[1].forEach(function(x){x._n=norm(x.name)});DATA[c[0][0]]=r[0];DATA[c[1][0]]=r[1];DATA.upd=DATA.upd||{};DATA.upd[sec]=Date.now()}
+/* fields the provider sends that the app never reads: dropped so the stored catalogue is smaller and loads faster */
+var DROPF=['num','stream_type','rating_5based','is_adult','custom_sid','direct_source','category_ids','thumbnail','youtube_trailer','trailer','episode_run_time','tv_archive','tv_archive_duration','epg_channel_id','_n'];
+function slim(L){for(var i=0;i<L.length;i++){var x=L[i];for(var j=0;j<DROPF.length;j++)if(DROPF[j] in x)delete x[DROPF[j]]}return L}
+function fetchSection(a,sec){return Promise.all(SECT[sec].calls.map(function(c,i){return api(a,'action='+c[1]).then(function(r){r=Array.isArray(r)?r:[];return i===1?slim(r):r})}))}
+function applySection(sec,r){var c=SECT[sec].calls;DATA[c[0][0]]=r[0];DATA[c[1][0]]=r[1];DATA.upd=DATA.upd||{};DATA.upd[sec]=Date.now()}
 function updLabel(sec){var t=DATA&&DATA.upd&&DATA.upd[sec];if(UPD[sec])return 'Mise à jour en cours…';if(!t)return 'Jamais mis à jour';var d=new Date(t),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');return 'Mis à jour '+(sameDay(t)?'aujourd\'hui':d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' à '+hm}
 /* refresh one section without blocking the screen: the previous catalogue stays usable meanwhile */
 function refreshSection(sec,manual){
@@ -471,13 +476,19 @@ function dailyRefresh(){
   if(!DATA||navigator.onLine===false)return;
   ['live','vod','series'].filter(function(sec){return !sameDay(DATA.upd&&DATA.upd[sec])}).reduce(function(p,sec){return p.then(function(){return refreshSection(sec,false)})},Promise.resolve());
 }
+/* build the search/versions indexes while the user looks at the home screen, so the first sheet opens at once */
+function prebuild(){
+  var idle=window.requestIdleCallback||function(f){return setTimeout(f,400)},steps=[];
+  ['movie','series'].forEach(function(k){steps.push(function(){versionsOf(k,{name:''})});steps.push(function(){if(TREND)trendIndex(k)})});
+  ['live','vod','series'].forEach(function(sec){steps.push(function(){var L=DATA&&DATA[sec]||[];for(var i=0;i<L.length;i++)if(!L[i]._n)L[i]._n=norm(L[i].name)})});
+  (function next(){var f=steps.shift();if(!f)return;idle(function(){try{if(DATA)f()}catch(e){}next()})})();
+}
 function loadCatalog(){
   var a=acc();if(!a)return Promise.resolve();
   return kget('cat:'+a.id).then(function(c){
     if(c&&(c.live||c.vod||c.series)){
       if(!c.upd)c.upd={live:c.at,vod:c.at,series:c.at};
-      ['live','vod','series'].forEach(function(k){(c[k]||[]).forEach(function(x){if(!x._n)x._n=norm(x.name)})});
-      DATA=c;S.msg='';render();setTimeout(dailyRefresh,1500);return;
+      DATA=c;S.msg='';render();prebuild();setTimeout(dailyRefresh,1500);return;
     }
     S.loading='Premier chargement de ton catalogue…';render();
     var d={upd:{},live:[],liveCats:[],vod:[],vodCats:[],series:[],serCats:[]},errs=[];DATA=null;
@@ -488,7 +499,7 @@ function loadCatalog(){
       DATA=d;S.msg=errs.length?'Catalogue incomplet ('+errs.join(' · ')+'). Réessaie depuis le compte.':'';
       return kset('cat:'+a.id,d);
     });
-  }).then(function(){S.loading='';render()});
+  }).then(function(){S.loading='';render();prebuild()});
 }
 function refreshAccountInfo(a){
   if(!a||navigator.onLine===false)return;
@@ -767,18 +778,31 @@ function playInner(o){
     el.onclick=function(e){if(e.target.closest('[data-wpclose]')){var r={positionMs:Math.round((v.currentTime||0)*1000),durationMs:isFinite(v.duration)?Math.round(v.duration*1000):0,ended:v.ended};v.pause();el.hidden=true;el.innerHTML='';res(r)}};
   });
 }
-function liveExt(){var a=acc();return a&&a.format==='hls'?['m3u8','ts']:['ts','m3u8']}
+/* the live format that actually worked on this device is tried first next time (saves a failed attempt) */
+function lfmt(){try{return JSON.parse(localStorage.getItem('lfmt')||'{}')}catch(e){return {}}}
+function liveExt(){var a=acc();if(!a)return ['ts','m3u8'];var f=lfmt()[a.id+'|'+(a.format||'ts')]||(a.format==='hls'?'m3u8':'ts');return f==='m3u8'?['m3u8','ts']:['ts','m3u8']}
+function noteLive(ex,r){var a=acc();if(!a||!r||!r.usedFallback)return;try{var m=lfmt();m[a.id+'|'+(a.format||'ts')]=ex[1];localStorage.setItem('lfmt',JSON.stringify(m))}catch(e){}}
 function playLive(item){
   var ex=liveExt();
   USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
-  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(){if(S.tab==='home'||S.tab==='live')render()});
+  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(r){noteLive(ex,r);if(S.tab==='home'||S.tab==='live')render()});
+}
+/* subtitles never delay the start: saved ones go in at once, OpenSubtitles ones are added to the open player when they arrive */
+function subsFor(k,meta){
+  if(!NATIVE||S.castDev||TIZEN)return getSubs(k,meta).then(function(L){return {now:L,box:{L:L}}});
+  return kget('sub:'+k).then(function(c){
+    if(c&&c.srt){var L=[subTrack(c)];return {now:L,box:{L:L}}}
+    var box={L:[]};
+    if(osOn()&&navigator.onLine!==false&&curSubMode()!=='never')setTimeout(function(){getSubs(k,meta,true).then(function(L){if(!L.length)return;box.L=L;nat('addSubtitles',{url:L[0].url,offset:L[0].offset||0}).catch(function(){})})},600);
+    return {now:[],box:box};
+  },function(){return {now:[],box:{L:[]}}});
 }
 function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
   var local=dlReady(k),info=sheet&&sheet.kind==='movie'&&sheet.item===item?sheet.info:null;
-  getSubs(k,subMeta('movie',item,info)).then(function(subs){return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,subs,r);return r})}).then(function(r){
+  subsFor(k,subMeta('movie',item,info)).then(function(sf){var subs=sf.now;return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended))saveProgress(k,r,{kind:'movie',id:item.stream_id,name:item.name,icon:item.stream_icon});
     render();if(sheet&&sheet.kind==='movie')renderSheet();
   });
@@ -787,16 +811,27 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  getSubs(k,subMeta('series',series,info,ep)).then(function(subs){return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,subs,r);return r})}).then(function(r){
+  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
       saveUser();
     }
     render();if(sheet&&sheet.kind==='series')renderSheet();
-    if(r&&r.ended){var nx=nextEpisode(ep);if(nx)toast('Épisode suivant prêt : '+nx.title)}
+    if(r&&r.ended){var nx=nextEpisode(ep);if(nx)nextCountdown(series,nx)}
   });
 }
+/* at the end of an episode: the next one starts by itself after a short countdown, unless cancelled */
+var NXT=null;
+function nextCountdown(series,nx){
+  cancelNext();var el=document.createElement('div');el.id='nextep';el.setAttribute('role','alertdialog');el.setAttribute('aria-label','Épisode suivant');document.body.appendChild(el);
+  var n=8,lab='S'+String(nx.season).padStart(2,'0')+'E'+String(nx.episode_num).padStart(2,'0');
+  var paint=function(){el.innerHTML='<div><small>Épisode suivant dans '+n+' s</small><b>'+esc(lab+(nx.title?' · '+nx.title:''))+'</b></div><button type="button" class="btn" data-nxgo>'+IC.play+'Lancer</button><button type="button" class="btn ghost" data-nxno>Annuler</button>'};
+  paint();var b=el.querySelector('[data-nxgo]');if(b)b.focus();var cnt=function(){var s=el.querySelector('small');if(s)s.textContent='Épisode suivant dans '+n+' s'};
+  el.onclick=function(e){if(e.target.closest('[data-nxgo]')){cancelNext();playEpisode(series,nx,true)}else if(e.target.closest('[data-nxno]'))cancelNext()};
+  NXT={el:el,t:setInterval(function(){n--;if(n<=0){cancelNext();playEpisode(series,nx,true);return}cnt()},1000)};
+}
+function cancelNext(){if(!NXT)return;clearInterval(NXT.t);NXT.el.remove();NXT=null}
 
 /* ---------- EPG (now / next, fetched for channels on screen) ---------- */
 function wantEpg(id){
@@ -846,7 +881,7 @@ function chHtml(x){
     '<button type="button" class="star'+(isFav('live',id)?' on':'')+'" data-fav="live:'+esc(id)+'" aria-label="Favori">'+(isFav('live',id)?IC.starOn:IC.star)+'</button></div>';
 }
 function catsHtml(kind,current,attr){
-  var cats=visCats(kind),list=rawList(kind),count={},seen={};list.forEach(function(x){var k=x.category_id+'|'+(x.stream_id||x.series_id);if(seen[k])return;seen[k]=1;count[x.category_id]=(count[x.category_id]||0)+1});
+  var cats=visCats(kind),count=memo('count|'+kind,function(){var c={},seen={};rawList(kind).forEach(function(x){var k=x.category_id+'|'+(x.stream_id||x.series_id);if(seen[k])return;seen[k]=1;c[x.category_id]=(c[x.category_id]||0)+1});return c});
   var h='<div class="chips"><button type="button" class="chip" '+attr+'="all" aria-pressed="'+(current==='all')+'">Tout<b>'+visList(kind).length+'</b></button><button type="button" class="chip" '+attr+'="fav" aria-pressed="'+(current==='fav')+'">Ma liste</button>';
   cats.forEach(function(c){if(count[c.category_id])h+='<button type="button" class="chip" '+attr+'="'+esc(c.category_id)+'" aria-pressed="'+(String(current)===String(c.category_id))+'">'+esc(c.category_name)+'<b>'+count[c.category_id]+'</b></button>'});
   return h+'</div>';
@@ -901,10 +936,17 @@ function loadTrends(force){
 }
 /* match TMDB titles with the provider's catalogue: by TMDB id when the provider gives it, else by title (+ year) */
 var TIX=new WeakMap();
+/* heavy lists (suggestions, tops, counts) are computed once per day / catalogue update / filter change, then reused */
+var MEMO={},MEMOV='';
+function memoKey(){return S.activeId+'|'+S.profileId+'|'+new Date().toDateString()+'|'+(DATA&&DATA.upd?[DATA.upd.live,DATA.upd.vod,DATA.upd.series].join(','):'')+'|'+hidSig('live')+'/'+hidSig('vod')+'/'+hidSig('series')+'|'+(TREND?trendId(TREND):'')}
+var TRID=new WeakMap(),TRN=0;function trendId(t){if(!TRID.has(t))TRID.set(t,++TRN);return TRID.get(t)}
+function memo(k,fn){var v=memoKey();if(v!==MEMOV){MEMO={};MEMOV=v}if(!(k in MEMO))MEMO[k]=fn();return MEMO[k]}
+var VPC=new WeakMap();
+function vpOf(x){var r=VPC.get(x);if(!r){r=verParts(x.name);VPC.set(x,r)}return r}
 function trendIndex(kind){
   var L=visList(kind),ix=TIX.get(L);if(ix)return ix;
   ix={id:{},key:{}};
-  L.forEach(function(x){var tid=x.tmdb||x.tmdb_id;if(tid)ix.id[tid]=ix.id[tid]||x;var k=verParts(x.name).key;if(k.length>1)(ix.key[k]=ix.key[k]||[]).push(x)});
+  L.forEach(function(x){var tid=x.tmdb||x.tmdb_id;if(tid)ix.id[tid]=ix.id[tid]||x;var k=vpOf(x).key;if(k.length>1)(ix.key[k]=ix.key[k]||[]).push(x)});
   TIX.set(L,ix);return ix;
 }
 /* titles of one platform's list that exist in the catalogue, in the platform's order */
@@ -924,12 +966,18 @@ function matchIn(kind,T,cat,plat){
 /* kind = 'movie' | 'series' | 'mix' (films and series merged by popularity) */
 function platTop(pk,kind,cat){
   if(!TREND||!TREND.p||!TREND.p[pk])return [];
+  return memo('plat|'+pk+'|'+kind+'|'+(cat||''),function(){return platTopRaw(pk,kind,cat)});
+}
+function platTopRaw(pk,kind,cat){
   var P=TREND.p[pk];
   if(kind==='mix')return platTop(pk,'movie',cat).concat(platTop(pk,'series',cat)).sort(function(a,b){return b.pop-a.pop});
   return matchIn(kind,kind==='movie'?P.movie:P.tv,cat,pk);
 }
 function weekTop(kind,cat){
   if(!TREND||!TREND.week)return [];
+  return memo('week|'+kind+'|'+(cat||''),function(){return weekTopRaw(kind,cat)});
+}
+function weekTopRaw(kind,cat){
   var out=[];
   TREND.week.forEach(function(t,i){
     var k=t.mt==='movie'?'movie':'series';if(kind!=='mix'&&kind!==k)return;
@@ -941,22 +989,27 @@ function trendingIn(kind,cat){var o=[];PLAT.forEach(function(pl){o=o.concat(plat
 function watched(kind,x){var p=kind==='movie'?USER.prog['movie:'+x.stream_id]:null;return !!(p&&p.done)}
 function bestRated(kind,cat,n,skip){
   if(kind==='mix')return bestRated('movie',cat,n,skip).concat(bestRated('series',cat,n,skip)).sort(function(a,b){return rate(b.x)-rate(a.x)}).slice(0,n);
-  var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind);
-  var yNow=new Date().getFullYear();
-  return L.filter(function(x){return imgOf(kind,x)&&rate(x)>0&&rate(x)<=9.6&&!skip[x.stream_id||x.series_id]&&!watched(kind,x)})
-    .map(function(x){var y=+year(x.releaseDate||x.name)||0;return {x:x,s:rate(x)+(y&&yNow-y<=3?0.4:0)}})
-    .sort(function(a,b){return b.s-a.s||added(b.x)-added(a.x)}).slice(0,n).map(function(o){return {kind:kind,x:o.x,best:true}});
+  var C=memo('best|'+kind+'|'+(cat||''),function(){
+    var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind),yNow=new Date().getFullYear();
+    return L.filter(function(x){return imgOf(kind,x)&&rate(x)>0&&rate(x)<=9.6})
+      .map(function(x){var y=+year(x.releaseDate||x.name)||0;return {x:x,s:rate(x)+(y&&yNow-y<=3?0.4:0)}})
+      .sort(function(a,b){return b.s-a.s||added(b.x)-added(a.x)}).slice(0,120).map(function(o){return o.x});
+  });
+  return C.filter(function(x){return !skip[x.stream_id||x.series_id]&&!watched(kind,x)}).slice(0,n).map(function(x){return {kind:kind,x:x,best:true}});
 }
 function recentGood(kind,cat,n,skip){
   if(kind==='mix')return recentGood('movie',cat,n,skip).concat(recentGood('series',cat,n,skip)).sort(function(a,b){return rate(b.x)-rate(a.x)}).slice(0,n);
-  var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind),now=Date.now()/1000;
-  var R=L.filter(function(x){return imgOf(kind,x)&&!skip[x.stream_id||x.series_id]&&!watched(kind,x)&&added(x)&&now-added(x)<45*86400});
-  return R.sort(function(a,b){return rate(b)-rate(a)||added(b)-added(a)}).slice(0,n).map(function(x){return {kind:kind,x:x,fresh:true}});
+  var C=memo('recent|'+kind+'|'+(cat||''),function(){
+    var L=cat?dedupe(rawList(kind).filter(function(x){return String(x.category_id)===String(cat)})):visList(kind),now=Date.now()/1000;
+    return L.filter(function(x){return imgOf(kind,x)&&added(x)&&now-added(x)<45*86400}).sort(function(a,b){return rate(b)-rate(a)||added(b)-added(a)}).slice(0,120);
+  });
+  return C.filter(function(x){return !skip[x.stream_id||x.series_id]&&!watched(kind,x)}).slice(0,n).map(function(x){return {kind:kind,x:x,fresh:true}});
 }
 /* the top of Netflix, Prime Video and Disney+ in turn, completed by the best rated (5 in total) */
-function suggest(kind,cat,n){
+function suggest(kind,cat,n){return memo('sugg|'+kind+'|'+(cat||'')+'|'+n,function(){return suggestRaw(kind,cat,n+6)}).filter(function(o){return !watched(o.kind||kind,o.x)}).slice(0,n)}
+function suggestRaw(kind,cat,n){
   var skip={},out=[];
-  var add=function(list,max){list.forEach(function(o){if(out.length>=n||max<=0)return;var id=o.x.stream_id||o.x.series_id,vk='v:'+verParts(o.x.name).key;if(skip[id]||skip[vk]||watched(o.kind,o.x)||!imgOf(o.kind,o.x))return;skip[id]=1;skip[vk]=1;out.push(o);max--})};
+  var add=function(list,max){list.forEach(function(o){if(out.length>=n||max<=0)return;var id=o.x.stream_id||o.x.series_id,vk='v:'+vpOf(o.x).key;if(skip[id]||skip[vk]||watched(o.kind,o.x)||!imgOf(o.kind,o.x))return;skip[id]=1;skip[vk]=1;out.push(o);max--})};
   var lists=[weekTop(kind,cat)].concat(PLAT.map(function(pl){return platTop(pl.k,kind,cat)})),turn=[];
   for(var i=0;i<10;i++)lists.forEach(function(L){if(L[i])turn.push(L[i])});
   add(turn,n);
@@ -1022,10 +1075,9 @@ setInterval(function(){
   var i=Math.round(sl.scrollLeft/sl.clientWidth),n=(i+1)%sl.children.length;sl.scrollTo({left:n*sl.clientWidth,behavior:'smooth'});
 },7000);
 function catRows(kind,max){
-  var cats=visCats(kind),L=rawList(kind),by={},h='';
-  L.forEach(function(x){(by[x.category_id]=by[x.category_id]||[]).push(x)});Object.keys(by).forEach(function(k){by[k]=dedupe(by[k])});
+  var cats=visCats(kind),h='',by=memo('bycat|'+kind,function(){var b={};rawList(kind).forEach(function(x){(b[x.category_id]=b[x.category_id]||[]).push(x)});Object.keys(b).forEach(function(k){b[k]=dedupe(b[k]).sort(function(a,c){return added(c)-added(a)}).slice(0,20)});return b});
   cats.filter(function(c){return (by[c.category_id]||[]).length}).slice(0,max).forEach(function(c){
-    var items=by[c.category_id].slice().sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,20);
+    var items=by[c.category_id];
     h+=rowHtml(c.category_name,items.map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''),'<button type="button" class="more" data-'+(kind==='movie'?'vcat':'scat')+'="'+esc(c.category_id)+'" data-goto="'+(kind==='movie'?'movies':'series')+'">Tout voir</button>');
   });
   return h;
@@ -1048,16 +1100,17 @@ function platRows(kind){
   return h;
 }
 function top10(){
-  var L=visList('movie').filter(function(x){return parseFloat(x.rating)>0}).sort(function(a,b){return parseFloat(b.rating)-parseFloat(a.rating)||(+(b.added)||0)-(+(a.added)||0)}).slice(0,10);
+  var L=memo('top10',function(){return visList('movie').filter(function(x){return parseFloat(x.rating)>0}).sort(function(a,b){return parseFloat(b.rating)-parseFloat(a.rating)||(+(b.added)||0)-(+(a.added)||0)}).slice(0,10)});
   return L.map(function(x,i){return '<span class="top10"><span class="rk" aria-hidden="true">'+(i+1)+'</span>'+posterHtml('movie',x)+'</span>'}).join('');
 }
+function newest(kind){return memo('new|'+kind,function(){return visList(kind).slice().sort(function(a,b){return added(b)-added(a)}).slice(0,20)})}
 function viewHome(){
   /* uncluttered: billboard, resume, my list, trends and top 10s, updated series */
   var h=billHtml('mix')+continueRow();
   var favs=Object.keys(USER.favs).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind!=='live'}).sort(function(a,b){return b.at-a.at}).slice(0,20);
   h+=rowHtml('Ma liste',favs.map(function(f){var x=byId(f.kind,f.id);return x?posterHtml(f.kind,x):''}).join(''),'<button type="button" class="more" data-tab="favs">Tout voir</button>');
   h+=TREND?platRows('mix'):rowHtml('Top 10 des films les mieux notés',top10());
-  h+=rowHtml('Séries mises à jour',visList('series').slice().sort(function(a,b){return (+b.last_modified||0)-(+a.last_modified||0)}).slice(0,20).map(function(x){return posterHtml('series',x,{fresh:true})}).join(''),'<button type="button" class="more" data-tab="series">Tout voir</button>');
+  h+=rowHtml('Séries mises à jour',newest('series').map(function(x){return posterHtml('series',x,{fresh:true})}).join(''),'<button type="button" class="more" data-tab="series">Tout voir</button>');
   if(!DATA.vod.length&&!DATA.series.length&&!DATA.live.length)h+='<div class="empty" style="margin-top:20px"><p>Ce compte ne contient encore rien. Essaie « Actualiser » dans le compte.</p></div>';
   return h;
 }
@@ -1075,8 +1128,8 @@ function verParts(name){
 }
 function versionsOf(kind,x){
   var L=visList(kind),ix=VX.get(L);
-  if(!ix){ix={};L.forEach(function(y){var k=verParts(y.name).key;if(k.length>2)(ix[k]=ix[k]||[]).push(y)});VX.set(L,ix)}
-  var id=x.stream_id||x.series_id,k=verParts(x.name).key;
+  if(!ix){ix={};L.forEach(function(y){var k=vpOf(y).key;if(k.length>2)(ix[k]=ix[k]||[]).push(y)});VX.set(L,ix)}
+  var id=x.stream_id||x.series_id,k=vpOf(x).key;
   return (ix[k]||[]).filter(function(y){return String(y.stream_id||y.series_id)!==String(id)});
 }
 function verLabel(kind,y){
@@ -1113,7 +1166,8 @@ function visList(kind){
   else{var bad={};rawCats(kind).forEach(function(x){if(catHidden(kind,x))bad[x.category_id]=1});v=dedupe(L.filter(function(x){return !bad[x.category_id]}))}
   VL.set(L,{sig:sig,v:v});return v;
 }
-function groupsOf(kind){
+function groupsOf(kind){return memo('groups|'+kind,function(){return groupsOfRaw(kind)})}
+function groupsOfRaw(kind){
   var C=rawCats(kind),per={},g={};
   rawList(kind).forEach(function(x){per[x.category_id]=(per[x.category_id]||0)+1});
   C.forEach(function(c){var k=grpOf(c.category_name);g[k]=g[k]||{name:k,cats:0,n:0,ex:[],list:[]};g[k].cats++;g[k].n+=per[c.category_id]||0;if(g[k].ex.length<3)g[k].ex.push(c.category_name);if(per[c.category_id])g[k].list.push({id:c.category_id,name:c.category_name,n:per[c.category_id]})});
@@ -1136,7 +1190,7 @@ function viewGrid(kind){
   var catKey=kind==='movie'?'vodCat':'serCat',cats=visCats(kind),all=visList(kind),sec=kind==='movie'?'vod':'series';
   if(S[catKey]==='all'){
     return billHtml(kind)+'<section class="sec">'+catsHtml(kind,'all',kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section>'+continueRow(kind)+platRows(kind)+
-      rowHtml(kind==='movie'?'Nouveautés':'Mises à jour récentes',all.slice().sort(function(a,b){return (+(b.added||b.last_modified)||0)-(+(a.added||a.last_modified)||0)}).slice(0,20).map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''))+
+      rowHtml(kind==='movie'?'Nouveautés':'Mises à jour récentes',newest(kind).map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''))+
       catRows(kind,40)+(!all.length?'<div class="empty"><p>'+(hidCount(kind)?'Tous les groupes sont masqués. Touche « Filtrer » pour en réafficher.':'Rien pour l\'instant dans ce compte.')+'</p></div>':'');
   }
   var L=filtered(kind,S[catKey]),key=kind+':'+S[catKey],pg=pageOf(L,key,60);
@@ -1221,7 +1275,7 @@ function loadXCats(){
     Promise.all([kget('cat:'+a.id),kget(ukey(a.id))]).then(function(r){
       var c=r[0],u=r[1]||{};
       XLOAD[a.id]=c?'':'missing';
-      if(c){['live','vod','series'].forEach(function(k){(c[k]||[]).forEach(function(x){if(!x._n)x._n=norm(x.name)})});XCAT[a.id]={cat:c,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{}}}
+      if(c){XCAT[a.id]={cat:c,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{}}}
       if(S.tab==='search')softRender();
     });
   });
@@ -1229,7 +1283,7 @@ function loadXCats(){
 function fetchXCat(a){
   XLOAD[a.id]='loading';softRender();
   var d={upd:{},live:[],liveCats:[],vod:[],vodCats:[],series:[],serCats:[]};
-  Promise.all(['live','vod','series'].map(function(sec){return fetchSection(a,sec).then(function(r){var c=SECT[sec].calls;r[1].forEach(function(x){x._n=norm(x.name)});d[c[0][0]]=r[0];d[c[1][0]]=r[1];d.upd[sec]=Date.now()})}))
+  Promise.all(['live','vod','series'].map(function(sec){return fetchSection(a,sec).then(function(r){var c=SECT[sec].calls;d[c[0][0]]=r[0];d[c[1][0]]=r[1];d.upd[sec]=Date.now()})}))
     .then(function(){return kset('cat:'+a.id,d)}).then(function(){XLOAD[a.id]='';XCAT[a.id]={cat:d,hidden:{},hiddenCats:{}};softRender()},function(e){XLOAD[a.id]='missing';toast(a.name+' : '+errText(e));softRender()});
 }
 /* same filter as the lists: groups hidden by the profile in that account */
@@ -1244,7 +1298,7 @@ function viewSearch(){
   var q=norm(S.q).trim(),multi=S.accounts.length>1;
   if(multi)loadXCats();
   if(q.length<2)return '<div class="empty" style="margin-top:12px"><p>Tape au moins 2 lettres : nom d\'une chaîne, d\'un film ou d\'une série.'+(multi?' La recherche porte sur tes '+S.accounts.length+' listes.':'')+'</p></div>';
-  var words=q.split(/\s+/),m=function(x){return words.every(function(w){return x._n.indexOf(w)>=0})};
+  var words=q.split(/\s+/),m=function(x){var t=x._n||(x._n=norm(x.name));return words.every(function(w){return t.indexOf(w)>=0})};
   /* every playlist: [accountId, kind, item] */
   var srcs=[{id:S.activeId,get:function(k){return visList(k)}}];
   if(multi)otherAccounts().forEach(function(a){var xc=XCAT[a.id];if(xc)srcs.push({id:a.id,get:function(k){return xVisible(xc,k)}})});
@@ -1357,6 +1411,8 @@ function parseM3uLink(v){
 function openSheet(s){sheet=s;renderSheet()}
 function closeSheet(){if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 function renderSheet(){keepFocus(renderSheetInner)}
+/* re-render an open sheet with fresher data without jumping back to the top */
+function softSheet(){var root=$('#sheet'),q=function(e){return e===root?null:'.'+String(e.className).trim().split(/\s+/).join('.')},sc=[].filter.call([root].concat([].slice.call(root.querySelectorAll('*'))),function(e){return e.scrollTop>0}).map(function(e){return [q(e),e.scrollTop]});renderSheet();sc.forEach(function(o){var e=o[0]?root.querySelector(o[0]):root;if(e)e.scrollTop=o[1]})}
 function renderSheetInner(){
   var el=$('#sheet');if(!sheet){closeSheet();return}
   var h='<div class="panel" role="dialog" aria-modal="true">';
@@ -1502,9 +1558,12 @@ function openItem(kind,id){
   var x=byId(kind,id);if(!x)return;
   if(kind==='live'){playLive(x);return}
   openSheet({kind:kind,item:x,loading:true});
+  /* show the saved sheet at once, then refresh it from the provider in the background */
+  var ck='info:'+S.activeId+':'+kind+':'+id,shown='',live=function(){return sheet&&sheet.item===x};
+  var show=function(r){var j=JSON.stringify(r||{});if(!live()||j===shown)return;var first=!shown;shown=j;sheet.loading=false;sheet.info=kind==='movie'?(r&&r.info)||{}:r||{};if(first)renderSheet();else softSheet()};
+  kget(ck).then(function(c){if(c&&!shown)show(c)},function(){});
   var p=kind==='movie'?api(acc(),'action=get_vod_info&vod_id='+id):api(acc(),'action=get_series_info&series_id='+id);
-  var ck='info:'+S.activeId+':'+kind+':'+id;
-  p.then(function(r){kset(ck,r);return r},function(e){return kget(ck).then(function(c){if(c)return c;throw e})}).then(function(r){if(!sheet||sheet.item!==x)return;sheet.loading=false;sheet.info=kind==='movie'?(r&&r.info)||{}:r||{};renderSheet()},function(e){if(!sheet||sheet.item!==x)return;sheet.loading=false;sheet.info={};renderSheet();if(navigator.onLine!==false)toast('Fiche indisponible : '+errText(e))});
+  p.then(function(r){kset(ck,r);show(r)},function(e){if(!live()||shown)return;kget(ck).then(function(c){if(c){show(c);return}sheet.loading=false;sheet.info={};renderSheet();if(navigator.onLine!==false)toast('Fiche indisponible : '+errText(e))})});
 }
 
 /* ---------- account save ---------- */
@@ -2019,6 +2078,7 @@ function keepFocus(fn){
 }
 /* back: closes the sheet, the profile picker, returns home, then leaves the app */
 function goBack(){
+  if(NXT){cancelNext();return true}
   if(!$('#tvplayer').hidden){tvStop();return true}
   if(!$('#webplayer').hidden)return true;
   if(sheet){closeSheet();if(TV)keepFocus(function(){});return true}

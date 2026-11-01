@@ -74,6 +74,20 @@ public class PlayerPlugin extends Plugin {
         startActivityForResult(call, intent, "onPlayerClosed");
     }
 
+    /** Subtitles found after the video started: shown in the open player. */
+    @PluginMethod
+    public void addSubtitles(PluginCall call) {
+        PlayerActivity open = PlayerActivity.current;
+        JSObject ret = new JSObject();
+        if (open != null && !open.isFinishing()) {
+            open.addExternalSubs(call.getString("url", ""), call.getData().optLong("offset", 0L));
+            ret.put("added", true);
+        } else {
+            ret.put("added", false);
+        }
+        call.resolve(ret);
+    }
+
     private PluginCall pendingCall;
     private Intent pendingIntent;
 
@@ -460,6 +474,7 @@ public class PlayerPlugin extends Plugin {
             ret.put("durationMs", data.getLongExtra(PlayerActivity.RESULT_DURATION, 0L));
             ret.put("ended", data.getBooleanExtra(PlayerActivity.RESULT_ENDED, false));
             ret.put("subOffsetMs", data.getLongExtra(PlayerActivity.RESULT_SUB_OFFSET, 0L));
+            ret.put("usedFallback", data.getBooleanExtra(PlayerActivity.RESULT_USED_FALLBACK, false));
             String error = data.getStringExtra(PlayerActivity.RESULT_ERROR);
             if (error != null) {
                 ret.put("error", error);
