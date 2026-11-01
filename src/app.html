@@ -298,6 +298,9 @@ html.avplaying #app,html.avplaying #nav,html.avplaying #castbar{visibility:hidde
 .sethead svg{width:22px;height:22px;flex:none;transition:transform .2s;color:var(--muted)}.sethead[aria-expanded="true"] svg{transform:rotate(180deg)}
 .setbody{display:flex;flex-direction:column;gap:12px;padding:0 14px 16px}
 .setbody .updrow,.setbody .accrow{background:var(--surface)}
+.qrbox{display:flex;align-items:center;gap:14px;background:var(--surface);border-radius:10px;padding:10px}
+.qrbox svg{width:132px;height:132px;flex:none;background:#fff;border-radius:6px}
+.qrbox span{color:var(--muted);font-size:.85rem}
 @keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.panel{animation:none}.spin,.upd i{animation-duration:3s}}
@@ -311,6 +314,7 @@ html.avplaying #app,html.avplaying #nav,html.avplaying #castbar{visibility:hidde
 <div id="webplayer" hidden></div>
 <div id="tvplayer" hidden></div>
 <div id="toast" role="status" hidden></div>
+<script>/*@@QRCODE@@*/</script>
 <script>
 (function(){
 "use strict";
@@ -1382,6 +1386,7 @@ function renderSheetInner(){
       '<div class="fld"><label for="os-pass">Mot de passe OpenSubtitles</label><input id="os-pass" type="password" value="'+esc(o.pass||'')+'"></div>'+
       '<p class="err" id="oserr" hidden></p><p class="okmsg" id="osok"'+(o.key&&o.remaining!=null?'':' hidden')+'>'+(o.remaining!=null?esc(o.remaining+' téléchargement'+(o.remaining>1?'s':'')+' restant'+(o.remaining>1?'s':'')+' aujourd\'hui'):'')+'</p>'+
       '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
+    h+=secOpen('share','Partager l\'appli','Envoyer le lien à quelqu\'un')+shareHtml()+secClose;
     h+=secOpen('app','Appli et mises à jour','Version '+esc(APP_VERSION)+(S.apkUpdate?' · mise à jour disponible':''))+'<p class="hint" style="margin:0">Version de l\'appli : '+esc(APP_VERSION)+'</p>'+
       '<div class="acts"><button type="button" class="btn ghost" data-checkupd'+(S.updChecking?' disabled':'')+'>'+IC.refresh+(S.updChecking?'Recherche…':'Rechercher une mise à jour')+'</button>'+
       (S.apkUpdate?'<button type="button" class="btn red" data-getapk>'+IC.dl+'Télécharger la mise à jour'+(S.apkUpdate.tag?' ('+esc(S.apkUpdate.tag)+')':'')+'</button><p class="hint" style="margin:0;flex-basis:100%">Ouvre ensuite le fichier tv-streamy.apk pour l\'installer par-dessus : tes comptes et ta liste sont conservés.</p>':'')+'</div>';
@@ -1518,7 +1523,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1543,6 +1548,8 @@ document.addEventListener('click',function(e){
     toast('Liste « '+accName(xacc)+' » activée.');
     switchAccount(xacc).then(function(){if(d.xopen){var w=what.split(':');openItem(w[0],w.slice(1).join(':'))}else{var ch=byId('live',what);if(ch)playLive(ch)}});return}
   if(d.setsec){S.setOpen[d.setsec]=!S.setOpen[d.setsec];var sb=t.nextElementSibling;if(sb)sb.hidden=!S.setOpen[d.setsec];t.setAttribute('aria-expanded',!!S.setOpen[d.setsec]);return}
+  if(t.hasAttribute('data-share')){shareApp();return}
+  if(t.hasAttribute('data-copylink')){copyText(SHARE_APK);return}
   if(d.syncsetup){openSheet({kind:'sync',mode:d.syncsetup});return}
   if(d.syncmode){sheet.mode=d.syncmode;renderSheet();return}
   if(t.hasAttribute('data-syncnow')){syncNow(true);return}
@@ -1764,6 +1771,27 @@ function savePrefs(){PREFS.at=Date.now();kset('prefs',PREFS);syncSoon()}
 S.setOpen={acc:true};
 function secOpen(id,title,sum){var o=!!S.setOpen[id];return '<section class="setsec"><button type="button" class="sethead" data-setsec="'+id+'" aria-expanded="'+o+'"><span><b>'+title+'</b>'+(sum?'<small>'+sum+'</small>':'')+'</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="setbody"'+(o?'':' hidden')+'>'}
 var secClose='</div></section>';
+/* share the app: link to the latest APK (phone, tablet, Android TV) and to the releases page (Samsung) */
+var SHARE_APK='https://github.com/Nagromc86/TV-Streamy/releases/latest/download/tv-streamy.apk',SHARE_PAGE='https://github.com/Nagromc86/TV-Streamy/releases/latest';
+var SHARE_TEXT='TV Streamy, un lecteur IPTV façon Netflix. Pour l\'installer sur un téléphone, une tablette ou une Android TV, télécharge ce fichier puis ouvre-le : '+SHARE_APK;
+function qrSvg(text){try{var q=qrcode(0,'M');q.addData(text);q.make();return q.createSvgTag({cellSize:4,margin:2,scalable:true})}catch(e){return ''}}
+function shareHtml(){
+  return '<p class="hint" style="margin:0">Envoie le lien de l\'appli : la personne l\'installe sur son téléphone, sa tablette ou son Android TV. Elle devra ajouter sa propre liste de lecture : tes comptes, ta liste et ta synchro ne sont jamais partagés.</p>'+
+    '<div class="acts"><button type="button" class="btn" data-share>'+'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>'+'Partager le lien</button><button type="button" class="btn ghost" data-copylink>Copier le lien</button></div>'+
+    '<div class="qrbox">'+qrSvg(SHARE_APK)+'<span>Ou fais scanner ce QR code avec l\'appareil photo de l\'autre téléphone.</span></div>'+
+    '<p class="hint" style="margin:0">Sur une Android TV : installer l\'appli <b>Downloader</b>, puis saisir l\'adresse <span style="word-break:break-all;color:var(--ink)">'+esc(SHARE_APK.replace('https://',''))+'</span>. Pour une TV Samsung, la version .wgt est sur la <span style="color:var(--ink)">page des versions</span> : '+esc(SHARE_PAGE.replace('https://',''))+'.</p>';
+}
+function copyText(t){
+  var done=function(){toast('Lien copié.')};
+  if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t).then(done,function(){legacyCopy(t)&&done()});
+  if(legacyCopy(t))done();else toast(t);
+}
+function legacyCopy(t){var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();return ok}
+function shareApp(){
+  if(NATIVE)return nat('shareText',{title:'TV Streamy',text:SHARE_TEXT}).catch(function(){copyText(SHARE_TEXT)});
+  if(navigator.share)return navigator.share({title:'TV Streamy',text:SHARE_TEXT}).catch(function(){});
+  copyText(SHARE_TEXT);
+}
 function syncHtml(){
   if(!SYNC)return '<p class="hint" style="margin:0">Retrouve tes comptes, favoris, reprises de lecture et filtres sur tous tes appareils. Tout est chiffré sur l\'appareil avec ta phrase secrète.</p><div class="acts"><button type="button" class="btn ghost" data-syncsetup="new">'+IC.refresh+'Activer la synchro</button></div>';
   var t=SYNC.last?new Date(SYNC.last):null;

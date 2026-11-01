@@ -414,6 +414,23 @@ public class PlayerPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** Opens Android's share sheet (Messages, WhatsApp, mail...) with a text. */
+    @PluginMethod
+    public void shareText(PluginCall call) {
+        try {
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_SUBJECT, call.getString("title", ""));
+            send.putExtra(Intent.EXTRA_TEXT, call.getString("text", ""));
+            Intent chooser = Intent.createChooser(send, "Partager TV Streamy");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Partage impossible : " + e.getMessage());
+        }
+    }
+
     /** Tells the app whether it runs on a TV (Android TV, Google TV...). */
     @PluginMethod
     public void deviceInfo(PluginCall call) {

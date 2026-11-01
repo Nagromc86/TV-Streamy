@@ -16,6 +16,7 @@
     "@capacitor/assets": "3.0.5",
     "@capacitor/cli": "6.2.1",
     "@fontsource/bricolage-grotesque": "5.1.0",
-    "@fontsource/figtree": "5.1.1"
+    "@fontsource/figtree": "5.1.1",
+    "qrcode-generator": "1.4.4"
   }
 }

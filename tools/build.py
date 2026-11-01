@@ -17,7 +17,8 @@ try:
     now = datetime.datetime.now(ZoneInfo('Europe/Paris'))
 except Exception:
     now = datetime.datetime.now()
-out = src.replace('/*@@FONTS@@*/', fonts).replace('/*@@VERSION@@*/', now.strftime('%d/%m/%Y %H:%M'))
+qr = open(os.path.join(nm, 'qrcode-generator', 'qrcode.js'), encoding='utf-8').read()
+out = src.replace('/*@@QRCODE@@*/', qr).replace('/*@@FONTS@@*/', fonts).replace('/*@@VERSION@@*/', now.strftime('%d/%m/%Y %H:%M'))
 os.makedirs(os.path.join(root, 'www'), exist_ok=True)
 open(os.path.join(root, 'www', 'index.html'), 'w', encoding='utf-8').write(out)
 print('www/index.html', len(out.encode()))
