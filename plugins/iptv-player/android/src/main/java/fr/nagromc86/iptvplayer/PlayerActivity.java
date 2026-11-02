@@ -114,6 +114,17 @@ public class PlayerActivity extends Activity {
     private FrameLayout rootView;
     private LinearLayout actionsRow;
     private boolean frenchAudio;
+    /* live pause: short pauses resume from memory; longer ones through the provider's replay (timeshift) */
+    static final String EXTRA_TS_TPL = "tsTpl";
+    static final String EXTRA_TS_TZ = "tsTz";
+    private String tsTpl;
+    private int tsTz;
+    private String liveUrl;
+    private long pausedAt;
+    private long behindMs;
+    private boolean onTimeshift;
+    private long tsStartWall;
+    private TextView goLiveButton;
     /* subtitles: the video's own French ones first (CC); OpenSubtitles only when the video has none, or on request */
     static final String EXTRA_OS_ON = "osOn";
     private boolean osOn;
@@ -201,6 +212,18 @@ public class PlayerActivity extends Activity {
         if (subButton != null) {
             actions.addView(subButton);
         }
+        tsTpl = in.getStringExtra(EXTRA_TS_TPL);
+        tsTz = in.getIntExtra(EXTRA_TS_TZ, 0);
+        if (live) {
+            goLiveButton = pill("Retour au direct");
+            goLiveButton.setContentDescription("Revenir au direct");
+            goLiveButton.setVisibility(View.GONE);
+            goLiveButton.setOnClickListener(v -> goLive(null));
+            LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            glp.setMargins(dp(10), 0, 0, 0);
+            goLiveButton.setLayoutParams(glp);
+            actions.addView(goLiveButton);
+        }
         if (pipButton != null) {
             LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             plp.setMargins(dp(10), 0, 0, 0);
@@ -221,6 +244,9 @@ public class PlayerActivity extends Activity {
             }
             if (subButton != null) {
                 subButton.setVisibility(inPip ? View.GONE : visibility);
+            }
+            if (goLiveButton != null) {
+                goLiveButton.setVisibility(inPip || !isBehind() ? View.GONE : visibility);
             }
             if (visibility != View.VISIBLE) {
                 hideSystemUi();
@@ -279,6 +305,43 @@ public class PlayerActivity extends Activity {
             }
 
             @Override
+            public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+                if (!live || reason != Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
+                    return;
+                }
+                if (!playWhenReady) {
+                    if (pausedAt == 0) {
+                        pausedAt = System.currentTimeMillis();
+                    }
+                    return;
+                }
+                if (pausedAt == 0) {
+                    return;
+                }
+                long paused = System.currentTimeMillis() - pausedAt;
+                pausedAt = 0;
+                if (paused < 3000) {
+                    return;
+                }
+                if (onTimeshift) {
+                    // the provider may have closed the replay while paused: reopen it where we were
+                    if (paused > 60000) {
+                        openTimeshift(tsStartWall + player.getCurrentPosition());
+                    }
+                    return;
+                }
+                behindMs += paused;
+                if (paused <= 45000) {
+                    // short pause: the video kept in memory goes on, a little behind the live
+                    showBehind();
+                } else if (!TextUtils.isEmpty(tsTpl)) {
+                    openTimeshift(System.currentTimeMillis() - behindMs);
+                } else {
+                    goLive("Pause trop longue et pas de replay sur cette chaîne : retour au direct");
+                }
+            }
+
+            @Override
             public void onTracksChanged(Tracks tracks) {
                 // Tell once, when the video has loaded, whether it carries subtitles at all
                 if (tracksChecked || live || tracks.isEmpty() || !tracks.containsType(C.TRACK_TYPE_VIDEO)) {
@@ -314,6 +377,10 @@ public class PlayerActivity extends Activity {
             @Override
             public void onPlayerError(PlaybackException error) {
                 lastError = error.getErrorCodeName();
+                if (live && isBehind() && !finishing) {
+                    goLive(onTimeshift ? "Le replay ne répond pas : retour au direct" : "Retour au direct");
+                    return;
+                }
                 if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && httpRetries < 3 && !finishing) {
                     httpRetries++;
                     final long pos = live ? C.TIME_UNSET : player.getCurrentPosition();
@@ -350,6 +417,7 @@ public class PlayerActivity extends Activity {
         });
 
         currentUrl = url;
+        liveUrl = url;
         player.setMediaItem(buildItem(url, in.getStringExtra(EXTRA_TITLE)));
         watchUrl = in.getStringExtra(EXTRA_WATCH_URL);
         watchToken = in.getStringExtra(EXTRA_WATCH_TOKEN);
@@ -868,6 +936,58 @@ public class PlayerActivity extends Activity {
         }
         in.close();
         return b.toString("UTF-8");
+    }
+
+    private boolean isBehind() {
+        return onTimeshift || behindMs > 0;
+    }
+
+    private void showBehind() {
+        if (goLiveButton != null) {
+            goLiveButton.setVisibility(inPip ? View.GONE : View.VISIBLE);
+        }
+        playerView.showController();
+    }
+
+    /** Watch the channel from wallMs (device clock) through the provider's replay. */
+    private void openTimeshift(long wallMs) {
+        long startSec = (wallMs / 60000L) * 60L;
+        long behindMin = Math.max(1, (System.currentTimeMillis() / 1000L - startSec) / 60L);
+        java.util.Calendar c = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"));
+        c.setTimeInMillis((startSec + tsTz * 60L) * 1000L);
+        String start = String.format(java.util.Locale.ROOT, "%04d-%02d-%02d:%02d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1,
+                c.get(java.util.Calendar.DAY_OF_MONTH), c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE));
+        String u = tsTpl.replace("{DUR}", String.valueOf(behindMin + 120)).replace("{START}", start);
+        onTimeshift = true;
+        tsStartWall = startSec * 1000L;
+        currentUrl = u;
+        player.setMediaItem(buildItem(u, getIntent().getStringExtra(EXTRA_TITLE)));
+        long into = wallMs - tsStartWall;
+        if (into > 0) {
+            player.seekTo(into);
+        }
+        player.prepare();
+        player.play();
+        Toast.makeText(this, "En différé · « Retour au direct » en haut à droite", Toast.LENGTH_SHORT).show();
+        showBehind();
+    }
+
+    private void goLive(String message) {
+        onTimeshift = false;
+        behindMs = 0;
+        pausedAt = 0;
+        currentUrl = liveUrl;
+        if (player != null) {
+            player.setMediaItem(buildItem(liveUrl, getIntent().getStringExtra(EXTRA_TITLE)));
+            player.prepare();
+            player.play();
+        }
+        if (goLiveButton != null) {
+            goLiveButton.setVisibility(View.GONE);
+        }
+        if (message != null) {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        }
     }
 
     /** Close from outside (another video is being started). */

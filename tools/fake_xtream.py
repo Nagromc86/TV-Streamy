@@ -1,6 +1,6 @@
 """Fake Xtream Codes server for testing the interface (no real streams).
 Run: python3 tools/fake_xtream.py 8899   ->  server http://localhost:8899, user demo / pass demo"""
-import base64, json, sys, time, random
+import time, base64, json, sys, time, random
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -20,7 +20,7 @@ for c, L in names.items():
     for nm in L:
         LIVE.append({'num': n, 'name': 'FR | ' + nm, 'stream_type': 'live', 'stream_id': 1000 + n, 'stream_icon': '',
                      'epg_channel_id': nm.lower().replace(' ', '') + '.fr', 'added': str(NOW - n * 3600), 'category_id': c,
-                     'tv_archive': 0, 'direct_source': '', 'tv_archive_duration': 0})
+                     'tv_archive': 1 if c == '1' else 0, 'direct_source': '', 'tv_archive_duration': 7 if c == '1' else 0})
         n += 1
 VOD_CATS = [{'category_id': '10', 'category_name': 'FR ★ Action', 'parent_id': 0},
             {'category_id': '11', 'category_name': 'FR ★ Comédie', 'parent_id': 0},
@@ -92,6 +92,12 @@ class H(BaseHTTPRequestHandler):
                     '<text x="24" y="400" font-family="sans-serif" font-weight="800" font-size="34" fill="#fff">%s</text></svg>') % (h, h + 40, h + 180, k)
             body = body.encode(); self.send_response(200); self.send_header('Content-Type', 'image/svg+xml')
             self.send_header('Content-Length', str(len(body))); self.end_headers(); return self.wfile.write(body)
+        if u.path.startswith('/timeshift/') or u.path.startswith('/live/'):
+            TS_LOG.append(u.path)
+            body = b'\x47' * 188 * 50; self.send_response(200); self.send_header('Content-Type', 'video/mp2t')
+            self.send_header('Content-Length', str(len(body))); self.end_headers(); return self.wfile.write(body)
+        if u.path == '/tslog':
+            return self.send(TS_LOG)
         if u.path != '/player_api.php':
             return self.send({'error': 'not found'}, 404)
         user = q.get('username')
@@ -105,7 +111,7 @@ class H(BaseHTTPRequestHandler):
         if a == '':
             return self.send({'user_info': {'username': 'demo', 'auth': 1, 'status': 'Active', 'exp_date': str(NOW + 200 * 86400),
                                             'max_connections': '1', 'active_cons': '0', 'allowed_output_formats': ['m3u8', 'ts']},
-                              'server_info': {'url': 'localhost', 'port': '8899', 'timestamp_now': NOW}})
+                              'server_info': {'url': 'localhost', 'port': '8899', 'timestamp_now': int(time.time()), 'timezone': 'Europe/Paris', 'time_now': srv(int(time.time()))}})
         cat = q.get('category_id')
         if a == 'get_live_categories': return self.send(LIVE_CATS)
         if a == 'get_live_streams': return self.send([x for x in LIVEL if not cat or x['category_id'] == cat])
@@ -138,7 +144,23 @@ class H(BaseHTTPRequestHandler):
                 L.append({'id': str(k), 'title': b64(t), 'description': b64('Description de ' + t), 'start_timestamp': str(start + k * 1800),
                           'stop_timestamp': str(start + (k + 1) * 1800)})
             return self.send({'epg_listings': L})
+        if a == 'get_simple_data_table':
+            sid = int(q.get('stream_id', '0')); ch = next((x for x in LIVEL if x['stream_id'] == sid), None)
+            arch = bool(ch and ch['tv_archive']); now = int(time.time()); day0 = now - now % 3600 - 3 * 86400
+            progs = ['Journal', 'Magazine', 'Film du soir', 'Documentaire', 'Match en direct', 'Série', 'Jeu', 'Météo']
+            L = []
+            for k in range(5 * 24):
+                st = day0 + k * 3600; en = st + 3600; t = progs[(sid + k) % len(progs)]
+                L.append({'id': str(k), 'epg_id': '', 'title': b64(t), 'description': b64('Description de ' + t),
+                          'start': srv(st), 'end': srv(en), 'start_timestamp': str(st), 'stop_timestamp': str(en),
+                          'now_playing': 1 if st <= now < en else 0, 'has_archive': 1 if arch and en <= now else 0})
+            return self.send({'epg_listings': L})
         return self.send([])
+
+TS_LOG = []
+def srv(ts):
+    # the provider's clock: Paris time (UTC+1 in winter)
+    return time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(ts + 3600))
 
 if __name__ == '__main__':
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8899

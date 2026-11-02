@@ -11,6 +11,28 @@
 .boot svg{width:112px;height:112px;filter:drop-shadow(0 12px 30px rgba(229,9,20,.35))}.boot b{font-family:var(--display);font-size:1.7rem;font-weight:800;letter-spacing:-.02em}.boot .spin{margin-top:10px;opacity:0;animation:spin 1s linear infinite,fadein .3s .9s forwards}@keyframes fadein{to{opacity:1}}
 @keyframes bootin{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 .epdl.prog{background:linear-gradient(90deg,rgba(229,9,20,.55) var(--pc),var(--surface2) var(--pc));font-size:.78rem;font-weight:700;min-width:56px}
+.chlist .ch .star svg{width:20px;height:20px}
+.gwrap{overflow-x:auto;overflow-y:visible;border-radius:12px;background:var(--surface);-webkit-overflow-scrolling:touch;margin-top:10px}
+.ginner{position:relative}
+.gruler{position:sticky;top:0;height:28px;border-bottom:1px solid var(--line);z-index:2;background:var(--surface)}
+.gh{position:absolute;top:6px;font-size:.75rem;color:var(--muted);padding-left:4px;border-left:1px solid var(--line)}
+.grow{position:relative;height:58px;border-bottom:1px solid var(--line)}
+.grow .glab{position:sticky;left:0;z-index:1;width:112px;height:58px;display:flex;align-items:center;gap:6px;padding:0 8px;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:.78rem;font-weight:700;text-align:left}
+.gruler .glab{position:sticky;left:0;display:block;width:112px;height:27px;background:var(--surface);z-index:3}
+.grow .glab img{width:28px;height:28px;object-fit:contain;flex:none}.grow .glab span{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.gline{position:absolute;left:112px;top:0;right:0;height:58px}
+.gblk{position:absolute;top:5px;height:48px;border:0;border-radius:8px;background:var(--surface2);color:var(--ink);text-align:left;padding:5px 8px;clip-path:inset(0 round 8px);display:flex;flex-direction:column;justify-content:center;font-size:.78rem;white-space:nowrap}
+.gblk b,.gblk small{position:sticky;left:120px;align-self:flex-start;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis}.gblk small{color:var(--muted);font-size:.7rem}
+.gblk svg{position:absolute;right:5px;top:5px;width:14px;height:14px;color:var(--accent2)}
+.gblk.now{box-shadow:inset 0 0 0 2px var(--accent);background:rgba(229,9,20,.18)}.gblk.old{opacity:.45}.gblk:focus-visible{outline:3px solid #fff}
+.gnowline{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:1;pointer-events:none}
+.gwait{position:absolute;left:12px;top:20px;font-size:.75rem;color:var(--muted)}
+.chlogo{width:48px;height:48px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;font-weight:800}.chlogo img{width:100%;height:100%;object-fit:contain}
+.gl{display:flex;flex-direction:column;margin-top:10px}
+.gp{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.gp .gt{font-weight:800;font-variant-numeric:tabular-nums}.gp .gb{min-width:0;display:flex;flex-direction:column;gap:2px}
+.gp .gb small{color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.gp.now{background:rgba(229,9,20,.1);border-radius:10px;padding:10px 8px}.gp.old{opacity:.5}.gp .btn svg{width:18px;height:18px}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -138,7 +160,7 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 
 /* channels */
 .chlist{display:flex;flex-direction:column;gap:8px}
-.ch{display:grid;grid-template-columns:76px 1fr auto;gap:12px;align-items:center;padding:8px;border-radius:10px;background:var(--surface)}
+.ch{display:grid;grid-template-columns:76px 1fr auto auto;gap:8px;align-items:center;padding:8px;border-radius:10px;background:var(--surface)}
 .logo{width:76px;height:52px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;border:0;padding:4px}
 .logo img{max-width:100%;max-height:100%;object-fit:contain}
 .logo .ph{font-family:var(--display);font-weight:800;font-size:.95rem;color:#333}
@@ -357,7 +379,7 @@ var IC={
 };
 
 /* ---------- state ---------- */
-var S={boot:true,accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
+var S={boot:true,liveView:(function(){try{return localStorage.getItem('lview')||'list'}catch(e){return 'list'}})(),accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
 var DATA=null;      /* catalogue of the active account */
 var USER={favs:{},prog:{},recent:[],downloads:{}};
 var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:''};  /* per-account personal data */
@@ -463,7 +485,7 @@ var SECT={live:{label:'TV',calls:[['liveCats','get_live_categories'],['live','ge
 var UPD={};
 function sameDay(t){return t&&new Date(t).toDateString()===new Date().toDateString()}
 /* fields the provider sends that the app never reads: dropped so the stored catalogue is smaller and loads faster */
-var DROPF=['num','stream_type','rating_5based','is_adult','custom_sid','direct_source','category_ids','thumbnail','youtube_trailer','trailer','episode_run_time','tv_archive','tv_archive_duration','epg_channel_id','_n'];
+var DROPF=['num','stream_type','rating_5based','is_adult','custom_sid','direct_source','category_ids','thumbnail','youtube_trailer','trailer','episode_run_time','_n'];
 function slim(L){for(var i=0;i<L.length;i++){var x=L[i];for(var j=0;j<DROPF.length;j++)if(DROPF[j] in x)delete x[DROPF[j]]}return L}
 function fetchSection(a,sec){return Promise.all(SECT[sec].calls.map(function(c,i){return api(a,'action='+c[1]).then(function(r){r=Array.isArray(r)?r:[];return i===1?slim(r):r})}))}
 function applySection(sec,r){var c=SECT[sec].calls;DATA[c[0][0]]=r[0];DATA[c[1][0]]=r[1];DATA.upd=DATA.upd||{};DATA.upd[sec]=Date.now()}
@@ -498,7 +520,9 @@ function loadCatalog(){
   return kget('cat:'+a.id).then(function(c){
     if(c&&(c.live||c.vod||c.series)){
       if(!c.upd)c.upd={live:c.at,vod:c.at,series:c.at};
-      DATA=c;S.msg='';repairFavs();render();prebuild();setTimeout(dailyRefresh,1500);return;
+      DATA=c;S.msg='';repairFavs();render();prebuild();
+      /* catalogues saved by v1.29–1.40 lost the replay information of the channels: fetch the channels again once */
+      if((c.live||[]).length&&!c.live.some(function(x){return 'tv_archive' in x}))setTimeout(function(){refreshSection('live',false)},3000);setTimeout(dailyRefresh,1500);return;
     }
     S.loading='Premier chargement de ton catalogue…';render();
     var d={upd:{},live:[],liveCats:[],vod:[],vodCats:[],series:[],serCats:[]},errs=[];DATA=null;
@@ -820,7 +844,8 @@ var AUTH={};
 function authPing(force){
   var a=acc();if(!a||navigator.onLine===false)return Promise.resolve();
   var t=AUTH[a.id]||0;if(!force&&Date.now()-t<10*60000)return Promise.resolve();
-  return withTimeout(api(a,''),6000).then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){AUTH[a.id]=Date.now();if(ui.max_connections)a.maxConn=+ui.max_connections||a.maxConn}},function(){});
+  return withTimeout(api(a,''),6000).then(function(r){var ui=r&&r.user_info;var si=r&&r.server_info;if(si&&si.time_now&&si.timestamp_now){var z=tzFrom(si.time_now,+si.timestamp_now);if(z!==null)setTz(a.id,z)}
+    if(ui&&String(ui.auth)==='1'){AUTH[a.id]=Date.now();if(ui.max_connections)a.maxConn=+ui.max_connections||a.maxConn}},function(){});
 }
 function netChanged(){AUTH={}}
 window.addEventListener('online',netChanged);
@@ -857,7 +882,7 @@ function playLive(item){
   var ex=liveExt();
   USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
-  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(r){noteLive(ex,r);explainRefusal(r);if(S.tab==='home'||S.tab==='live')render()});
+  play(Object.assign({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true},NATIVE&&!TIZEN?timeshiftOpts(item):{})).then(function(r){noteLive(ex,r);explainRefusal(r);if(S.tab==='home'||S.tab==='live')render()});
 }
 /* Subtitles: the video's own French ones come first (CC). OpenSubtitles is only asked by the player when the video
    has none (and the audio is not French), or when the OpenSub button is pressed. Saved ones go in at once. */
@@ -939,8 +964,8 @@ function epgHtml(id){
   return '<span class="epg"><em>'+esc(n.title)+'</em> · '+hhmm(n.start)+'–'+hhmm(n.end)+(x?' · ensuite '+esc(x.title):'')+'</span><span class="prog"><i style="width:'+pc.toFixed(0)+'%"></i></span>';
 }
 function paintEpg(id){var el=document.querySelector('[data-epg="'+id+'"]');if(el)el.innerHTML=epgHtml(id)}
-var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var id=e.target.getAttribute('data-epg');if(id)wantEpg(id);if(e.target.hasAttribute('data-more'))e.target.click();io.unobserve(e.target)}})},{rootMargin:'200px'}):null;
-function observe(){if(!io)return;[].forEach.call(document.querySelectorAll('[data-epg],[data-more]'),function(el){io.observe(el)})}
+var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var id=e.target.getAttribute('data-epg');if(id)wantEpg(id);var g=e.target.getAttribute('data-grow');if(g)wantFull(g);if(e.target.hasAttribute('data-more'))e.target.click();io.unobserve(e.target)}})},{rootMargin:'200px'}):null;
+function observe(){if(!io)return;[].forEach.call(document.querySelectorAll('[data-epg],[data-more],[data-grow]'),function(el){io.observe(el)})}
 
 /* ---------- rendering pieces ---------- */
 function imgOf(kind,x){return kind==='series'?x.cover:x.stream_icon}
@@ -957,10 +982,113 @@ function wideHtml(attr,img,label,pc){
   return '<button type="button" class="wide" '+attr+'><span class="art">'+(img?'<img loading="lazy" src="'+esc(img)+'" alt="" onerror="this.remove()">':'')+'<span class="pl">'+IC.play+'</span><span class="lab">'+esc(label)+'</span>'+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span></button>';
 }
 function rowHtml(title,items,more){if(!items)return '';return '<section class="sec"><div class="sech"><h2>'+esc(title)+'</h2>'+(more||'')+'</div><div class="row">'+items+'</div></section>'}
+/* ---------- full TV guide, replay (catch-up) and timeshift ----------
+   Loaded only for the channel opened, or for the rows of the guide on screen: nothing is fetched otherwise. */
+var EPGF={},epgFQ=[],epgFBusy=0;
+/* the provider's clock, in minutes from UTC: replay addresses are written in its local time */
+function tzFrom(str,ts){var m=/(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)(?::(\d\d))?/.exec(String(str||''));if(!m||!ts)return null;return Math.round((Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0))/1000-ts)/900)*15}
+function tzOf(id){try{var v=localStorage.getItem('tz:'+id);return v===null?null:+v}catch(e){return null}}
+function setTz(id,z){try{localStorage.setItem('tz:'+id,String(z))}catch(e){}}
+function srvStr(ts,z){var d=new Date((ts+z*60)*1000),p=function(n){return String(n).padStart(2,'0')};return d.getUTCFullYear()+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate())+':'+p(d.getUTCHours())+'-'+p(d.getUTCMinutes())}
+function hasArchive(x){return x&&+x.tv_archive===1}
+function archDays(x){return Math.max(1,+x.tv_archive_duration||1)}
+function wantFull(id,force){
+  var c=EPGF[id];if(c&&(c.loading||(!force&&Date.now()-c.at<30*60000)))return;
+  EPGF[id]={loading:true,at:Date.now(),list:c&&c.list};epgFQ.push(id);runFull();
+}
+function runFull(){
+  while(epgFBusy<4&&epgFQ.length){
+    var id=epgFQ.shift(),a=acc();if(!a)return;epgFBusy++;
+    (function(id){
+      api(a,'action=get_simple_data_table&stream_id='+id).then(function(r){
+        var L=((r&&r.epg_listings)||[]).map(function(x){var s=+x.start_timestamp,e=+x.stop_timestamp;return {t:b64(x.title),d:b64(x.description),s:s,e:e,arch:+x.has_archive===1,ss:x.start}}).filter(function(x){return x.s&&x.e>x.s}).sort(function(p,q){return p.s-q.s});
+        var u=[];L.forEach(function(x){if(!u.length||x.s>=u[u.length-1].e)u.push(x)});
+        if(u[0]&&u[0].ss){var z=tzFrom(u[0].ss,u[0].s);if(z!==null)setTz(a.id,z)}
+        EPGF[id]={list:u,at:Date.now()};
+      },function(){EPGF[id]={list:(EPGF[id]&&EPGF[id].list)||[],at:Date.now(),err:true}}).then(function(){epgFBusy--;paintFull(id);runFull()});
+    })(id);
+  }
+}
+function paintFull(id){
+  var r=document.querySelector('[data-grow="'+id+'"] .gline');if(r)r.innerHTML=gridLine(id);
+  if(sheet&&sheet.kind==='chguide'&&String(sheet.item.stream_id)===String(id)){renderSheet();if((sheet.day||0)===0)setTimeout(scrollNow,30)}
+}
+/* can this past programme be watched again? */
+function canReplay(x,p){var now=Date.now()/1000;return hasArchive(x)&&p.e<=now&&p.s>=now-archDays(x)*86400}
+function replayUrls(x,p){
+  var a=acc(),z=tzOf(a.id);if(z===null)z=-new Date().getTimezoneOffset();
+  var st=p.ss?String(p.ss).replace(/^(\d{4}-\d\d-\d\d)[ T](\d\d):(\d\d).*$/,'$1:$2-$3'):srvStr(p.s,z),dur=Math.ceil((p.e-p.s)/60)+2;
+  var u=encodeURIComponent(a.username),pw=encodeURIComponent(a.password),b=base(a);
+  return [b+'/timeshift/'+u+'/'+pw+'/'+dur+'/'+st+'/'+x.stream_id+'.ts',b+'/streaming/timeshift.php?username='+u+'&password='+pw+'&stream='+x.stream_id+'&start='+st+'&duration='+dur];
+}
+function playReplay(x,p){
+  var U=replayUrls(x,p),d=new Date(p.s*1000);
+  play({url:U[0],fallbackUrl:U[1],image:x.stream_icon,title:cleanName(x.name)+' · '+p.t,subtitle:'Replay · '+d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})+' '+hhmm(p.s)+'–'+hhmm(p.e),live:false,startMs:0});
+}
+/* what the live player needs to pause and resume later through the provider's replay */
+function timeshiftOpts(x){
+  if(!hasArchive(x))return {};var a=acc(),z=tzOf(a.id);if(z===null)return {};
+  return {tsTpl:base(a)+'/timeshift/'+encodeURIComponent(a.username)+'/'+encodeURIComponent(a.password)+'/{DUR}/{START}/'+x.stream_id+'.ts',tsTz:z,tsDays:archDays(x)};
+}
+function dayStart(off){var d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+off);return d.getTime()/1000}
+function dayLabel(off){if(off===0)return 'Aujourd\'hui';if(off===-1)return 'Hier';if(off===1)return 'Demain';var d=new Date(dayStart(off)*1000);return d.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric'})}
+function dayChips(cur,attr,min,max){var h='<div class="chips">';for(var o=min;o<=max;o++)h+='<button type="button" class="chip" '+attr+'="'+o+'" aria-pressed="'+(o===cur)+'">'+esc(dayLabel(o))+'</button>';return h+'</div>'}
+var GICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7"/></svg>';
+var RICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>';
+/* channel guide sheet: one day at a time, replay on past programmes */
+function chGuideHtml(){
+  var x=sheet.item,id=x.stream_id,c=EPGF[id],off=sheet.day||0,now=Date.now()/1000,a0=dayStart(off),a1=dayStart(off+1);
+  var min=hasArchive(x)?-Math.min(7,archDays(x)):-1;
+  var h='<div class="grab"></div><div class="in gut"><div class="updrow" style="background:none;padding:0"><span style="display:flex;align-items:center;gap:12px;min-width:0"><span class="chlogo">'+(x.stream_icon?'<img src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':initials(x.name))+'</span><span style="min-width:0"><b>'+esc(cleanName(x.name))+'</b><small>'+(hasArchive(x)?'Replay disponible '+archDays(x)+' jour'+(archDays(x)>1?'s':''):'Pas de replay sur cette chaîne')+'</small></span></span><button type="button" class="btn" data-play="live:'+esc(id)+'">'+IC.play+'Direct</button></div>'+dayChips(off,'data-gday',min,3);
+  var close='<div class="acts"><button type="button" class="btn" data-close>Fermer</button></div></div>';
+  if(!c||(!c.list&&c.loading))return h+'<div class="loading" style="padding:30px 0"><div class="spin"></div></div>'+close;
+  var L=(c.list||[]).filter(function(p){return p.e>a0&&p.s<a1});
+  if(!L.length)return h+'<div class="empty"><p>'+(c.err?'Programme indisponible pour le moment.':'Pas de programme annoncé ce jour-là.')+'</p></div>'+close;
+  h+='<div class="gl">';
+  L.forEach(function(p,i){
+    var live=p.s<=now&&now<p.e,past=p.e<=now,rp=past&&canReplay(x,p),pc=live?Math.round((now-p.s)/(p.e-p.s)*100):0;
+    h+='<div class="gp'+(live?' now':'')+(past&&!rp?' old':'')+'"'+(live?' data-gnow':'')+'><span class="gt">'+hhmm(p.s)+'</span><span class="gb"><b>'+esc(p.t)+'</b>'+(p.d?'<small>'+esc(p.d)+'</small>':'')+(live?'<span class="dlbar"><i style="width:'+pc+'%"></i></span>':'')+'</span>'+
+      (live?'<button type="button" class="btn" data-play="live:'+esc(id)+'">Direct</button>':rp?'<button type="button" class="btn ghost" data-replay="'+esc(id)+'|'+p.s+'">'+RICON+'Revoir</button>':'<span></span>')+'</div>';
+  });
+  return h+'</div>'+close;
+}
+function openChGuide(x){openSheet({kind:'chguide',item:x,day:0});wantFull(x.stream_id);setTimeout(scrollNow,60)}
+function scrollNow(){chipIntoView('#sheet [data-gday][aria-pressed=true]');var n=document.querySelector('#sheet [data-gnow]');if(n)n.scrollIntoView({block:'center'})}
+function progOf(id,s){var c=EPGF[id];return c&&c.list&&c.list.filter(function(p){return String(p.s)===String(s)})[0]}
+/* guide grid for the channels of the selected category: 4 px per minute, rows filled as they come on screen */
+var GPX=4,GLAB=112;
+function gridLine(id){
+  var c=EPGF[id],x=byId('live',id),off=S.gDay||0,a0=dayStart(off),a1=dayStart(off+1),now=Date.now()/1000;
+  if(!c||!c.list)return '<span class="gwait">Chargement…</span>';
+  var L=c.list.filter(function(p){return p.e>a0&&p.s<a1});
+  if(!L.length)return '<span class="gwait">Pas de programme annoncé</span>';
+  return L.map(function(p){
+    var l=Math.max(0,(p.s-a0)/60*GPX),r=Math.min(1440*GPX,(p.e-a0)/60*GPX),live=p.s<=now&&now<p.e,rp=p.e<=now&&canReplay(x,p),old=p.e<=now&&!rp;
+    return '<button type="button" class="gblk'+(live?' now':'')+(old?' old':'')+(rp?' rp':'')+'" style="left:'+l.toFixed(0)+'px;width:'+Math.max(18,r-l-3).toFixed(0)+'px" data-gprog="'+esc(id)+'|'+p.s+'" title="'+esc(hhmm(p.s)+' '+p.t)+'">'+(rp?RICON:'')+'<b>'+esc(p.t)+'</b><small>'+hhmm(p.s)+'</small></button>';
+  }).join('');
+}
+function viewGuide(L){
+  var off=S.gDay||0,pg=pageOf(L,'guide:'+S.liveCat,40),W=1440*GPX,now=Date.now()/1000,a0=dayStart(off);
+  var h=dayChips(off,'data-gridday',-7,3)+'<div class="gwrap" id="gwrap"><div class="ginner" style="width:'+(W+GLAB)+'px"><div class="gruler"><span class="glab"></span>';
+  for(var t=0;t<24;t++)h+='<span class="gh" style="left:'+(GLAB+t*60*GPX)+'px">'+String(t).padStart(2,'0')+':00</span>';
+  h+='</div>';
+  pg.items.forEach(function(x){h+='<div class="grow" data-grow="'+esc(x.stream_id)+'"><button type="button" class="glab" data-chguide="'+esc(x.stream_id)+'">'+(x.stream_icon?'<img loading="lazy" src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'')+'<span>'+esc(cleanName(x.name))+'</span></button><div class="gline">'+gridLine(x.stream_id)+'</div></div>'});
+  if(off===0)h+='<span class="gnowline" style="left:'+(GLAB+(now-a0)/60*GPX).toFixed(0)+'px"></span>';
+  return h+'</div></div>'+(pg.more?moreHtml('guide:'+S.liveCat):'')+'<p class="hint">Touche un programme passé marqué '+RICON.replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')+' pour le revoir (si ta chaîne propose le replay), le programme en cours pour le direct, ou le nom d\'une chaîne pour son programme complet.</p>';
+}
+function chipIntoView(sel){var c=document.querySelector(sel);if(c&&c.parentNode){var p=c.parentNode;p.scrollLeft=c.offsetLeft-p.clientWidth/2+c.offsetWidth/2}}
+function guideScroll(){
+  chipIntoView('[data-gridday][aria-pressed=true]');
+  var w=$('#gwrap');if(!w)return;
+  if(S.gScroll!=null&&S.gScrollDay===(S.gDay||0)){w.scrollLeft=S.gScroll}
+  else{var off=S.gDay||0,t=off===0?(Date.now()/1000-dayStart(0))/60-45:18*60;w.scrollLeft=Math.max(0,t*GPX)}
+  w.onscroll=function(){S.gScroll=w.scrollLeft;S.gScrollDay=S.gDay||0};
+}
 function chHtml(x){
   var id=x.stream_id,img=x.stream_icon;
   return '<div class="ch"><button type="button" class="logo" data-play="live:'+esc(id)+'" aria-label="Regarder '+esc(x.name)+'">'+(img?'<img loading="lazy" src="'+esc(img)+'" alt="" onerror="this.remove()">':'')+(img?'':'<span class="ph">'+initials(x.name)+'</span>')+'</button>'+
     '<button type="button" class="n" data-play="live:'+esc(id)+'" style="border:0;background:none;padding:0;text-align:left;min-width:0"><b>'+esc(cleanName(x.name))+'</b><span data-epg="'+esc(id)+'">'+epgHtml(id)+'</span></button>'+
+    '<button type="button" class="star" data-chguide="'+esc(id)+'" aria-label="Programme'+(hasArchive(x)?' et replay':'')+' de '+esc(cleanName(x.name))+'">'+(hasArchive(x)?RICON:GICON)+'</button>'+
     '<button type="button" class="star'+(isFav('live',id)?' on':'')+'" data-fav="live:'+esc(id)+'" aria-label="Favori">'+(isFav('live',id)?IC.starOn:IC.star)+'</button></div>';
 }
 function catsHtml(kind,current,attr){
@@ -1301,7 +1429,11 @@ function filtered(kind,cat){
 }
 function viewLive(){
   var L=filtered('live',S.liveCat),pg=pageOf(L,'live:'+S.liveCat,60);
-  var h='<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+freshHtml('live')+'<section class="sec" style="margin-top:12px">'+catsHtml('live',S.liveCat,'data-lcat')+'</section><section class="sec" style="margin-top:12px"><div class="chlist">';
+  var gv=S.liveView==='guide';
+  var h='<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+freshHtml('live')+'<section class="sec" style="margin-top:12px">'+catsHtml('live',S.liveCat,'data-lcat')+'</section>'+
+    '<div class="tabs" style="margin-top:10px"><button type="button" class="chip" data-lview="list" aria-pressed="'+!gv+'">Chaînes</button><button type="button" class="chip" data-lview="guide" aria-pressed="'+gv+'">'+GICON.replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"')+'Guide TV</button></div>';
+  if(gv)return h+'<section class="sec" style="margin-top:12px">'+(L.length?viewGuide(L):'<div class="empty"><p>Aucune chaîne dans cette catégorie.</p></div>')+'</section>';
+  h+='<section class="sec" style="margin-top:12px"><div class="chlist">';
   pg.items.forEach(function(x){h+=chHtml(x)});
   return h+'</div>'+(pg.more?moreHtml('live:'+S.liveCat):'')+(!L.length?'<div class="empty"><p>'+(S.liveCat==='fav'?'Touche l\'étoile d\'une chaîne pour la retrouver ici.':'Aucune chaîne dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
@@ -1510,7 +1642,7 @@ function renderInner(){
   app.innerHTML=topHtml()+'<main class="gut">'+lead+(navigator.onLine===false?'<p class="offline">Hors connexion : les films et épisodes téléchargés restent lisibles (Ma liste).</p>':'')+(S.msg?'<p class="err" style="margin-top:8px">'+esc(S.msg)+'</p>':'')+v+'</main>';
   nav.innerHTML=navHtml();nav.hidden=false;
   if(hadFocus){var q=$('#q');if(q){q.focus();try{q.setSelectionRange(sel,sel)}catch(e){}}}
-  onScroll();observe();billSync();
+  onScroll();observe();billSync();if(S.tab==='live'&&S.liveView==='guide')guideScroll();
 }
 function onScroll(){var t=$('#topbar');if(t&&t.classList.contains('over'))t.classList.toggle('solid',window.scrollY>40)}
 window.addEventListener('scroll',onScroll,{passive:true});
@@ -1590,6 +1722,8 @@ function renderSheetInner(){
     h+=syncSheetHtml();
   }else if(sheet.kind==='cast'){
     h+=castSheetHtml();
+  }else if(sheet.kind==='chguide'){
+    h+=chGuideHtml();
   }else if(sheet.kind==='groups'){
     var gs=groupsOf(sheet.sec),hg=hidG(sheet.sec),hc=hidC(sheet.sec),unit={live:'chaînes',vod:'films',series:'séries'}[sheet.sec];
     sheet.open=sheet.open||{};if(gs.length===1)sheet.open[gs[0].name]=true;
@@ -1718,7 +1852,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -1774,6 +1908,17 @@ document.addEventListener('click',function(e){
     return}
   if(d.tab){S.confirmDl=null;if(d.tab===S.tab&&d.tab==='movies')S.vodCat='all';if(d.tab===S.tab&&d.tab==='series')S.serCat='all';if(d.tab===S.tab&&d.tab==='favs')S.favCat='all';S.tab=d.tab;if(d.tab!=='search')S.q=S.q;render();window.scrollTo(0,0);if(d.tab==='search')setTimeout(function(){var q=$('#q');if(q)q.focus()},30);return}
   if(d.open){var p=d.open.split(':');openItem(p[0],p.slice(1).join(':'));return}
+  if(d.chguide!==undefined){var cg=byId('live',d.chguide);if(cg)openChGuide(cg);return}
+  if(d.gday!==undefined){sheet.day=+d.gday;renderSheet();setTimeout(sheet.day===0?scrollNow:function(){chipIntoView('#sheet [data-gday][aria-pressed=true]')},30);return}
+  if(d.lview){S.liveView=d.lview;try{localStorage.setItem('lview',d.lview)}catch(x){}render();return}
+  if(d.gridday!==undefined){S.gDay=+d.gridday;S.gScroll=null;var y=window.scrollY;render();window.scrollTo(0,y);return}
+  if(d.replay){var rp=d.replay.split('|'),rx=byId('live',rp[0]),pr=rx&&progOf(rp[0],rp[1]);if(pr)playReplay(rx,pr);return}
+  if(d.gprog){
+    var gp=d.gprog.split('|'),gx=byId('live',gp[0]),pp=gx&&progOf(gp[0],gp[1]),nw=Date.now()/1000;if(!pp)return;
+    if(pp.s<=nw&&nw<pp.e){playLive(gx);return}
+    if(pp.e<=nw&&canReplay(gx,pp)){playReplay(gx,pp);return}
+    toast(hhmm(pp.s)+'–'+hhmm(pp.e)+' · '+pp.t+(pp.e<=nw?' · pas de replay sur cette chaîne':'')+(pp.d?' — '+pp.d.slice(0,140):''));return;
+  }
   if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x)playLive(x);return}
   if(d.fav){var f=d.fav.split(':'),it=byId(f[0],f.slice(1).join(':'));if(it){toggleFav(f[0],it);render();if(sheet)renderSheet()}return}
   if(d.lcat){S.liveCat=d.lcat;render();return}
