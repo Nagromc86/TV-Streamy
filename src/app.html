@@ -575,7 +575,7 @@ function startDownload(k,url,ext,meta,quiet){
   if(!NATIVE){toast('Le téléchargement fonctionne dans l\'appli Android.');return Promise.resolve()}
   var file=safeFile(meta.title)+' - '+k.replace(':','-')+'.'+(ext||'mp4');
   var before=Object.keys(USER.downloads||{}).filter(function(x){return dlActive(USER.downloads[x])}).length;
-  return nat('download',{url:url,fileName:file,title:meta.title,allowMobile:!!PREFS.allowMobile,conns:Math.min(4,maxConn())}).then(function(r){
+  return nat('download',{url:url,fileName:file,title:meta.title,allowMobile:!!PREFS.allowMobile,conns:Math.max(1,Math.min(4,maxConn()-1))}).then(function(r){
     USER.downloads[k]=Object.assign({},meta,{dlId:r.id,file:file,status:'queued',bytes:0,total:0,at:Date.now()});saveUser();
     if(!quiet)toast((before?'Ajouté à la file d\'attente ('+before+' avant).':'Téléchargement lancé.')+(PREFS.allowMobile?'':' Il se fait en Wi-Fi (réglable dans le compte).'));
     refreshUi();pollDownloads();
@@ -788,11 +788,23 @@ function play(o){
   o.subMode=curSubMode();
   var stream=!/^(file|content):/.test(o.url)||!!(NATIVE&&S.castDev);
   var busy=Object.keys(USER.downloads||{}).some(function(k){return dlActive(USER.downloads[k])});
-  if(NATIVE&&stream&&busy&&maxConn()<=1){
-    nat('holdDownloads',{hold:true}).catch(function(){});toast('Téléchargements en pause pendant la lecture (ton abonnement autorise un seul écran).');
+  if(NATIVE&&stream&&busy&&maxConn()<=3){
+    nat('holdDownloads',{hold:true}).catch(function(){});toast('Téléchargements en pause pendant la lecture, pour te laisser un écran libre.');
     return playInner(o).then(function(r){nat('holdDownloads',{hold:false}).then(pollDownloads,function(){});return r},function(e){nat('holdDownloads',{hold:false}).catch(function(){});throw e});
   }
   return playInner(o);
+}
+/* the provider refused the stream: ask it why (expired, all screens in use) and say it plainly */
+function explainRefusal(r){
+  if(!r||r.usedFallback||!/BAD_HTTP_STATUS|AUTH/.test(String(r.error||''))||navigator.onLine===false)return;
+  var a=acc();if(!a)return;
+  api(a,'').then(function(x){
+    var ui=x&&x.user_info;if(!ui)return;
+    var exp=+ui.exp_date,act=+ui.active_cons||0,mx=+ui.max_connections||0;
+    if(String(ui.auth)!=='1'||/expired|banned|disabled/i.test(String(ui.status||''))||(exp&&exp*1000<Date.now()))toast('Ton fournisseur refuse : abonnement « '+a.name+' » '+(exp&&exp*1000<Date.now()?'expiré le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'inactif ('+(ui.status||'?')+')')+'.');
+    else if(mx&&act>=mx)toast('Tous tes écrans sont occupés ('+act+'/'+mx+') : un autre appareil ou un téléchargement utilise ton abonnement. Arrête-le puis réessaie.');
+    else toast('Ton fournisseur a refusé cette chaîne alors que ton abonnement est actif ('+act+'/'+mx+' écrans utilisés). Essaie une autre chaîne, ou réessaie dans une minute.');
+  },function(){});
 }
 function playInner(o){
   if(TIZEN&&window.webapis&&webapis.avplay)return tvPlay(o);
@@ -813,7 +825,7 @@ function playLive(item){
   var ex=liveExt();
   USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
-  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(r){noteLive(ex,r);if(S.tab==='home'||S.tab==='live')render()});
+  play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(r){noteLive(ex,r);explainRefusal(r);if(S.tab==='home'||S.tab==='live')render()});
 }
 /* subtitles never delay the start: saved ones go in at once, OpenSubtitles ones are added to the open player when they arrive */
 function subsFor(k,meta){
