@@ -47,6 +47,12 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", ""));
         intent.putExtra(PlayerActivity.EXTRA_SUB_MODE, call.getString("subMode", "auto"));
         intent.putExtra(PlayerActivity.EXTRA_SUB_OFFSET, call.getData().optLong("subOffset", 0L));
+        intent.putExtra(PlayerActivity.EXTRA_WATCH_URL, call.getString("watchUrl", ""));
+        intent.putExtra(PlayerActivity.EXTRA_WATCH_TOKEN, call.getString("watchToken", ""));
+        intent.putExtra(PlayerActivity.EXTRA_WATCH_REFRESH, call.getString("watchRefresh", ""));
+        intent.putExtra(PlayerActivity.EXTRA_WATCH_KEY, call.getString("watchKey", ""));
+        intent.putExtra(PlayerActivity.EXTRA_WATCH_DEV, call.getString("watchDev", ""));
+        intent.putExtra(PlayerActivity.EXTRA_WATCH_SINCE, call.getData().optLong("watchSince", 0L));
         JSArray subs = call.getArray("subtitles");
         if (subs != null && subs.length() > 0) {
             String[] urls = new String[subs.length()];
@@ -475,6 +481,10 @@ public class PlayerPlugin extends Plugin {
             ret.put("ended", data.getBooleanExtra(PlayerActivity.RESULT_ENDED, false));
             ret.put("subOffsetMs", data.getLongExtra(PlayerActivity.RESULT_SUB_OFFSET, 0L));
             ret.put("usedFallback", data.getBooleanExtra(PlayerActivity.RESULT_USED_FALLBACK, false));
+            String taken = data.getStringExtra(PlayerActivity.RESULT_TAKEN_BY);
+            if (taken != null) {
+                ret.put("takenBy", taken);
+            }
             String error = data.getStringExtra(PlayerActivity.RESULT_ERROR);
             if (error != null) {
                 ret.put("error", error);

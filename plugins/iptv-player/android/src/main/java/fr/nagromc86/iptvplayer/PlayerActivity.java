@@ -68,6 +68,18 @@ public class PlayerActivity extends Activity {
     static final String EXTRA_SUB_OFFSET = "subOffset";
     static final String RESULT_SUB_OFFSET = "subOffsetMs";
     static final String RESULT_USED_FALLBACK = "usedFallback";
+    static final String RESULT_TAKEN_BY = "takenBy";
+    static final String EXTRA_WATCH_URL = "watchUrl";
+    static final String EXTRA_WATCH_TOKEN = "watchToken";
+    static final String EXTRA_WATCH_REFRESH = "watchRefresh";
+    static final String EXTRA_WATCH_KEY = "watchKey";
+    static final String EXTRA_WATCH_DEV = "watchDev";
+    static final String EXTRA_WATCH_SINCE = "watchSince";
+    /* one screen at a time between synced devices: see watchTick */
+    private String watchUrl, watchToken, watchRefresh, watchKey, watchDev;
+    private long watchSince;
+    private String takenBy;
+    private final android.os.Handler watchHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private boolean fallbackWorked;
 
     /** The player currently open (full screen or in its floating window). */
@@ -320,6 +332,15 @@ public class PlayerActivity extends Activity {
 
         currentUrl = url;
         player.setMediaItem(buildItem(url, in.getStringExtra(EXTRA_TITLE)));
+        watchUrl = in.getStringExtra(EXTRA_WATCH_URL);
+        watchToken = in.getStringExtra(EXTRA_WATCH_TOKEN);
+        watchRefresh = in.getStringExtra(EXTRA_WATCH_REFRESH);
+        watchKey = in.getStringExtra(EXTRA_WATCH_KEY);
+        watchDev = in.getStringExtra(EXTRA_WATCH_DEV);
+        watchSince = in.getLongExtra(EXTRA_WATCH_SINCE, 0L);
+        if (!TextUtils.isEmpty(watchUrl) && !TextUtils.isEmpty(watchDev) && watchSince > 0) {
+            watchHandler.postDelayed(watchTick, 5000);
+        }
         if (!live && startMs > 0) {
             player.seekTo(startMs);
         }
@@ -716,6 +737,99 @@ public class PlayerActivity extends Activity {
         }).start();
     }
 
+    /** Every 5 s: has another synced device started a video since this one began? Then stop here. */
+    private final Runnable watchTick = new Runnable() {
+        @Override
+        public void run() {
+            if (finishing) {
+                return;
+            }
+            new Thread(() -> {
+                String by = checkTaken();
+                runOnUiThread(() -> {
+                    if (finishing) {
+                        return;
+                    }
+                    if (by != null) {
+                        takenBy = by;
+                        Toast.makeText(PlayerActivity.this, "Lecture lancée sur " + by + " : arrêt ici", Toast.LENGTH_LONG).show();
+                        finishWithResult();
+                    } else {
+                        watchHandler.postDelayed(watchTick, 5000);
+                    }
+                });
+            }).start();
+        }
+    };
+
+    private String checkTaken() {
+        try {
+            String body = httpGet(watchUrl, watchToken);
+            if (body == null && !TextUtils.isEmpty(watchRefresh) && !TextUtils.isEmpty(watchKey)) {
+                // the sign-in token expired (1 h): get a new one and ask again
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://securetoken.googleapis.com/v1/token?key=" + watchKey).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(8000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                c.getOutputStream().write(("grant_type=refresh_token&refresh_token=" + java.net.URLEncoder.encode(watchRefresh, "UTF-8")).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                if (c.getResponseCode() == 200) {
+                    org.json.JSONObject j = new org.json.JSONObject(readAll(c.getInputStream()));
+                    watchToken = j.optString("id_token", watchToken);
+                    body = httpGet(watchUrl, watchToken);
+                }
+                c.disconnect();
+            }
+            if (body == null) {
+                return null;
+            }
+            org.json.JSONObject f = new org.json.JSONObject(body).optJSONObject("fields");
+            if (f == null) {
+                return null;
+            }
+            String dev = f.optJSONObject("dev") != null ? f.optJSONObject("dev").optString("stringValue", "") : "";
+            long at = f.optJSONObject("at") != null ? Long.parseLong(f.optJSONObject("at").optString("integerValue", "0")) : 0L;
+            if (!dev.isEmpty() && !dev.equals(watchDev) && at > watchSince) {
+                String name = f.optJSONObject("name") != null ? f.optJSONObject("name").optString("stringValue", "") : "";
+                return name.isEmpty() ? "un autre appareil" : name;
+            }
+        } catch (Exception ignored) {
+            // no network: keep playing
+        }
+        return null;
+    }
+
+    /** Body of a GET, or null when the token was refused (401/403). */
+    private static String httpGet(String url, String token) throws java.io.IOException {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(8000);
+        c.setRequestProperty("Authorization", "Bearer " + token);
+        int code = c.getResponseCode();
+        if (code == 401 || code == 403) {
+            c.disconnect();
+            return null;
+        }
+        if (code != 200) {
+            c.disconnect();
+            throw new java.io.IOException("HTTP " + code);
+        }
+        String out = readAll(c.getInputStream());
+        c.disconnect();
+        return out;
+    }
+
+    private static String readAll(java.io.InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            b.write(buf, 0, n);
+        }
+        in.close();
+        return b.toString("UTF-8");
+    }
+
     /** Close from outside (another video is being started). */
     void closeForNewVideo() {
         finishWithResult();
@@ -851,11 +965,15 @@ public class PlayerActivity extends Activity {
         data.putExtra(RESULT_ENDED, ended);
         data.putExtra(RESULT_SUB_OFFSET, subOffset);
         data.putExtra(RESULT_USED_FALLBACK, fallbackWorked);
+        if (takenBy != null) {
+            data.putExtra(RESULT_TAKEN_BY, takenBy);
+        }
         if (lastError != null) {
             data.putExtra(RESULT_ERROR, lastError);
         }
         setResult(RESULT_OK, data);
         retryHandler.removeCallbacksAndMessages(null);
+        watchHandler.removeCallbacksAndMessages(null);
         if (player != null) {
             // close the connection to the provider right now, so the next video gets the screen
             player.stop();
@@ -896,6 +1014,7 @@ public class PlayerActivity extends Activity {
     protected void onDestroy() {
         subHandler.removeCallbacksAndMessages(null);
         retryHandler.removeCallbacksAndMessages(null);
+        watchHandler.removeCallbacksAndMessages(null);
         if (current == this) {
             current = null;
         }

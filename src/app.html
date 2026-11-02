@@ -822,9 +822,11 @@ document.addEventListener('visibilitychange',function(){if(document.visibilitySt
 function refused(r){return r&&!r.usedFallback&&/BAD_HTTP_STATUS|AUTH/.test(String(r.error||''))}
 function playInner(o){
   var stream=!/^(file|content):/.test(o.url);
-  if(!stream||TIZEN||!NATIVE)return playRaw(o);
-  return authPing(false).then(function(){return playRaw(o)}).then(function(r){
-    if(!refused(r)||o._again)return r;
+  if(!stream)return playRaw(o);
+  if(NATIVE&&S.castDev)return authPing(false).then(function(){return playRaw(o)});
+  return Promise.all([claimScreen(),authPing(false)]).then(function(x){if(x[0]){o._since=x[0];Object.assign(o,watchOpts(x[0]))}return playRaw(o)}).then(function(r){
+    if(r&&r.takenBy){toast('Lecture arrêtée ici : elle a été lancée sur '+r.takenBy+'.');return r}
+    if(!refused(r)||o._again||TIZEN||!NATIVE)return r;
     o._again=true;toast('Reconnexion à ton fournisseur…');
     return authPing(true).then(function(){return new Promise(function(z){setTimeout(z,1500)})}).then(function(){if(o.startMs&&r.positionMs)o.startMs=r.positionMs;return playRaw(o)});
   });
@@ -1835,6 +1837,32 @@ var FBS={
     return fbFetch(FBS.url()+'?'+pre,{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{blob:{stringValue:blob},salt:{stringValue:SYNC.salt},v:{integerValue:'1'},at:{integerValue:String(Date.now())}}})}).then(function(d){return d.updateTime});
   })}
 };
+/* ---------- one screen at a time between synced devices ----------
+   Starting a video writes « playing on device X since t » next to the synced data. A device that is playing checks
+   this every few seconds and stops by itself when another one has taken over, so the provider's screen is freed. */
+var DEVID=(function(){try{var d=localStorage.getItem('devid');if(!d){d='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem('devid',d)}return d}catch(e){return 'd'+Date.now().toString(36)}})();
+function devLabel(){return TIZEN?'la TV Samsung':TV?'la TV Android':'le téléphone'}
+function playDocUrl(){return 'https://firestore.googleapis.com/v1/projects/'+FB.projectId+'/databases/(default)/documents/users/'+SYNC.uid+'/sync/play'}
+function claimScreen(){
+  if(!SYNC||!SYNC.uid||navigator.onLine===false)return Promise.resolve(null);
+  var at=Date.now();
+  return withTimeout(FBS.token().then(function(tk){
+    return fbFetch(playDocUrl(),{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{dev:{stringValue:DEVID},name:{stringValue:devLabel()},at:{integerValue:String(at)}}})});
+  }),2500).then(function(){return at},function(){return null});
+}
+/* null = nobody else; else the label of the device that took over after `since` */
+function screenTaken(since){
+  if(!SYNC||!SYNC.uid)return Promise.resolve(null);
+  return FBS.token().then(function(tk){return fbFetch(playDocUrl(),{headers:{Authorization:'Bearer '+tk}})}).then(function(d){
+    var f=d.fields||{},dev=f.dev&&f.dev.stringValue,at=+(f.at&&f.at.integerValue)||0;
+    return dev&&dev!==DEVID&&at>since?(f.name&&f.name.stringValue)||'un autre appareil':null;
+  },function(){return null});
+}
+/* what the native player needs to watch the signal by itself (the app's screen is asleep behind the video) */
+function watchOpts(since){
+  if(!SYNC||!SYNC.uid||!since)return {};
+  return {watchUrl:playDocUrl(),watchToken:SYNC.idToken||'',watchRefresh:SYNC.refresh||'',watchKey:FB.apiKey,watchDev:DEVID,watchSince:since};
+}
 /* what is shared: accounts, favourites (+ deletions), resume points, recent channels, hidden groups, a few settings. Downloads stay on each device. */
 function userPart(u){u=u||{};return {favs:u.favs||{},favDel:u.favDel||{},prog:u.prog||{},recent:u.recent||[],recentAt:u.recentAt||0,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{},hiddenAt:u.hiddenAt||0}}
 function localState(){
@@ -2018,6 +2046,7 @@ function tvPlay(o){
   return new Promise(function(res){
     var av=webapis.avplay,el=$('#tvplayer');
     if(TVP)tvStop();
+    if(o._since){var since=o._since,poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},6000)}
     TVP={o:o,res:res,pos:o.startMs||0,dur:0,ended:false,paused:false,buffering:true,urls:[o.url,o.fallbackUrl].filter(Boolean),u:0};
     document.documentElement.classList.add('avplaying');
     el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'OK : infos · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ▲ ▼ : 1 min · Retour : quitter')+'</div></div>';
@@ -2065,7 +2094,7 @@ function tvStop(){
   try{var p=webapis.avplay.getCurrentTime();if(p)t.pos=p}catch(e){}
   try{webapis.avplay.stop()}catch(e){}try{webapis.avplay.close()}catch(e){}
   document.documentElement.classList.remove('avplaying');el.hidden=true;el.innerHTML='';
-  t.res({positionMs:t.pos,durationMs:t.dur,ended:t.ended});
+  t.res({positionMs:t.pos,durationMs:t.dur,ended:t.ended,takenBy:t.takenBy});
   keepFocus(function(){});
 }
 function tvKey(e){
