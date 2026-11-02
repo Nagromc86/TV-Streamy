@@ -506,7 +506,8 @@ function refreshAccountInfo(a){
   api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){a.maxConn=+ui.max_connections||1;var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');saveAccounts()}},function(){});
 }
 function switchAccount(id){
-  XCAT={};XLOAD={};
+  /* the list we leave stays known for « Aussi dans tes autres listes », so you can come back to it */
+  var old=S.activeId;if(old&&old!==id&&DATA)XCAT[old]={cat:DATA,hidden:USER.hidden||{},hiddenCats:USER.hiddenCats||{}};XLOAD[old]='';delete XCAT[id];delete XLOAD[id];
   setTimeout(function(){refreshAccountInfo(S.accounts.filter(function(x){return x.id===id})[0])},4000);
   S.activeId=id;DATA=null;USER={favs:{},prog:{},recent:[],downloads:{}};epgCache={};S.liveCat=S.vodCat=S.serCat='all';S.limit={};
   saveAccounts();
@@ -1277,6 +1278,7 @@ function loadXCats(){
       XLOAD[a.id]=c?'':'missing';
       if(c){XCAT[a.id]={cat:c,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{}}}
       if(S.tab==='search')softRender();
+      if(sheet&&(sheet.kind==='movie'||sheet.kind==='series')&&!sheet.loading)softSheet();
     });
   });
 }
