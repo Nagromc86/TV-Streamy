@@ -74,5 +74,5 @@ jobs:
         run: |
           gh release create "v1.${{ github.run_number }}" tv-streamy.apk \
             --title "TV Streamy 1.${{ github.run_number }} ($APP_VERSION)" \
-            --notes "Appli Android TV Streamy, version du $APP_VERSION. Télécharge tv-streamy.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
-            --latest
+            --notes "VERSION DE TEST : code de la v1.12 republié pour comparer la lecture. Télécharge tv-streamy.apk sur ton téléphone puis ouvre-le pour l'installer ou la mettre à jour." \
+            --target ${{ github.sha }} --latest
