@@ -77,8 +77,44 @@ class DownloadEngine {
         load();
     }
 
-    File dir() {
+    /** The SD card's app folder when one is inserted, else null. */
+    File sdDir() {
+        File[] all = ctx.getExternalFilesDirs(Environment.DIRECTORY_MOVIES);
+        for (int i = 1; all != null && i < all.length; i++) {
+            File f = all[i];
+            try {
+                if (f != null && Environment.isExternalStorageRemovable(f) && Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState(f))) {
+                    return f;
+                }
+            } catch (Exception ignored) {
+                // volume being removed
+            }
+        }
+        return null;
+    }
+
+    boolean useSd() {
+        return prefs().getBoolean("use_sd", false);
+    }
+
+    void setUseSd(boolean sd) {
+        prefs().edit().putBoolean("use_sd", sd).apply();
+    }
+
+    File phoneDir() {
         File d = ctx.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        if (d == null) {
+            d = new File(ctx.getFilesDir(), "Movies");
+        }
+        return d;
+    }
+
+    /** Where new downloads go: the SD card if chosen and present, else the phone. */
+    File dir() {
+        File d = useSd() ? sdDir() : null;
+        if (d == null) {
+            d = phoneDir();
+        }
         if (d == null) {
             d = new File(ctx.getFilesDir(), "Movies");
         }

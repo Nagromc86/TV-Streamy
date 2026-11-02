@@ -228,12 +228,106 @@ public class PlayerPlugin extends Plugin {
         }
         JSObject ret = new JSObject();
         ret.put("items", out);
-        File dir = getContext().getExternalFilesDir(Environment.DIRECTORY_MOVIES);
+        File dir = DownloadEngine.get(getContext()).dir();
         if (dir != null) {
             StatFs fs = new StatFs(dir.getAbsolutePath());
             ret.put("freeBytes", fs.getAvailableBytes());
         }
         call.resolve(ret);
+    }
+
+    /** Phone memory and SD card (when inserted): free space, and which one receives new downloads. */
+    @PluginMethod
+    public void storageInfo(PluginCall call) {
+        DownloadEngine eng = DownloadEngine.get(getContext());
+        JSObject ret = new JSObject();
+        JSArray vols = new JSArray();
+        File ph = eng.phoneDir(), sd = eng.sdDir();
+        for (Object[] v : new Object[][] {{"phone", "Téléphone", ph}, {"sd", "Carte SD", sd}}) {
+            File f = (File) v[2];
+            if (f == null) {
+                continue;
+            }
+            try {
+                f.mkdirs();
+                StatFs fs = new StatFs(f.getAbsolutePath());
+                JSObject o = new JSObject();
+                o.put("id", v[0]);
+                o.put("label", v[1]);
+                o.put("free", fs.getAvailableBytes());
+                o.put("total", fs.getTotalBytes());
+                vols.put(o);
+            } catch (Exception ignored) {
+                // volume not readable
+            }
+        }
+        ret.put("volumes", vols);
+        ret.put("current", eng.useSd() && sd != null ? "sd" : "phone");
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setStorage(PluginCall call) {
+        DownloadEngine.get(getContext()).setUseSd("sd".equals(call.getString("id", "phone")));
+        call.resolve();
+    }
+
+    /** Looks inside a downloaded video: does it carry French subtitles, is its audio French? */
+    @PluginMethod
+    public void probeTracks(PluginCall call) {
+        String uri = call.getString("uri", "");
+        if (TextUtils.isEmpty(uri)) {
+            call.reject("Fichier manquant");
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            final androidx.media3.exoplayer.ExoPlayer p = new androidx.media3.exoplayer.ExoPlayer.Builder(getContext()).build();
+            final boolean[] done = {false};
+            final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+            final Runnable finish = () -> {
+                if (done[0]) {
+                    return;
+                }
+                done[0] = true;
+                JSObject r = new JSObject();
+                boolean frText = false, frAudio = false, anyText = false;
+                for (androidx.media3.common.Tracks.Group g : p.getCurrentTracks().getGroups()) {
+                    for (int i = 0; i < g.length; i++) {
+                        String lang = g.getTrackFormat(i).language;
+                        boolean fr = lang != null && (lang.startsWith("fr") || lang.equals("fre"));
+                        if (g.getType() == androidx.media3.common.C.TRACK_TYPE_TEXT) {
+                            anyText = true;
+                            frText |= fr;
+                        } else if (g.getType() == androidx.media3.common.C.TRACK_TYPE_AUDIO) {
+                            frAudio |= fr;
+                        }
+                    }
+                }
+                r.put("frText", frText);
+                r.put("frAudio", frAudio);
+                r.put("anyText", anyText);
+                r.put("known", !p.getCurrentTracks().isEmpty());
+                p.release();
+                call.resolve(r);
+            };
+            p.addListener(new androidx.media3.common.Player.Listener() {
+                @Override
+                public void onTracksChanged(androidx.media3.common.Tracks tracks) {
+                    if (!tracks.isEmpty()) {
+                        finish.run();
+                    }
+                }
+
+                @Override
+                public void onPlayerError(androidx.media3.common.PlaybackException error) {
+                    finish.run();
+                }
+            });
+            p.setMediaItem(androidx.media3.common.MediaItem.fromUri(uri));
+            p.setPlayWhenReady(false);
+            p.prepare();
+            h.postDelayed(finish, 15000);
+        });
     }
 
     @PluginMethod
