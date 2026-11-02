@@ -7,6 +7,9 @@
 <title>TV Streamy</title>
 <style>/*@@FONTS@@*/#nextep{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:160;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card,#1b1b20);border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 #nextep div{flex:1 1 180px;display:flex;flex-direction:column;gap:2px}#nextep small{color:var(--muted)}
+.boot{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;animation:bootin .35s ease-out}
+.boot svg{width:112px;height:112px;filter:drop-shadow(0 12px 30px rgba(229,9,20,.35))}.boot b{font-family:var(--display);font-size:1.7rem;font-weight:800;letter-spacing:-.02em}.boot .spin{margin-top:10px;opacity:0;animation:spin 1s linear infinite,fadein .3s .9s forwards}@keyframes fadein{to{opacity:1}}
+@keyframes bootin{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -353,7 +356,7 @@ var IC={
 };
 
 /* ---------- state ---------- */
-var S={accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
+var S={boot:true,accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
 var DATA=null;      /* catalogue of the active account */
 var USER={favs:{},prog:{},recent:[],downloads:{}};
 var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:''};  /* per-account personal data */
@@ -1347,6 +1350,8 @@ function elsewhereHtml(kind,x){
     if(hit)out.push('<button type="button" class="chip" data-xopen="'+esc(a.id)+'|'+kind+':'+esc(hit.stream_id||hit.series_id)+'">'+esc(a.name)+'</button>')});
   return out.length?'<div><p class="hint" style="margin:0 0 6px">Aussi dans tes autres listes</p><div class="tabs" style="flex-wrap:wrap">'+out.join('')+'</div></div>':'';
 }
+/* opening screen while the saved accounts and catalogue are read (never the sign-in form when already set up) */
+function bootHtml(){return '<div class="boot"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="114" fill="#fff1d6"/><g transform="translate(256 256) scale(.9) translate(-256 -256)"><path d="M168 84l88 104 88-104" fill="none" stroke="#e50914" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/><rect x="92" y="196" width="328" height="232" rx="72" fill="#e50914"/><circle cx="256" cy="378" r="21" fill="#fff1d6"/><path d="M212.15980000000002 334.1598A62 62 0 0 1 299.8402 334.1598" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/><path d="M176.8048 298.8048A112 112 0 0 1 335.1952 298.8048" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/></g></svg><b>TV Streamy</b><div class="spin"></div></div>'}
 function welcomeHtml(){
   return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="114" fill="#fff1d6"/><g transform="translate(256 256) scale(.9) translate(-256 -256)"><path d="M168 84l88 104 88-104" fill="none" stroke="#e50914" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/><rect x="92" y="196" width="328" height="232" rx="72" fill="#e50914"/><circle cx="256" cy="378" r="21" fill="#fff1d6"/><path d="M212.15980000000002 334.1598A62 62 0 0 1 299.8402 334.1598" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/><path d="M176.8048 298.8048A112 112 0 0 1 335.1952 298.8048" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/></g></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
     '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur ce téléphone.</p>'+accountForm({})+'<div class="acts" style="margin-top:18px"><button type="button" class="btn ghost" data-syncsetup="login">'+IC.refresh+'Déjà utilisé sur un autre appareil ? Récupérer mes comptes</button></div></section></main>';
@@ -1379,6 +1384,7 @@ function profSheetHtml(){
 function render(){keepFocus(renderInner)}
 function renderInner(){
   var app=$('#app'),nav=$('#nav');
+  if(S.boot&&!S.loading&&!DATA&&!S.pickProfile){app.innerHTML=bootHtml();nav.hidden=true;return}
   if(!S.accounts.length){app.innerHTML=welcomeHtml();nav.hidden=true;return}
   if(S.pickProfile||!S.profileId){app.innerHTML=pickerHtml();nav.hidden=true;return}
   if(S.loading&&!DATA){app.innerHTML=topHtml()+'<main class="gut"><div class="loading" style="padding-top:140px"><div class="spin"></div><p>'+esc(S.loading)+'<br><span class="hint">Les fois suivantes, l\'appli s\'ouvre tout de suite sur le catalogue de la veille.</span></p></div></main>';nav.hidden=true;return}
@@ -2117,8 +2123,9 @@ document.addEventListener('visibilitychange',function(){if(!SYNC)return;if(docum
 kget('accounts').then(function(r){
   if(r&&r.del)S.accDel=r.del;
   if(r&&r.list&&r.list.length){S.accounts=r.list;S.activeId=r.active&&r.list.some(function(a){return a.id===r.active})?r.active:r.list[0].id;return migrateProfiles().then(function(){return switchAccount(S.activeId)})}
-  return migrateProfiles().then(render);
-});
+  return migrateProfiles();
+}).catch(function(){}).then(function(){S.boot=false;render()});
+setTimeout(function(){if(S.boot){S.boot=false;render()}},10000);
 })();
 </script>
 </body>
