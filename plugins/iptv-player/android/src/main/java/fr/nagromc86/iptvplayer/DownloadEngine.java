@@ -176,7 +176,12 @@ class DownloadEngine {
         Task t = new Task();
         t.id = "e" + System.currentTimeMillis() + (int) (Math.random() * 1000);
         t.url = url;
-        t.file = new File(dir(), fileName).getAbsolutePath();
+        // never trust the name: no folders, no "..", stays inside the app's video folder
+        String safe = fileName == null ? "video" : fileName.replaceAll("[\\\\/:*?\"<>|\\x00-\\x1f]", " ").replace("..", " ").trim();
+        if (safe.isEmpty()) {
+            safe = "video";
+        }
+        t.file = new File(dir(), safe).getAbsolutePath();
         t.title = title;
         t.ua = ua;
         t.mobile = mobile;

@@ -124,6 +124,22 @@ class DlnaHelper {
             String xml = http("GET", location, null, null, 2500);
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
             f.setNamespaceAware(false);
+            // a device on the Wi-Fi sends this XML: refuse DOCTYPE / external entities (XXE)
+            try {
+                f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            } catch (Exception ignored) {
+                // feature unknown to this parser
+            }
+            try {
+                f.setFeature("http://xml.org/sax/features/external-general-entities", false);
+                f.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            } catch (Exception ignored) {
+                // feature unknown to this parser
+            }
+            f.setExpandEntityReferences(false);
+            if (xml.contains("<!DOCTYPE") || xml.contains("<!ENTITY")) {
+                return null;
+            }
             Document doc = f.newDocumentBuilder().parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
             Element root = doc.getDocumentElement();
             String base = text(root, "URLBase");

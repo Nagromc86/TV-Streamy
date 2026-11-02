@@ -22,6 +22,9 @@ class SubServer {
 
     private static ServerSocket server;
     private static final Map<String, byte[]> files = new ConcurrentHashMap<>();
+    /* a few requests at a time are plenty for a TV; a flood from the network cannot create endless threads */
+    private static final java.util.concurrent.ExecutorService pool = new java.util.concurrent.ThreadPoolExecutor(1, 4, 30, java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.ArrayBlockingQueue<>(16), new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
 
     /** Returns [srtUrl, vttUrl], or null when the phone has no local network address. */
     /** Shifts every "00:01:02,345 --> 00:01:04,000" line by offsetMs (positive = later). */
@@ -77,7 +80,7 @@ class SubServer {
             while (server != null && !server.isClosed()) {
                 try {
                     Socket s = server.accept();
-                    new Thread(() -> handle(s)).start();
+                    pool.execute(() -> handle(s));
                 } catch (IOException e) {
                     break;
                 }
