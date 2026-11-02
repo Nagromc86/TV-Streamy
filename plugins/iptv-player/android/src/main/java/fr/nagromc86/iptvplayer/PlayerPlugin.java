@@ -490,7 +490,8 @@ public class PlayerPlugin extends Plugin {
             Intent intent = pendingIntent;
             pendingCall = null;
             pendingIntent = null;
-            startActivityForResult(next, intent, "onPlayerClosed");
+            // give the provider a moment to see the previous stream closed
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> startActivityForResult(next, intent, "onPlayerClosed"), 700);
         }
     }
 }

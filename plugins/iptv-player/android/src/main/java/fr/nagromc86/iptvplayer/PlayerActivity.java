@@ -84,6 +84,12 @@ public class PlayerActivity extends Activity {
     private String fallbackUrl;
     private String lastError;
     private boolean finishing;
+    /* the provider often still counts the previous stream for a few seconds: retry instead of failing */
+    private int httpRetries;
+    private String currentUrl;
+    private boolean stoppedInBackground;
+    private long backgroundPos;
+    private final android.os.Handler retryHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private boolean tracksChecked;
     private String subMode;
     private List<MediaItem.SubtitleConfiguration> extraSubs = new ArrayList<>();
@@ -221,8 +227,12 @@ public class PlayerActivity extends Activity {
         player.addListener(new Player.Listener() {
             @Override
             public void onPlaybackStateChanged(int state) {
-                if (state == Player.STATE_READY && triedFallback) {
-                    fallbackWorked = true;
+                if (state == Player.STATE_READY) {
+                    httpRetries = 0;
+                    lastError = null;
+                    if (triedFallback) {
+                        fallbackWorked = true;
+                    }
                 }
                 if (state == Player.STATE_ENDED && !live) {
                     ended = true;
@@ -273,8 +283,27 @@ public class PlayerActivity extends Activity {
             @Override
             public void onPlayerError(PlaybackException error) {
                 lastError = error.getErrorCodeName();
+                if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && httpRetries < 3 && !finishing) {
+                    httpRetries++;
+                    final long pos = live ? C.TIME_UNSET : player.getCurrentPosition();
+                    Toast.makeText(PlayerActivity.this, "Le fournisseur libère l'écran précédent… nouvel essai (" + httpRetries + "/3)", Toast.LENGTH_SHORT).show();
+                    retryHandler.postDelayed(() -> {
+                        if (player == null || finishing) {
+                            return;
+                        }
+                        player.setMediaItem(buildItem(currentUrl, getIntent().getStringExtra(EXTRA_TITLE)));
+                        if (pos != C.TIME_UNSET && pos > 0) {
+                            player.seekTo(pos);
+                        }
+                        player.prepare();
+                        player.play();
+                    }, 2500L * httpRetries);
+                    return;
+                }
                 if (!triedFallback && !TextUtils.isEmpty(fallbackUrl)) {
                     triedFallback = true;
+                    httpRetries = 0;
+                    currentUrl = fallbackUrl;
                     long pos = live ? C.TIME_UNSET : player.getCurrentPosition();
                     player.setMediaItem(buildItem(fallbackUrl, getIntent().getStringExtra(EXTRA_TITLE)));
                     if (pos != C.TIME_UNSET && pos > 0) {
@@ -288,6 +317,7 @@ public class PlayerActivity extends Activity {
             }
         });
 
+        currentUrl = url;
         player.setMediaItem(buildItem(url, in.getStringExtra(EXTRA_TITLE)));
         if (!live && startMs > 0) {
             player.seekTo(startMs);
@@ -792,6 +822,11 @@ public class PlayerActivity extends Activity {
             data.putExtra(RESULT_ERROR, lastError);
         }
         setResult(RESULT_OK, data);
+        retryHandler.removeCallbacksAndMessages(null);
+        if (player != null) {
+            // close the connection to the provider right now, so the next video gets the screen
+            player.stop();
+        }
         finish();
     }
 
@@ -804,13 +839,30 @@ public class PlayerActivity extends Activity {
             return;
         }
         if (player != null && !isFinishing()) {
-            player.pause();
+            // in the background: free the provider's screen (a paused stream still holds it), resume on return
+            backgroundPos = player.getCurrentPosition();
+            player.stop();
+            stoppedInBackground = true;
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (stoppedInBackground && player != null && !finishing) {
+            stoppedInBackground = false;
+            if (!live && backgroundPos > 0) {
+                player.seekTo(backgroundPos);
+            }
+            player.prepare();
+            player.setPlayWhenReady(live);
         }
     }
 
     @Override
     protected void onDestroy() {
         subHandler.removeCallbacksAndMessages(null);
+        retryHandler.removeCallbacksAndMessages(null);
         if (current == this) {
             current = null;
         }

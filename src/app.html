@@ -788,9 +788,10 @@ function play(o){
   o.subMode=curSubMode();
   var stream=!/^(file|content):/.test(o.url)||!!(NATIVE&&S.castDev);
   var busy=Object.keys(USER.downloads||{}).some(function(k){return dlActive(USER.downloads[k])});
-  if(NATIVE&&stream&&busy&&maxConn()<=3){
-    nat('holdDownloads',{hold:true}).catch(function(){});toast('Téléchargements en pause pendant la lecture, pour te laisser un écran libre.');
-    return playInner(o).then(function(r){nat('holdDownloads',{hold:false}).then(pollDownloads,function(){});return r},function(e){nat('holdDownloads',{hold:false}).catch(function(){});throw e});
+  if(NATIVE&&stream&&busy){
+    /* the video takes over: downloads stop their connection first, then playback starts */
+    toast('Téléchargements en pause pendant la lecture.');
+    return nat('holdDownloads',{hold:true}).catch(function(){}).then(function(){return new Promise(function(r){setTimeout(r,900)})}).then(function(){return playInner(o)}).then(function(r){nat('holdDownloads',{hold:false}).then(pollDownloads,function(){});return r},function(e){nat('holdDownloads',{hold:false}).catch(function(){});throw e});
   }
   return playInner(o);
 }
