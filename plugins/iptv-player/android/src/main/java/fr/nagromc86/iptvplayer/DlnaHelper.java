@@ -97,31 +97,20 @@ class DlnaHelper {
                 lock.release();
             }
         }
-        // ask every answering device for its description at the same time, and don't wait for slow ones
-        Map<String, Device> found = new ConcurrentHashMap<>();
-        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(Math.max(1, Math.min(8, locations.size())));
+        Map<String, Device> found = new HashMap<>();
         for (String loc : locations) {
-            pool.submit(() -> {
-                Device d = describe(loc);
-                if (d != null) {
-                    found.putIfAbsent(d.id, d);
-                    devices.put(d.id, d);
-                }
-            });
+            Device d = describe(loc);
+            if (d != null && !found.containsKey(d.id)) {
+                found.put(d.id, d);
+                devices.put(d.id, d);
+            }
         }
-        pool.shutdown();
-        try {
-            pool.awaitTermination(3000, java.util.concurrent.TimeUnit.MILLISECONDS);
-        } catch (InterruptedException ignored) {
-            // return what we have
-        }
-        pool.shutdownNow();
         return new ArrayList<>(found.values());
     }
 
     private static Device describe(String location) {
         try {
-            String xml = http("GET", location, null, null, 2500);
+            String xml = http("GET", location, null, null, 4000);
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
             f.setNamespaceAware(false);
             Document doc = f.newDocumentBuilder().parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
