@@ -999,12 +999,30 @@ function tmdbReq(path){
 }
 /* once a day: what is popular right now on Netflix, Prime Video and Disney+ in France
    (TMDB popularity of the titles each platform offers in France, 40 films + 40 series per platform) */
-var PLAT=[{k:'netflix',name:'Netflix',id:8},{k:'prime',name:'Prime Video',id:119},{k:'disney',name:'Disney+',id:337}];
+/* Netflix: its official weekly Top 10 for France (published by Netflix, copied each day by the repo's data job).
+   Prime Video and Disney+ publish no ranking: their own series (« originales ») are shown instead, never called a Top. */
+var PLAT=[{k:'netflix',name:'Netflix',id:8,net:213},{k:'prime',name:'Prime Video',id:119,net:1024},{k:'disney',name:'Disney+',id:337,net:2739}];
+var NFX_URL='https://raw.githubusercontent.com/Nagromc86/TV-Streamy/data/netflix-fr.json';
+function tmdbItem(t){return {id:t.id,t:[t.title||t.name,t.original_title||t.original_name].filter(Boolean),y:String(t.release_date||t.first_air_date||'').slice(0,4),v:t.vote_average||0,pop:t.popularity||0}}
+/* English Netflix title → the TMDB entry (French title, original title, year) */
+function tmdbFind(kind,q){
+  return tmdbReq('/search/'+kind+'?query='+encodeURIComponent(q)).then(function(r){
+    var R=r.results||[],n=function(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]+/g,'')},nq=n(q);
+    var ex=R.filter(function(t){return n(t.title||t.name)===nq||n(t.original_title||t.original_name)===nq});
+    return (ex.length?ex:R).slice().sort(function(a,b){return (b.popularity||0)-(a.popularity||0)})[0]||null;
+  },function(){return null});
+}
+function netflixTop(){
+  return withTimeout(fetch(NFX_URL,{cache:'no-cache'}),15000).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(d){
+    var conv=function(L,kind){return Promise.all((L||[]).slice(0,10).map(function(e){return tmdbFind(kind,e.title).then(function(t){if(!t)return null;var o=tmdbItem(t);o.rank=e.rank;o.pop=1000-e.rank;o.t.push(e.title);return o})})).then(function(a){return a.filter(Boolean)})};
+    return Promise.all([conv(d.films,'movie'),conv(d.tv,'tv')]).then(function(r){return {movie:r[0],tv:r[1],week:d.week}});
+  });
+}
 function loadTrends(force){
   if(!PREFS.tmdb||trendLoading)return Promise.resolve(TREND);
   var day=new Date().toDateString();
   return kget('trend').then(function(c){
-    if(c&&c.v===4&&c.day===day&&!force){TREND=c;return c}
+    if(c&&c.v===5&&c.day===day&&!force){TREND=c;return c}
     if(navigator.onLine===false){TREND=c&&c.v>=2?c:null;return TREND}
     trendLoading=true;
     /* fresh=true: only what came out on the platform these last 3 months (new films, new series or new seasons) */
@@ -1012,11 +1030,13 @@ function loadTrends(force){
     var get=function(pl,kind,fresh){return Promise.all([1,2].map(function(pg){
       return tmdbReq('/discover/'+kind+'?watch_region=FR&with_watch_providers='+pl.id+'&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page='+pg+(fresh?(kind==='movie'?'&primary_release_date.gte=':'&air_date.gte=')+since+'&vote_count.gte='+(kind==='movie'?5:2):'')).then(function(r){return r.results||[]},function(e){if(pg===1)throw e;return []})
     })).then(function(a){return [].concat.apply([],a).map(function(t){return {id:t.id,t:[t.title||t.name,t.original_title||t.original_name].filter(Boolean),y:String(t.release_date||t.first_air_date||'').slice(0,4),v:t.vote_average||0,pop:t.popularity||0}})})};
-    var out={day:day,v:4,p:{},n:{},week:[]};
+    var out={day:day,v:5,p:{},n:{},week:[]};
     var week=Promise.all([1,2,3].map(function(pg){return tmdbReq('/trending/all/week?page='+pg).then(function(r){return r.results||[]},function(e){if(pg===1)throw e;return []})})).then(function(a){
       out.week=[].concat.apply([],a).filter(function(t){return t.media_type==='movie'||t.media_type==='tv'}).map(function(t){return {id:t.id,mt:t.media_type,t:[t.title||t.name,t.original_title||t.original_name].filter(Boolean),y:String(t.release_date||t.first_air_date||'').slice(0,4),v:t.vote_average||0,pop:t.popularity||0}});
     });
-    return Promise.all(PLAT.map(function(pl){return Promise.all([get(pl,'movie'),get(pl,'tv'),get(pl,'movie',true).catch(function(){return []}),get(pl,'tv',true).catch(function(){return []})]).then(function(r){out.p[pl.k]={movie:r[0],tv:r[1]};out.n[pl.k]={movie:r[2],tv:r[3]}})}).concat([week])).then(function(){TREND=out;kset('trend',out);return out});
+    var originals=function(pl){return Promise.all([1,2].map(function(pg){return tmdbReq('/discover/tv?with_networks='+pl.net+'&sort_by=popularity.desc&page='+pg).then(function(r){return (r.results||[]).map(tmdbItem)},function(e){if(pg===1)throw e;return []})})).then(function(a){return {movie:[],tv:[].concat.apply([],a),orig:true}})};
+    var top=function(pl){return pl.k==='netflix'?netflixTop().catch(function(){return c&&c.p&&c.p.netflix&&c.p.netflix.week?c.p.netflix:{movie:[],tv:[]}}):originals(pl)};
+    return Promise.all(PLAT.map(function(pl){return Promise.all([top(pl),get(pl,'movie',true).catch(function(){return []}),get(pl,'tv',true).catch(function(){return []})]).then(function(r){out.p[pl.k]=r[0];out.n[pl.k]={movie:r[1],tv:r[2]}})}).concat([week])).then(function(){TREND=out;kset('trend',out);return out});
   }).catch(function(e){if(force)throw e;return TREND}).then(function(t){trendLoading=false;return t},function(e){trendLoading=false;throw e});
 }
 /* match TMDB titles with the provider's catalogue: by TMDB id when the provider gives it, else by title (+ year) */
@@ -1044,7 +1064,7 @@ function matchIn(kind,T,cat,plat){
     /* prefer a French version when several versions of the title exist */
     c.sort(function(a,b){var fa=/^\s*\[?(fr|vf|vff|multi)\b/i.test(a.name)?0:1,fb=/^\s*\[?(fr|vf|vff|multi)\b/i.test(b.name)?0:1;return fa-fb});
     var x=c[0];if(!x)return;var id=x.stream_id||x.series_id;if(seen[id])return;seen[id]=1;
-    out.push({kind:kind,x:x,plat:plat,rank:rank+1,pop:t.pop,v:t.v});
+    out.push({kind:kind,x:x,plat:plat,rank:t.rank||rank+1,pop:t.pop,v:t.v});
   });
   return out;
 }
@@ -1113,7 +1133,7 @@ function suggestRaw(kind,cat,n){
 }
 function billBadge(o){
   if(o.plat==='trend')return '<span class="badge" style="background:#fff;color:#111">Tendance de la semaine · N°'+o.rank+'</span>';
-  if(o.plat){var pl=PLAT.filter(function(p){return p.k===o.plat})[0];return '<span class="badge">Top '+esc(pl.name)+' · N°'+o.rank+' '+(o.kind==='movie'?'films':'séries')+'</span>'}
+  if(o.plat){var pl=PLAT.filter(function(p){return p.k===o.plat})[0];return pl.k==='netflix'?'<span class="badge">Top 10 Netflix France · N°'+o.rank+' '+(o.kind==='movie'?'films':'séries')+'</span>':'<span class="badge">Série originale '+esc(pl.name)+'</span>'}
   if(o.best)return '<span class="badge" style="background:var(--gold);color:#111">Parmi les mieux notés</span>';
   if(o.fresh)return '<span class="badge" style="background:#fff;color:#111">Nouveauté</span>';
   return '';
@@ -1185,13 +1205,16 @@ function continueRow(only){
   });
   return rowHtml('Reprendre la lecture',h);
 }
-function rankRow(list){return list.slice(0,10).map(function(o,i){return '<span class="top10"><span class="rk" aria-hidden="true">'+(i+1)+'</span>'+posterHtml(o.kind,o.x)+'</span>'}).join('')}
+function rankRow(list,real){return list.slice(0,10).map(function(o,i){return '<span class="top10"><span class="rk" aria-hidden="true">'+(real&&o.rank?o.rank:i+1)+'</span>'+posterHtml(o.kind,o.x)+'</span>'}).join('')}
 function platRows(kind){
   if(!TREND)return '';var h='';
   var W=weekTop(kind,null).filter(function(o){return imgOf(o.kind,o.x)});
   if(W.length>=3)h+=rowHtml('Tendances de la semaine'+(kind==='movie'?' · films':kind==='series'?' · séries':''),rankRow(W));
   var suf=kind==='movie'?' · films':kind==='series'?' · séries':'';
-  PLAT.forEach(function(pl){var L=platTop(pl.k,kind,null).filter(function(o){return imgOf(o.kind,o.x)});if(L.length>=3)h+=rowHtml('Top 10 '+pl.name+suf+' en ce moment',rankRow(L))});
+  /* Netflix: official ranks (a title missing from your provider leaves its number out) */
+  var nf=function(k){return platTop('netflix',k,null).filter(function(o){return imgOf(o.kind,o.x)})};
+  (kind==='mix'?['series','movie']:[kind]).forEach(function(k){var L=nf(k);if(L.length>=2)h+=rowHtml('Top 10 Netflix France · '+(k==='movie'?'films':'séries')+' de la semaine',rankRow(L,true))});
+  PLAT.forEach(function(pl){if(pl.k==='netflix'||kind==='movie')return;var L=platTop(pl.k,'series',null).filter(function(o){return imgOf(o.kind,o.x)}).slice(0,20);if(L.length>=3)h+=rowHtml('Séries originales '+pl.name,L.map(function(o){return posterHtml(o.kind,o.x)}).join(''))});
   PLAT.forEach(function(pl){var L=platNew(pl.k,kind).filter(function(o){return imgOf(o.kind,o.x)}).slice(0,20);if(L.length>=3)h+=rowHtml('Tendances '+pl.name+suf+' · nouveautés',L.map(function(o){return posterHtml(o.kind,o.x)}).join(''))});
   return h;
 }
@@ -1992,13 +2015,13 @@ var TUTO={
     'Touche <b>New consumer</b>, donne le nom <b>TV Streamy</b>, puis <b>Save</b>.',
     'Copie l\'<b>API key</b> affichée à côté de « TV Streamy ».',
     'Colle-la ci-dessous avec ton <b>identifiant</b> et ton <b>mot de passe</b> OpenSubtitles, puis <b>Enregistrer et tester</b>.']},
-  sync:{label:'Comment ça marche ? (ajouter un appareil, oubli…)',links:[['Console Firebase','https://console.firebase.google.com/project/tv-streamy/authentication/users']],steps:[
-    '<b>Premier appareil</b> (déjà fait) : la synchro a été activée avec ton e-mail, un mot de passe et une <b>phrase secrète</b>. Garde la phrase secrète notée quelque part : elle ne peut pas être récupérée.',
+  sync:{label:'Comment ça marche ? (créer son compte, ajouter un appareil, oubli…)',links:[],steps:[
+    '<b>Créer ton compte</b> (une seule fois) : Activer la synchro › <b>Premier appareil</b>, avec ton e-mail, un mot de passe et une <b>phrase secrète</b>. Note la phrase secrète quelque part : elle ne peut pas être récupérée.',
     '<b>Nouvel appareil</b> (téléphone, tablette, Android TV, TV Samsung) : à la première ouverture, touche « Déjà utilisé sur un autre appareil ? Récupérer mes comptes ». Sinon : Paramètres › Synchro › Activer la synchro › <b>J\'ai déjà un compte</b>.',
     'Entre le <b>même e-mail</b>, le <b>même mot de passe</b> et la <b>même phrase secrète</b>. Tes listes, profils, favoris, reprises de lecture, filtres et clés TMDB / OpenSubtitles reviennent. Les vidéos téléchargées restent sur chaque appareil.',
     'Ensuite, tout se met à jour seul : à l\'ouverture, toutes les minutes et dès que tu changes quelque chose. Le bouton <b>Synchroniser</b> force une mise à jour.',
-    '<b>Un seul écran à la fois</b> : lancer une vidéo sur un appareil arrête celle en cours sur un autre, pour ne pas dépasser les écrans de ton abonnement.',
-    'Les nouvelles inscriptions sont fermées dans ta console Firebase : « Premier appareil » est refusé, c\'est normal. Utilise toujours « J\'ai déjà un compte ».',
+    '<b>Un seul écran à la fois</b> : lancer une vidéo sur un appareil arrête celle en cours sur un autre (en 20 secondes environ), pour ne pas dépasser les écrans de ton abonnement.',
+    'Si « Premier appareil » est refusé, c\'est que les nouvelles inscriptions sont fermées pour le moment.',
     '<b>Mot de passe oublié</b> : dans « J\'ai déjà un compte », entre ton e-mail puis touche <b>Mot de passe oublié</b> pour recevoir un lien de réinitialisation. <b>Phrase secrète oubliée</b> : personne ne peut déchiffrer les données en ligne. Il faut les effacer dans la console Firebase (Firestore) puis réactiver la synchro depuis un appareil qui a tout.']}
 };
 function tutoHtml(k){
@@ -2073,7 +2096,7 @@ function tvPlay(o){
   return new Promise(function(res){
     var av=webapis.avplay,el=$('#tvplayer');
     if(TVP)tvStop();
-    if(o._since){var since=o._since,poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},6000)}
+    if(o._since){var since=o._since,poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},20000)}
     TVP={o:o,res:res,pos:o.startMs||0,dur:0,ended:false,paused:false,buffering:true,urls:[o.url,o.fallbackUrl].filter(Boolean),u:0};
     document.documentElement.classList.add('avplaying');
     el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'OK : infos · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ▲ ▼ : 1 min · Retour : quitter')+'</div></div>';

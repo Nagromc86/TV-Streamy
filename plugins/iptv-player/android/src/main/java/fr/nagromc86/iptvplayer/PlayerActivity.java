@@ -358,7 +358,7 @@ public class PlayerActivity extends Activity {
         watchDev = in.getStringExtra(EXTRA_WATCH_DEV);
         watchSince = in.getLongExtra(EXTRA_WATCH_SINCE, 0L);
         if (!TextUtils.isEmpty(watchUrl) && !TextUtils.isEmpty(watchDev) && watchSince > 0) {
-            watchHandler.postDelayed(watchTick, 5000);
+            watchHandler.postDelayed(watchTick, 20000);
         }
         if (!live && startMs > 0) {
             player.seekTo(startMs);
@@ -777,7 +777,7 @@ public class PlayerActivity extends Activity {
         }).start();
     }
 
-    /** Every 5 s: has another synced device started a video since this one began? Then stop here. */
+    /** Every 20 s (few reads, so the shared free quota holds): has another synced device started a video since this one began? Then stop here. */
     private final Runnable watchTick = new Runnable() {
         @Override
         public void run() {
@@ -795,7 +795,7 @@ public class PlayerActivity extends Activity {
                         Toast.makeText(PlayerActivity.this, "Lecture lancée sur " + by + " : arrêt ici", Toast.LENGTH_LONG).show();
                         finishWithResult();
                     } else {
-                        watchHandler.postDelayed(watchTick, 5000);
+                        watchHandler.postDelayed(watchTick, 20000);
                     }
                 });
             }).start();
