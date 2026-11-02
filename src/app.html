@@ -807,7 +807,29 @@ function explainRefusal(r){
     else toast('Ton fournisseur a refusé cette chaîne alors que ton abonnement est actif ('+act+'/'+mx+' écrans utilisés). Essaie une autre chaîne, ou réessaie dans une minute.');
   },function(){});
 }
+/* Many providers only let a stream through after a recent sign-in from the same internet address:
+   after a Wi-Fi / 4G change or a long pause, the app signs in again before playing, and once more after a refusal. */
+var AUTH={};
+function authPing(force){
+  var a=acc();if(!a||navigator.onLine===false)return Promise.resolve();
+  var t=AUTH[a.id]||0;if(!force&&Date.now()-t<10*60000)return Promise.resolve();
+  return withTimeout(api(a,''),6000).then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){AUTH[a.id]=Date.now();if(ui.max_connections)a.maxConn=+ui.max_connections||a.maxConn}},function(){});
+}
+function netChanged(){AUTH={}}
+window.addEventListener('online',netChanged);
+try{if(navigator.connection&&navigator.connection.addEventListener)navigator.connection.addEventListener('change',netChanged)}catch(e){}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')authPing(false)});
+function refused(r){return r&&!r.usedFallback&&/BAD_HTTP_STATUS|AUTH/.test(String(r.error||''))}
 function playInner(o){
+  var stream=!/^(file|content):/.test(o.url);
+  if(!stream||TIZEN||!NATIVE)return playRaw(o);
+  return authPing(false).then(function(){return playRaw(o)}).then(function(r){
+    if(!refused(r)||o._again)return r;
+    o._again=true;toast('Reconnexion à ton fournisseur…');
+    return authPing(true).then(function(){return new Promise(function(z){setTimeout(z,1500)})}).then(function(){if(o.startMs&&r.positionMs)o.startMs=r.positionMs;return playRaw(o)});
+  });
+}
+function playRaw(o){
   if(TIZEN&&window.webapis&&webapis.avplay)return tvPlay(o);
   if(NATIVE&&S.castDev)return castStart(o);
   if(NATIVE)return window.Capacitor.nativePromise('IptvPlayer','play',o).catch(function(e){toast('Lecture impossible : '+((e&&e.message)||e));return {}});
@@ -2161,7 +2183,7 @@ if(NATIVE)nat('deviceInfo').then(function(r){if(r&&r.tv&&!TV){TV=true;document.b
 
 /* ---------- start ---------- */
 function refreshTrends(){loadTrends(false).then(function(t){if(t&&DATA&&!sheet){softRender()}})}
-setTimeout(refreshTrends,1200);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')refreshTrends()});
+setTimeout(refreshTrends,1200);setTimeout(function(){authPing(false)},2500);document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')refreshTrends()});
 if(NATIVE)setTimeout(function(){checkUpdate(false)},5000);
 render();
 kget('prefs').then(function(p){if(p)PREFS=Object.assign(PREFS,p)});

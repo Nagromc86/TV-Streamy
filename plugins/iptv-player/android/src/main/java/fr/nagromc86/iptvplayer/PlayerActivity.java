@@ -286,7 +286,8 @@ public class PlayerActivity extends Activity {
                 if (error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS && httpRetries < 3 && !finishing) {
                     httpRetries++;
                     final long pos = live ? C.TIME_UNSET : player.getCurrentPosition();
-                    Toast.makeText(PlayerActivity.this, "Le fournisseur libère l'écran précédent… nouvel essai (" + httpRetries + "/3)", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(PlayerActivity.this, "Reconnexion à ton fournisseur… nouvel essai (" + httpRetries + "/3)", Toast.LENGTH_SHORT).show();
+                    signInAgain(currentUrl);
                     retryHandler.postDelayed(() -> {
                         if (player == null || finishing) {
                             return;
@@ -297,7 +298,7 @@ public class PlayerActivity extends Activity {
                         }
                         player.prepare();
                         player.play();
-                    }, 2500L * httpRetries);
+                    }, 2000L * httpRetries);
                     return;
                 }
                 if (!triedFallback && !TextUtils.isEmpty(fallbackUrl)) {
@@ -681,6 +682,38 @@ public class PlayerActivity extends Activity {
         } else {
             hideSystemUi();
         }
+    }
+
+    /**
+     * Many providers only accept a stream after a recent sign-in from the same internet address (after a Wi-Fi / 4G
+     * change for example). The stream address holds the account: /live|movie|series/user/password/id.ext
+     */
+    private static void signInAgain(String streamUrl) {
+        if (streamUrl == null) {
+            return;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(https?://.+?)/(?:live|movie|series)/([^/]+)/([^/]+)/[^/]+$").matcher(streamUrl);
+        if (!m.find()) {
+            return;
+        }
+        String api = m.group(1) + "/player_api.php?username=" + m.group(2) + "&password=" + m.group(3);
+        new Thread(() -> {
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(api).openConnection();
+                c.setConnectTimeout(5000);
+                c.setReadTimeout(5000);
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0");
+                java.io.InputStream in = c.getInputStream();
+                byte[] b = new byte[4096];
+                while (in.read(b) > 0) {
+                    // read the answer fully so the sign-in is complete
+                }
+                in.close();
+                c.disconnect();
+            } catch (Exception ignored) {
+                // the retry will tell
+            }
+        }).start();
     }
 
     /** Close from outside (another video is being started). */
