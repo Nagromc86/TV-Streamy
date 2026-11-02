@@ -1,0 +1,33 @@
+# Récupère chaque jour le Top 10 officiel Netflix France (publié par Netflix le mardi) et le met dans la branche "data".
+# L'appli le lit ici : https://raw.githubusercontent.com/Nagromc86/TV-Streamy/data/netflix-fr.json
+name: Top 10 Netflix France
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  push:
+    branches: [main]
+    paths: ['.github/scripts/netflix_top10.py', '.github/workflows/top10.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  top10:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Télécharger le Top 10 France
+        run: python3 .github/scripts/netflix_top10.py "$RUNNER_TEMP/netflix-fr.json"
+      - name: Publier dans la branche data
+        run: |
+          cd "$RUNNER_TEMP"
+          rm -rf pub && mkdir pub && cd pub
+          git init -q -b data
+          cp ../netflix-fr.json .
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add netflix-fr.json
+          git commit -qm "Top 10 Netflix France $(python3 -c 'import json;print(json.load(open("netflix-fr.json"))["week"])')"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
