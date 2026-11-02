@@ -391,15 +391,21 @@ function profPart(u){var o=Object.assign({},u||{});delete o.downloads;return o}
 function curSubMode(){var p=prof();return (p&&p.subMode)||'auto'}
 function saveProfiles(){syncSoon();return kset('profiles',{list:S.profiles,del:S.profDel})}
 function avatarHtml(p,size){size=size||28;return '<span class="avatar" style="width:'+size+'px;height:'+size+'px;background:'+esc(p&&p.color||PCOL[0])+';font-size:'+Math.round(size*0.45)+'px">'+esc(((p&&p.name)||'?').trim().charAt(0).toUpperCase())+'</span>'}
-function saveUser(){clearTimeout(userTimer);userTimer=setTimeout(function(){if(S.activeId){kset(ukey(S.activeId),profPart(USER));kset('dl:'+S.activeId,USER.downloads||{})}},300);syncSoon()}
+/* the pending save remembers which list/profile it belongs to, so switching quickly can never write one list's data over another's */
+var userPend=null;
+function saveUser(){if(!S.activeId)return;clearTimeout(userTimer);userPend={id:S.activeId,pid:S.profileId,u:USER};userTimer=setTimeout(flushUser,300);syncSoon()}
+function flushUser(){clearTimeout(userTimer);var q=userPend;userPend=null;if(!q)return Promise.resolve();return Promise.all([kset(ukey(q.id,q.pid),profPart(q.u)),kset('dl:'+q.id,q.u.downloads||{})])}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden')flushUser()});
+window.addEventListener('pagehide',function(){flushUser()});
 function loadUser(){
   var id=S.activeId;if(!id)return Promise.resolve();
   return Promise.all([kget(ukey(id)),kget('dl:'+id)]).then(function(r){
     if(id!==S.activeId)return;
-    USER=Object.assign({favs:{},prog:{},recent:[],downloads:{}},r[0]||{});USER.downloads=r[1]||{};pollDownloads();
+    USER=Object.assign({favs:{},prog:{},recent:[],downloads:{}},r[0]||{});USER.downloads=r[1]||{};pollDownloads();if(DATA)repairFavs();
   });
 }
 function useProfile(pid){
+  flushUser();
   S.profileId=pid;S.pickProfile=false;kset('profileActive',pid);S.limit={};
   return loadUser().then(function(){render();window.scrollTo(0,0)});
 }
@@ -470,7 +476,7 @@ function refreshSection(sec,manual){
   return fetchSection(a,sec).then(function(r){
     if(S.activeId!==id||!DATA)return;
     if(!r[1].length&&(DATA[SECT[sec].calls[1][0]]||[]).length)throw new Error('le serveur a renvoyé une liste vide');
-    applySection(sec,r);
+    applySection(sec,r);repairFavs();
     return kset('cat:'+id,DATA).then(function(){if(manual)toast(SECT[sec].label+' à jour : '+r[1].length+' titres.')});
   }).catch(function(e){if(manual)toast(SECT[sec].label+' : mise à jour impossible ('+errText(e)+').')}).then(function(){delete UPD[sec];softRender();if(sheet&&sheet.kind==='accounts'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('form')))renderSheet()});
 }
@@ -491,7 +497,7 @@ function loadCatalog(){
   return kget('cat:'+a.id).then(function(c){
     if(c&&(c.live||c.vod||c.series)){
       if(!c.upd)c.upd={live:c.at,vod:c.at,series:c.at};
-      DATA=c;S.msg='';render();prebuild();setTimeout(dailyRefresh,1500);return;
+      DATA=c;S.msg='';repairFavs();render();prebuild();setTimeout(dailyRefresh,1500);return;
     }
     S.loading='Premier chargement de ton catalogue…';render();
     var d={upd:{},live:[],liveCats:[],vod:[],vodCats:[],series:[],serCats:[]},errs=[];DATA=null;
@@ -502,13 +508,14 @@ function loadCatalog(){
       DATA=d;S.msg=errs.length?'Catalogue incomplet ('+errs.join(' · ')+'). Réessaie depuis le compte.':'';
       return kset('cat:'+a.id,d);
     });
-  }).then(function(){S.loading='';render();prebuild()});
+  }).then(function(){S.loading='';repairFavs();render();prebuild()});
 }
 function refreshAccountInfo(a){
   if(!a||navigator.onLine===false)return;
   api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){a.maxConn=+ui.max_connections||1;var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');saveAccounts()}},function(){});
 }
 function switchAccount(id){
+  flushUser();
   /* the list we leave stays known for « Aussi dans tes autres listes », so you can come back to it */
   var old=S.activeId;if(old&&old!==id&&DATA)XCAT[old]={cat:DATA,hidden:USER.hidden||{},hiddenCats:USER.hiddenCats||{}};XLOAD[old]='';delete XCAT[id];delete XLOAD[id];
   setTimeout(function(){refreshAccountInfo(S.accounts.filter(function(x){return x.id===id})[0])},4000);
@@ -523,8 +530,24 @@ function isFav(kind,id){return !!USER.favs[fkey(kind,id)]}
 function toggleFav(kind,item){
   var k=fkey(kind,item.stream_id||item.series_id);
   USER.favDel=USER.favDel||{};
-  if(USER.favs[k]){delete USER.favs[k];USER.favDel[k]=Date.now()}else USER.favs[k]={kind:kind,id:item.stream_id||item.series_id,at:Date.now()};
+  if(USER.favs[k]){delete USER.favs[k];USER.favDel[k]=Date.now()}else USER.favs[k]={kind:kind,id:item.stream_id||item.series_id,name:item.name,icon:item.stream_icon||item.cover||'',at:Date.now()};
   saveUser();
+}
+/* after each catalogue load: favourites whose number changed at the provider are found again by their name */
+function repairFavs(){
+  if(!DATA||!USER||!USER.favs)return;var F=USER.favs,changed=false;
+  Object.keys(F).forEach(function(k){
+    var f=F[k];if(!f||!f.kind)return;var x=byId(f.kind,f.id);
+    if(x){if(!f.name){f.name=x.name;f.icon=x.stream_icon||x.cover||'';changed=true}return}
+    if(!f.name)return;
+    var L=f.kind==='live'?DATA.live:f.kind==='movie'?DATA.vod:DATA.series,key=vpOf({name:f.name}).key,yr=year(f.name),n=cleanName(f.name).toLowerCase();
+    var hit=null;for(var i=0;i<L.length&&!hit;i++){if(cleanName(L[i].name).toLowerCase()===n)hit=L[i]}
+    if(!hit&&f.kind!=='live'&&key.length>2)for(var j=0;j<L.length&&!hit;j++){var y=L[j];if(vpOf(y).key===key&&(!yr||year(y.name)===yr))hit=y}
+    if(!hit)return;
+    var nid=hit.stream_id||hit.series_id,nk=fkey(f.kind,nid);if(nk===k)return;
+    delete F[k];F[nk]=Object.assign({},f,{id:nid});changed=true;
+  });
+  if(changed)saveUser();
 }
 function byId(kind,id){
   if(!DATA)return null;
