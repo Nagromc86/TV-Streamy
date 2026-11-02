@@ -114,6 +114,11 @@ public class PlayerActivity extends Activity {
     private FrameLayout rootView;
     private LinearLayout actionsRow;
     private boolean frenchAudio;
+    /* subtitles: the video's own French ones first (CC); OpenSubtitles only when the video has none, or on request */
+    static final String EXTRA_OS_ON = "osOn";
+    private boolean osOn;
+    private boolean embeddedFrench;
+    private boolean osRequested;
     private int lastCue = -2;
     private TextView subView;
     private TextView subButton;
@@ -158,7 +163,8 @@ public class PlayerActivity extends Activity {
             }
         }
         subOffset = in.getLongExtra(EXTRA_SUB_OFFSET, 0L);
-        extOn = !"never".equals(subMode);
+        extOn = false;
+        osOn = in.getBooleanExtra(EXTRA_OS_ON, false);
         String userAgent = in.getStringExtra(EXTRA_USER_AGENT);
         if (TextUtils.isEmpty(userAgent)) {
             userAgent = "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0";
@@ -176,6 +182,16 @@ public class PlayerActivity extends Activity {
         pipButton = buildPipButton();
         if (!cueTimes.isEmpty()) {
             buildSubOverlay(root);
+        } else if (osOn) {
+            subButton = pill("OpenSub");
+            subButton.setContentDescription("Sous-titres français OpenSubtitles");
+            subButton.setOnClickListener(v -> {
+                if (subPanel != null) {
+                    showSubPanel(subPanel.getVisibility() != View.VISIBLE);
+                } else {
+                    requestOpenSub(true);
+                }
+            });
         }
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -278,18 +294,21 @@ public class PlayerActivity extends Activity {
                             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build());
                     return;
                 }
-                if ("never".equals(subMode) || !cueTimes.isEmpty()) {
+                embeddedFrench = hasFrenchText(tracks);
+                if ("never".equals(subMode) || embeddedFrench) {
+                    // the video's own French subtitles (CC) are used; OpenSub stays available on the button
                     return;
                 }
-                String msg;
-                if (!tracks.containsType(C.TRACK_TYPE_TEXT)) {
-                    msg = "Pas de sous-titres dans cette vidéo";
-                } else if (!hasFrenchText(tracks)) {
-                    msg = "Pas de sous-titres français · autres langues dans CC";
-                } else {
+                if (!cueTimes.isEmpty()) {
+                    extOn = true;
+                    refreshSub();
                     return;
                 }
-                Toast.makeText(PlayerActivity.this, msg, Toast.LENGTH_LONG).show();
+                if (osOn) {
+                    requestOpenSub(false);
+                    return;
+                }
+                Toast.makeText(PlayerActivity.this, tracks.containsType(C.TRACK_TYPE_TEXT) ? "Pas de sous-titres français · autres langues dans CC" : "Pas de sous-titres dans cette vidéo", Toast.LENGTH_LONG).show();
             }
 
             @Override
@@ -498,8 +517,10 @@ public class PlayerActivity extends Activity {
         subView.setLayoutParams(lp);
         root.addView(subView);
 
-        subButton = pill("Sous-titres");
-        subButton.setContentDescription("Réglage des sous-titres");
+        if (subButton == null) {
+            subButton = pill("OpenSub");
+            subButton.setContentDescription("Sous-titres OpenSubtitles : décalage, afficher ou masquer");
+        }
         subButton.setOnClickListener(v -> showSubPanel(subPanel.getVisibility() != View.VISIBLE));
 
         subPanel = new LinearLayout(this);
@@ -586,21 +607,40 @@ public class PlayerActivity extends Activity {
             if (isFinishing() || !cueTimes.isEmpty() || rootView == null) {
                 return;
             }
+            boolean asked = osRequested;
             parseSrt(dataUri);
             if (cueTimes.isEmpty()) {
                 return;
             }
             subOffset = offsetMs;
-            extOn = !"never".equals(subMode) && !frenchAudio;
+            extOn = asked || (!"never".equals(subMode) && !frenchAudio && !embeddedFrench);
+            if (asked && embeddedFrench && player != null) {
+                // asked for OpenSub over the video's own subtitles: show only one set
+                player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build());
+            }
+            boolean hadButton = subButton != null && subButton.getParent() != null;
             buildSubOverlay(rootView);
-            if (subButton != null && actionsRow != null) {
+            if (!hadButton && subButton != null && actionsRow != null) {
                 subButton.setVisibility(playerView.isControllerFullyVisible() && !inPip ? View.VISIBLE : View.GONE);
                 actionsRow.addView(subButton, 0);
             }
             if (extOn) {
-                Toast.makeText(this, "Sous-titres français ajoutés", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Sous-titres français OpenSubtitles ajoutés", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /** Ask the app to fetch French subtitles on OpenSubtitles (byUser: the OpenSub button was pressed). */
+    private void requestOpenSub(boolean byUser) {
+        if (byUser) {
+            osRequested = true;
+            Toast.makeText(this, "Recherche des sous-titres français sur OpenSubtitles…", Toast.LENGTH_SHORT).show();
+        }
+        PlayerPlugin.requestOpenSub(byUser);
+    }
+
+    void showMessage(String text) {
+        runOnUiThread(() -> Toast.makeText(this, text, Toast.LENGTH_LONG).show());
     }
 
     private final Runnable hidePanel = () -> {

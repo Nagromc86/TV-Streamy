@@ -10,6 +10,7 @@
 .boot{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;animation:bootin .35s ease-out}
 .boot svg{width:112px;height:112px;filter:drop-shadow(0 12px 30px rgba(229,9,20,.35))}.boot b{font-family:var(--display);font-size:1.7rem;font-weight:800;letter-spacing:-.02em}.boot .spin{margin-top:10px;opacity:0;animation:spin 1s linear infinite,fadein .3s .9s forwards}@keyframes fadein{to{opacity:1}}
 @keyframes bootin{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+.epdl.prog{background:linear-gradient(90deg,rgba(229,9,20,.55) var(--pc),var(--surface2) var(--pc));font-size:.78rem;font-weight:700;min-width:56px}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -611,13 +612,19 @@ function pollDownloads(){
 function refreshUi(){if(sheet)renderSheet();if(S.tab==='favs'||S.tab==='home'||S.tab==='movies'){var y=window.scrollY;render();window.scrollTo(0,y)}}
 function spd(b){return b>=1048576?(b/1048576).toFixed(1).replace('.',',')+' Mo/s':Math.round(b/1024)+' Ko/s'}
 function eta(sec){sec=Math.round(sec);if(sec>=3600)return Math.floor(sec/3600)+' h '+String(Math.floor(sec/60)%60).padStart(2,'0');return Math.max(1,Math.round(sec/60))+' min'}
+/* episode button while downloading: percentage with a filling background, or the reason it waits */
+function epDlBtn(dk,d){
+  var pc=d.total?Math.floor(d.bytes/d.total*100):0,run=d.status==='running';
+  var t=run?(d.total?pc+' %':size(d.bytes)||'0 %'):d.status==='paused'?(pc?pc+' %':'Pause'):({wifi:'Wi-Fi',hold:'Pause',queue:'File',network:'Réseau',retry:'Essai'}[d.wait]||'File');
+  return '<button type="button" class="epdl prog" data-dlask="'+esc(dk)+'" aria-label="'+esc(dlLabel(d))+'" title="'+esc(dlLabel(d))+'" style="--pc:'+pc+'%">'+esc(t)+'</button>';
+}
 function dlLabel(d){
   if(!d)return '';
   if(d.status==='done')return 'Téléchargé'+(d.total?' · '+size(d.total):'');
   if(d.status==='failed')return 'Échec'+(d.error?' : '+d.error:'')+' · touche Réessayer';
   if(d.status==='paused')return 'En pause'+(d.total?' · '+Math.floor(d.bytes/d.total*100)+' %':'');
   var pc=d.total?Math.floor(d.bytes/d.total*100):0;
-  if(d.status==='running')return pc+' %'+(d.speed?' · '+spd(d.speed):'')+(d.speed&&d.total?' · reste '+eta((d.total-d.bytes)/d.speed):'')+(d.total?' · '+size(d.total):'');
+  if(d.status==='running')return (d.total?pc+' %':size(d.bytes)||'Démarrage…')+(d.speed?' · '+spd(d.speed):'')+(d.speed&&d.total?' · reste '+eta((d.total-d.bytes)/d.speed):'')+(d.total?' · '+size(d.total):'');
   var w={queue:'En file d\'attente',hold:'En pause pendant la lecture',wifi:'En attente du Wi-Fi',network:'En attente de connexion',retry:'Connexion perdue, nouvel essai…'}[d.wait]||'En attente…';
   return w+(pc?' · '+pc+' %':'');
 }
@@ -785,7 +792,7 @@ function castSheetHtml(){
 }
 
 function play(o){
-  o.subMode=curSubMode();
+  o.subMode=curSubMode();o.osOn=osOn()&&!o.live;
   var stream=!/^(file|content):/.test(o.url)||!!(NATIVE&&S.castDev);
   var busy=Object.keys(USER.downloads||{}).some(function(k){return dlActive(USER.downloads[k])});
   if(NATIVE&&stream&&busy){
@@ -852,16 +859,28 @@ function playLive(item){
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
   play({url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true}).then(function(r){noteLive(ex,r);explainRefusal(r);if(S.tab==='home'||S.tab==='live')render()});
 }
-/* subtitles never delay the start: saved ones go in at once, OpenSubtitles ones are added to the open player when they arrive */
+/* Subtitles: the video's own French ones come first (CC). OpenSubtitles is only asked by the player when the video
+   has none (and the audio is not French), or when the OpenSub button is pressed. Saved ones go in at once. */
+var CURSUB=null;
 function subsFor(k,meta){
   if(!NATIVE||S.castDev||TIZEN)return getSubs(k,meta).then(function(L){return {now:L,box:{L:L}}});
+  var box={L:[]};CURSUB={k:k,meta:meta,box:box};
   return kget('sub:'+k).then(function(c){
-    if(c&&c.srt){var L=[subTrack(c)];return {now:L,box:{L:L}}}
-    var box={L:[]};
-    if(osOn()&&navigator.onLine!==false&&curSubMode()!=='never')setTimeout(function(){getSubs(k,meta,true).then(function(L){if(!L.length)return;box.L=L;nat('addSubtitles',{url:L[0].url,offset:L[0].offset||0}).catch(function(){})})},600);
+    if(c&&c.srt){box.L=[subTrack(c)];return {now:box.L,box:box}}
     return {now:[],box:box};
-  },function(){return {now:[],box:{L:[]}}});
+  },function(){return {now:[],box:box}});
 }
+function onOpenSubRequest(e){
+  var c=CURSUB;if(!c)return;
+  if(!osOn()){nat('playerMessage',{text:'OpenSubtitles n\'est pas configuré : Paramètres › OpenSubtitles.'}).catch(function(){});return}
+  if(navigator.onLine===false){if(e&&e.byUser)nat('playerMessage',{text:'Pas de connexion.'}).catch(function(){});return}
+  getSubs(c.k,c.meta,true).then(function(L){
+    if(CURSUB!==c)return;
+    if(!L.length){if(e&&e.byUser)nat('playerMessage',{text:'Aucun sous-titre français trouvé sur OpenSubtitles.'}).catch(function(){});return}
+    c.box.L=L;nat('addSubtitles',{url:L[0].url,offset:L[0].offset||0}).catch(function(){});
+  });
+}
+try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','openSubRequest',onOpenSubRequest)}catch(e){}
 function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
@@ -1603,7 +1622,7 @@ function renderSheetInner(){
           else if(!dd)dlb='<button type="button" class="epdl" data-dlep="'+esc(ep.id)+'" aria-label="Télécharger l\'épisode">'+IC.dl+'</button>';
           else if(dd.status==='done')dlb='<button type="button" class="epdl done" data-dlask="'+esc(dk)+'" aria-label="Téléchargé">'+IC.check+'</button>';
           else if(dd.status==='failed')dlb='<button type="button" class="epdl warn" data-dlask="'+esc(dk)+'">Échec</button>';
-          else dlb='<button type="button" class="epdl" data-dlask="'+esc(dk)+'">'+(dd.total?Math.floor(dd.bytes/dd.total*100)+' %':'…')+'</button>';
+          else dlb=epDlBtn(dk,dd);
         }
         h+='<div class="ep"><button type="button" class="epplay" data-playep="'+esc(ep.id)+'"><span class="num">'+esc(ep.episode_num)+'</span><span><b>'+esc(ep.title||('Épisode '+ep.episode_num))+'</b>'+(ei.duration?'<small>'+esc(ei.duration)+'</small>':'')+(pe&&pe.done?' <span class="seen">· vu</span>':'')+(dd&&dd.status==='done'?' <span class="seen">· hors connexion</span>':'')+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span></button>'+dlb+'</div>';
       });
@@ -1972,12 +1991,20 @@ var TUTO={
     'Connecté, ouvre la <b>page des clés API</b> (ou : profil › API consumers).',
     'Touche <b>New consumer</b>, donne le nom <b>TV Streamy</b>, puis <b>Save</b>.',
     'Copie l\'<b>API key</b> affichée à côté de « TV Streamy ».',
-    'Colle-la ci-dessous avec ton <b>identifiant</b> et ton <b>mot de passe</b> OpenSubtitles, puis <b>Enregistrer et tester</b>.']}
+    'Colle-la ci-dessous avec ton <b>identifiant</b> et ton <b>mot de passe</b> OpenSubtitles, puis <b>Enregistrer et tester</b>.']},
+  sync:{label:'Comment ça marche ? (ajouter un appareil, oubli…)',links:[['Console Firebase','https://console.firebase.google.com/project/tv-streamy/authentication/users']],steps:[
+    '<b>Premier appareil</b> (déjà fait) : la synchro a été activée avec ton e-mail, un mot de passe et une <b>phrase secrète</b>. Garde la phrase secrète notée quelque part : elle ne peut pas être récupérée.',
+    '<b>Nouvel appareil</b> (téléphone, tablette, Android TV, TV Samsung) : à la première ouverture, touche « Déjà utilisé sur un autre appareil ? Récupérer mes comptes ». Sinon : Paramètres › Synchro › Activer la synchro › <b>J\'ai déjà un compte</b>.',
+    'Entre le <b>même e-mail</b>, le <b>même mot de passe</b> et la <b>même phrase secrète</b>. Tes listes, profils, favoris, reprises de lecture, filtres et clés TMDB / OpenSubtitles reviennent. Les vidéos téléchargées restent sur chaque appareil.',
+    'Ensuite, tout se met à jour seul : à l\'ouverture, toutes les minutes et dès que tu changes quelque chose. Le bouton <b>Synchroniser</b> force une mise à jour.',
+    '<b>Un seul écran à la fois</b> : lancer une vidéo sur un appareil arrête celle en cours sur un autre, pour ne pas dépasser les écrans de ton abonnement.',
+    'Les nouvelles inscriptions sont fermées dans ta console Firebase : « Premier appareil » est refusé, c\'est normal. Utilise toujours « J\'ai déjà un compte ».',
+    '<b>Mot de passe oublié</b> : dans « J\'ai déjà un compte », entre ton e-mail puis touche <b>Mot de passe oublié</b> pour recevoir un lien de réinitialisation. <b>Phrase secrète oubliée</b> : personne ne peut déchiffrer les données en ligne. Il faut les effacer dans la console Firebase (Firestore) puis réactiver la synchro depuis un appareil qui a tout.']}
 };
 function tutoHtml(k){
   var t=TUTO[k],open=S.tutoOpen&&S.tutoOpen[k];
-  return '<button type="button" class="tutobtn" data-tuto="'+k+'" aria-expanded="'+!!open+'">'+(open?'Masquer le tuto':'Comment obtenir ma clé ? (gratuit, 5 min)')+'</button>'+
-    (open?'<div class="tuto"><ol>'+t.steps.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol><div class="acts">'+t.links.map(function(l){return '<button type="button" class="btn ghost" data-ext="'+esc(l[1])+'">'+esc(l[0])+' ↗</button>'}).join('')+'</div><p class="hint" style="margin:0">Astuce : dans Chrome, menu ⋮ › « Version pour ordinateur » si la page est trop serrée.</p></div>':'');
+  return '<button type="button" class="tutobtn" data-tuto="'+k+'" aria-expanded="'+!!open+'">'+(open?'Masquer le tuto':t.label||'Comment obtenir ma clé ? (gratuit, 5 min)')+'</button>'+
+    (open?'<div class="tuto"><ol>'+t.steps.map(function(x){return '<li>'+x+'</li>'}).join('')+'</ol><div class="acts">'+t.links.map(function(l){return '<button type="button" class="btn ghost" data-ext="'+esc(l[1])+'">'+esc(l[0])+' ↗</button>'}).join('')+'</div>'+(k==='sync'?'':'<p class="hint" style="margin:0">Astuce : dans Chrome, menu ⋮ › « Version pour ordinateur » si la page est trop serrée.</p>')+'</div>':'');
 }
 function shareHtml(){
   return '<p class="hint" style="margin:0">Envoie le lien de l\'appli : la personne l\'installe sur son téléphone, sa tablette ou son Android TV. Elle devra ajouter sa propre liste de lecture : tes comptes, ta liste et ta synchro ne sont jamais partagés.</p>'+
@@ -1997,9 +2024,9 @@ function shareApp(){
   copyText(SHARE_TEXT);
 }
 function syncHtml(){
-  if(!SYNC)return '<p class="hint" style="margin:0">Retrouve tes comptes, favoris, reprises de lecture et filtres sur tous tes appareils. Tout est chiffré sur l\'appareil avec ta phrase secrète.</p><div class="acts"><button type="button" class="btn ghost" data-syncsetup="new">'+IC.refresh+'Activer la synchro</button></div>';
+  if(!SYNC)return tutoHtml('sync')+'<p class="hint" style="margin:0">Retrouve tes comptes, favoris, reprises de lecture et filtres sur tous tes appareils. Tout est chiffré sur l\'appareil avec ta phrase secrète.</p><div class="acts"><button type="button" class="btn ghost" data-syncsetup="new">'+IC.refresh+'Activer la synchro</button></div>';
   var t=SYNC.last?new Date(SYNC.last):null;
-  return '<div class="updrow"><span><b>'+esc(SYNC.email)+'</b><small>'+(syncBusy?'Synchronisation…':t?'Dernière synchro '+(sameDay(+t)?'aujourd\'hui':t.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' à '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'):'Pas encore synchronisé')+'</small>'+(syncErr?'<small style="color:var(--accent2)">'+esc(syncErr)+'</small>':'')+'</span><button type="button" class="btn ghost" data-syncnow'+(syncBusy?' disabled':'')+'>'+IC.refresh+'Synchro</button></div>'+
+  return tutoHtml('sync')+'<div class="updrow"><span><b>'+esc(SYNC.email)+'</b><small>'+(syncBusy?'Synchronisation…':t?'Dernière synchro '+(sameDay(+t)?'aujourd\'hui':t.toLocaleDateString('fr-FR',{day:'numeric',month:'short'}))+' à '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'):'Pas encore synchronisé')+'</small>'+(syncErr?'<small style="color:var(--accent2)">'+esc(syncErr)+'</small>':'')+'</span><button type="button" class="btn ghost" data-syncnow'+(syncBusy?' disabled':'')+'>'+IC.refresh+'Synchro</button></div>'+
     '<div class="acts"><button type="button" class="btn ghost" data-syncout>Désactiver sur cet appareil</button></div>';
 }
 function syncSheetHtml(){

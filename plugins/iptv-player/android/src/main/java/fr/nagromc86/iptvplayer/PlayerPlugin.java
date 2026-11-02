@@ -30,6 +30,32 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "IptvPlayer")
 public class PlayerPlugin extends Plugin {
 
+    private static PlayerPlugin instance;
+
+    @Override
+    public void load() {
+        instance = this;
+    }
+
+    /** The player asks the app (which holds the OpenSubtitles account) to fetch French subtitles. */
+    static void requestOpenSub(boolean byUser) {
+        PlayerPlugin p = instance;
+        if (p != null) {
+            JSObject o = new JSObject();
+            o.put("byUser", byUser);
+            p.notifyListeners("openSubRequest", o);
+        }
+    }
+
+    @PluginMethod
+    public void playerMessage(PluginCall call) {
+        PlayerActivity open = PlayerActivity.current;
+        if (open != null && !open.isFinishing()) {
+            open.showMessage(call.getString("text", ""));
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void play(PluginCall call) {
         String url = call.getString("url");
@@ -47,6 +73,7 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", ""));
         intent.putExtra(PlayerActivity.EXTRA_SUB_MODE, call.getString("subMode", "auto"));
         intent.putExtra(PlayerActivity.EXTRA_SUB_OFFSET, call.getData().optLong("subOffset", 0L));
+        intent.putExtra(PlayerActivity.EXTRA_OS_ON, call.getBoolean("osOn", false));
         intent.putExtra(PlayerActivity.EXTRA_WATCH_URL, call.getString("watchUrl", ""));
         intent.putExtra(PlayerActivity.EXTRA_WATCH_TOKEN, call.getString("watchToken", ""));
         intent.putExtra(PlayerActivity.EXTRA_WATCH_REFRESH, call.getString("watchRefresh", ""));
