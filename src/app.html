@@ -279,6 +279,30 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 .ptile .pen{position:absolute;top:34px;left:50%;transform:translateX(-50%);width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center}.ptile .pen svg{width:18px;height:18px}
 .swatch{width:36px;height:36px;border-radius:50%;border:0;padding:0}.swatch[aria-pressed="true"]{box-shadow:0 0 0 3px var(--surface),0 0 0 5px #fff}
 /* TV: side rail instead of bottom bar, big visible focus, no touch-only bits */
+body.tv .sec{scroll-margin-top:96px}
+body.tv :focus{outline:none}
+body.tv .tvf:not(.poster):not(.wide):not(.btn):not(.chip):not(#nav button){outline:3px solid #fff!important;outline-offset:3px;border-radius:8px}
+body.tv .poster.tvf .art,body.tv .wide.tvf .art{outline:4px solid #fff;outline-offset:2px;transform:scale(1.07)}
+body.tv .btn.tvf{box-shadow:0 0 0 3px var(--bg),0 0 0 6px #fff;transform:scale(1.04)}
+body.tv .chip.tvf{background:#fff;color:#111}
+body.tv #nav button.tvf{background:rgba(255,255,255,.16);color:#fff}
+body.tv .bill{text-align:left;padding:84px 0 8px 0;margin-inline:0}
+body.tv .bill .bg{inset:0;filter:none;opacity:.42;transform:none;transition:none;background-position:center 20%}
+body.tv .bill::after{background:linear-gradient(90deg,var(--bg) 0%,rgba(16,16,20,.88) 34%,rgba(16,16,20,.25) 70%,rgba(16,16,20,.55) 100%),linear-gradient(rgba(16,16,20,0) 55%,var(--bg) 100%)}
+body.tv .bslides{display:grid;overflow:visible;margin:0;scroll-snap-type:none}
+body.tv .bslide{grid-area:1/1;display:flex;flex-direction:row-reverse;align-items:center;justify-content:flex-end;gap:48px;padding:0;opacity:0;visibility:hidden;transition:opacity .45s ease,visibility 0s .45s}
+body.tv .bslide.on{opacity:1;visibility:visible;transition:opacity .45s ease}
+body.tv .bill .card{width:200px;margin:0 0 0 auto;flex:none;box-shadow:0 24px 60px rgba(0,0,0,.7)}
+body.tv .bill .info{margin:0;max-width:640px;flex:1}
+body.tv .tvtitle{margin:0 0 10px;font-family:var(--display);font-weight:800;font-size:2.7rem;line-height:1.02;letter-spacing:-.02em;text-wrap:balance}
+body.tv .bill .tags{justify-content:flex-start;font-size:1rem}
+body.tv .tvplot{margin:12px 0 0;color:#cfcfd6;font-size:1.02rem;line-height:1.45;max-width:58ch;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:1em}
+body.tv .bill .acts{justify-content:flex-start;margin-top:20px}
+body.tv .bdots{justify-content:flex-start;margin-top:18px}
+body.tv .bdots button.tvf{outline:2px solid #fff!important;outline-offset:3px}
+body.tv .sech h2{font-size:1.25rem}
+body.tv .row{padding-block:12px;margin-block:-12px}
+body.tv .bill+.sec,body.tv .bill~.sec:first-of-type{margin-top:6px}
 body.tv{--navh:0px}
 body.tv #nav{top:0;bottom:0;right:auto;width:104px;padding:0;background:linear-gradient(90deg,rgba(16,16,20,.98) 70%,rgba(16,16,20,0))}
 body.tv #nav .in{grid-template-columns:none;grid-auto-rows:80px;height:auto;align-content:start;padding-top:110px;width:104px}
@@ -1290,7 +1314,25 @@ function wantBillInfo(kind,x){
   var id=x.stream_id||x.series_id,k=kind+':'+id;if(billInfo[k]||navigator.onLine===false)return;billInfo[k]={};
   kget('info:'+S.activeId+':'+kind+':'+id).then(function(c){if(c)return c;return api(acc(),kind==='movie'?'action=get_vod_info&vod_id='+id:'action=get_series_info&series_id='+id).then(function(r){kset('info:'+S.activeId+':'+kind+':'+id,r);return r})}).then(function(r){
     billInfo[k]=(r&&r.info)||{};var el=document.querySelector('.bslide[data-k="'+k+'"] .tags');if(el)el.innerHTML=billTags(kind,x);
+    var pl=document.querySelector('.bslide[data-k="'+k+'"] .tvplot');if(pl)pl.textContent=billPlot(kind,x);if(TV)tvBillBg();
   },function(){});
+}
+function billPlot(kind,x){var inf=billInfo[kind+':'+(x.stream_id||x.series_id)]||{},t=String(inf.plot||inf.description||x.plot||'').trim();return t.length>220?t.slice(0,217).replace(/\s+\S*$/,'')+'…':t}
+/* TV: a landscape backdrop when the provider has one, else the poster, sharp but darkened (no blur: too heavy for TVs) */
+function tvBillBg(){
+  var b=document.querySelector('.bill[data-bill]');if(!b)return;var on=b.querySelector('.bslide.on')||b.querySelector('.bslide');if(!on)return;
+  var k=on.getAttribute('data-k'),inf=billInfo[k]||{},bd=inf.backdrop_path,u=(Array.isArray(bd)?bd[0]:bd)||inf.movie_image||on.getAttribute('data-img')||'';
+  var bg=b.querySelector('.bg');if(bg&&bg.getAttribute('data-u')!==u){bg.setAttribute('data-u',u);bg.style.backgroundImage=u?'url("'+String(u).replace(/"/g,'%22')+'")':''}
+}
+/* TV: switch suggestion by cross-fading (no sliding), focus follows when it was on the hero */
+function tvBillGo(i){
+  var b=document.querySelector('.bill[data-bill]');if(!b)return;var sl=[].slice.call(b.querySelectorAll('.bslide'));if(!sl.length)return;
+  i=(i+sl.length)%sl.length;var key=b.getAttribute('data-bill'),had=document.activeElement&&document.activeElement.closest('.bslide');
+  var sel=had&&focusKey(document.activeElement)?focusKey(document.activeElement).replace(/="[^"]*"/,''):null;
+  sl.forEach(function(x,j){x.classList.toggle('on',j===i)});S.billIdx[key]=i;
+  [].forEach.call(b.querySelectorAll('[data-bdot]'),function(d,j){if(j===i)d.setAttribute('aria-current','true');else d.removeAttribute('aria-current')});
+  var kk=sl[i].getAttribute('data-k').split(':'),x=byId(kk[0],kk[1]);if(x)wantBillInfo(kk[0],x);tvBillBg();
+  if(had){var t=(sel&&sl[i].querySelector(sel))||sl[i].querySelector('.btn');if(t)focusEl(t)}
 }
 function billTags(kind,x){
   var inf=billInfo[kind+':'+(x.stream_id||x.series_id)]||{},r=parseFloat(x.rating),yr=year(inf.releasedate||inf.releaseDate||x.releaseDate||x.name);
@@ -1308,8 +1350,8 @@ function billHtml(kind,cat){
   var h='<section class="bill" data-bill="'+esc(key)+'"><span class="bg" style="background-image:url(\''+esc(imgOf(items[cur].kind,items[cur].x))+'\')"></span><div class="bslides">';
   items.forEach(function(o){
     var kd=o.kind,x=o.x,id=x.stream_id||x.series_id,k=kd+':'+id,img=imgOf(kd,x),p=kd==='movie'?progressOf('movie:'+id):USER.prog['series:'+id];
-    h+='<div class="bslide" data-k="'+k+'" data-img="'+esc(img)+'"><button type="button" class="card"'+(TV?' tabindex="-1"':'')+' data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
-      '<div class="info">'+(billBadge(o)?'<div style="margin-bottom:8px">'+billBadge(o)+'</div>':'')+'<div class="tags">'+billTags(kd,x)+'</div>'+
+    h+='<div class="bslide'+(items.indexOf(o)===cur?' on':'')+'" data-k="'+k+'" data-img="'+esc(img)+'"><button type="button" class="card"'+(TV?' tabindex="-1"':'')+' data-open="'+k+'" aria-label="'+esc(x.name)+'"><span class="ph">'+esc(cleanName(x.name))+'</span>'+(img?'<img src="'+esc(img)+'" alt="" loading="lazy" onerror="this.remove()" style="position:absolute;inset:0">':'')+'</button>'+
+      '<div class="info">'+(billBadge(o)?'<div style="margin-bottom:8px">'+billBadge(o)+'</div>':'')+(TV?'<h2 class="tvtitle">'+esc(cleanName(x.name))+'</h2>':'')+'<div class="tags">'+billTags(kd,x)+'</div>'+(TV?'<p class="tvplot">'+esc(billPlot(kd,x))+'</p>':'')+
       '<div class="acts">'+(kd==='movie'?'<button type="button" class="btn" data-playmovie="'+esc(id)+'">'+IC.play+(p&&!p.done&&p.pos?'Reprendre':'Lecture')+'</button>':'<button type="button" class="btn" data-open="'+k+'">'+IC.play+'Regarder</button>')+
       '<button type="button" class="btn ghost" data-fav="'+k+'">'+(isFav(kd,id)?IC.check+'Ma liste':IC.plus+'Ma liste')+'</button></div></div></div>';
   });
@@ -1318,6 +1360,7 @@ function billHtml(kind,cat){
 }
 /* keep the carousel where it was across re-renders, follow swipes, advance by itself */
 function billSync(){
+  if(TV){tvBillBg();return}
   var b=document.querySelector('.bill[data-bill]');if(!b)return;var sl=b.querySelector('.bslides');if(!sl)return;
   var i=(S.billIdx||{})[b.getAttribute('data-bill')]||0;sl.style.scrollBehavior='auto';sl.scrollLeft=i*sl.clientWidth;sl.style.scrollBehavior='';
 }
@@ -1333,6 +1376,7 @@ document.addEventListener('scroll',function(e){var t=e.target;if(t&&t.classList&
 var billTouch=0;['touchstart','pointerdown','wheel'].forEach(function(ev){document.addEventListener(ev,function(e){if(e.target.closest&&e.target.closest('.bill'))billTouch=Date.now()},{passive:true,capture:true})});
 setInterval(function(){
   if(document.hidden||sheet||Date.now()-billTouch<12000)return;
+  if(TV){var bb=document.querySelector('.bill[data-bill]');if(!bb||(document.activeElement&&document.activeElement.closest('.bill'))||window.scrollY>200)return;tvBillGo(((S.billIdx||{})[bb.getAttribute('data-bill')]||0)+1);return}
   var sl=document.querySelector('.bslides');if(!sl||sl.children.length<2)return;var r=sl.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight)return;
   var i=Math.round(sl.scrollLeft/sl.clientWidth),n=(i+1)%sl.children.length;sl.scrollTo({left:n*sl.clientWidth,behavior:'smooth'});
 },7000);
@@ -1959,6 +2003,7 @@ document.addEventListener('click',function(e){
   if(t.hasAttribute('data-castcancel')){stopScan();return}
   if(t.hasAttribute('data-mirror')){nat('castMirror').then(function(r){if(!r||!r.opened){S.mirrorHelp=true;renderSheet()}},function(){S.mirrorHelp=true;renderSheet()});return}
   if(d.cc){castControl(d.cc);return}
+  if(d.bdot&&TV){billTouch=Date.now();tvBillGo(+d.bdot);return}
   if(d.bdot){var bs=document.querySelector('.bslides');billTouch=Date.now();if(bs)bs.scrollTo({left:(+d.bdot)*bs.clientWidth,behavior:'smooth'});return}
   if(d.groups){openSheet({kind:'groups',sec:d.groups,back:sheet&&sheet.kind==='accounts'});return}
   if(d.gopen){sheet.open=sheet.open||{};sheet.open[d.gopen]=!sheet.open[d.gopen];renderSheet();return}
@@ -2381,7 +2426,9 @@ function moveFocus(dir){
   return false;
 }
 function focusEl(el){
+  var old=document.querySelector('.tvf');if(old&&old!==el)old.classList.remove('tvf');el.classList.add('tvf');
   try{el.focus({preventScroll:true})}catch(e){el.focus()}
+  if(TV&&!el.closest('.panel,#nav,#tvplayer')){tvScrollTo(el);return}
   var row=el.closest('.row,.chips,.bslides');
   if(row){var r=el.getBoundingClientRect(),rr=row.getBoundingClientRect();if(r.left<rr.left+10)row.scrollLeft-=rr.left+24-r.left;else if(r.right>rr.right-10)row.scrollLeft+=r.right-rr.right+24}
   var box=el.closest('.panel')||null,vr=el.getBoundingClientRect();
@@ -2389,6 +2436,16 @@ function focusEl(el){
   else if(!el.closest('#nav')){var top=110,bot=innerHeight-40;if(vr.top<top)window.scrollBy(0,vr.top-top-20);else if(vr.bottom>bot)window.scrollBy(0,vr.bottom-bot+20)}
 }
 /* keep the focus on "the same" item when the screen is redrawn */
+/* TV: the row of the focused item comes just under the header; a tall block (grid, guide) keeps the item centred */
+function tvScrollTo(el){
+  if(el.closest('.bill')||el.closest('.top')){window.scrollTo(0,0);return}
+  var sec=el.closest('.sec,.chlist .ch,.grow')||el,r=sec.getBoundingClientRect(),vh=window.innerHeight;
+  try{
+    if(sec!==el&&r.height<vh*0.7&&!el.closest('.grid,.chlist,.gwrap'))sec.scrollIntoView({block:'start',inline:'nearest'});
+    else el.scrollIntoView({block:'center',inline:'nearest'});
+    el.scrollIntoView({block:'nearest',inline:'nearest'});
+  }catch(e){el.scrollIntoView(false)}
+}
 function focusKey(el){if(!el||!el.attributes)return null;for(var i=0;i<el.attributes.length;i++){var n=el.attributes[i].name;if(n.indexOf('data-')===0&&n!=='data-confirm')return '['+n+'="'+String(el.attributes[i].value).replace(/"/g,'\\"')+'"]'}return el.id?'#'+el.id:null}
 var autoEl=null;
 function keepFocus(fn){
