@@ -24,7 +24,28 @@ class SubServer {
     private static final Map<String, byte[]> files = new ConcurrentHashMap<>();
 
     /** Returns [srtUrl, vttUrl], or null when the phone has no local network address. */
-    static synchronized String[] publish(String srt) {
+    /** Shifts every "00:01:02,345 --> 00:01:04,000" line by offsetMs (positive = later). */
+    static String shift(String srt, long offsetMs) {
+        if (offsetMs == 0) {
+            return srt;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+):(\\d{1,2}):(\\d{1,2})([,.])(\\d{1,3})").matcher(srt);
+        StringBuffer out = new StringBuffer();
+        while (m.find()) {
+            StringBuilder f = new StringBuilder(m.group(5));
+            while (f.length() < 3) {
+                f.append('0');
+            }
+            long t = Long.parseLong(m.group(1)) * 3600000L + Long.parseLong(m.group(2)) * 60000L + Long.parseLong(m.group(3)) * 1000L + Long.parseLong(f.substring(0, 3));
+            t = Math.max(0, t + offsetMs);
+            m.appendReplacement(out, String.format(java.util.Locale.ROOT, "%02d:%02d:%02d%s%03d", t / 3600000, (t / 60000) % 60, (t / 1000) % 60, m.group(4), t % 1000));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    static synchronized String[] publish(String srt, long offsetMs) {
+        srt = shift(srt == null ? "" : srt, offsetMs);
         String ip = lanIp();
         if (ip == null || srt == null || srt.isEmpty()) {
             return null;

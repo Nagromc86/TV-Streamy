@@ -15,6 +15,8 @@ import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -44,6 +46,7 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_LIVE, call.getBoolean("live", false));
         intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", ""));
         intent.putExtra(PlayerActivity.EXTRA_SUB_MODE, call.getString("subMode", "auto"));
+        intent.putExtra(PlayerActivity.EXTRA_SUB_OFFSET, call.getData().optLong("subOffset", 0L));
         JSArray subs = call.getArray("subtitles");
         if (subs != null && subs.length() > 0) {
             String[] urls = new String[subs.length()];
@@ -71,6 +74,20 @@ public class PlayerPlugin extends Plugin {
         startActivityForResult(call, intent, "onPlayerClosed");
     }
 
+    /** Subtitles found after the video started: shown in the open player. */
+    @PluginMethod
+    public void addSubtitles(PluginCall call) {
+        PlayerActivity open = PlayerActivity.current;
+        JSObject ret = new JSObject();
+        if (open != null && !open.isFinishing()) {
+            open.addExternalSubs(call.getString("url", ""), call.getData().optLong("offset", 0L));
+            ret.put("added", true);
+        } else {
+            ret.put("added", false);
+        }
+        call.resolve(ret);
+    }
+
     private PluginCall pendingCall;
     private Intent pendingIntent;
 
@@ -88,35 +105,68 @@ public class PlayerPlugin extends Plugin {
             call.reject("Adresse ou nom de fichier manquant");
             return;
         }
-        try {
-            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(url));
-            r.setTitle(call.getString("title", fileName));
-            r.setDescription("TV Streamy · téléchargement pour regarder hors connexion");
-            r.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-            r.setDestinationInExternalFilesDir(getContext(), Environment.DIRECTORY_MOVIES, fileName);
-            String ua = call.getString("userAgent", "");
-            r.addRequestHeader("User-Agent", TextUtils.isEmpty(ua) ? "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0" : ua);
-            boolean mobile = call.getBoolean("allowMobile", false);
-            r.setAllowedOverMetered(mobile);
-            r.setAllowedOverRoaming(false);
-            long id = dm().enqueue(r);
-            JSObject ret = new JSObject();
-            ret.put("id", String.valueOf(id));
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Téléchargement impossible : " + e.getMessage());
+        askNotificationPermission();
+        String id = DownloadEngine.get(getContext()).add(url, fileName, call.getString("title", fileName), call.getString("userAgent", ""),
+                call.getBoolean("allowMobile", false), call.getInt("conns", 1));
+        JSObject ret = new JSObject();
+        ret.put("id", id);
+        call.resolve(ret);
+    }
+
+    private void askNotificationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && getActivity() != null
+                && androidx.core.content.ContextCompat.checkSelfPermission(getContext(), "android.permission.POST_NOTIFICATIONS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            androidx.core.app.ActivityCompat.requestPermissions(getActivity(), new String[] {"android.permission.POST_NOTIFICATIONS"}, 4107);
         }
+    }
+
+    @PluginMethod
+    public void pauseDownload(PluginCall call) {
+        DownloadEngine.get(getContext()).pause(call.getString("id", ""));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void resumeDownload(PluginCall call) {
+        DownloadEngine.get(getContext()).resume(call.getString("id", ""));
+        call.resolve();
+    }
+
+    /** Pause the queue while a video is streamed (one connection allowed), resume afterwards. */
+    @PluginMethod
+    public void holdDownloads(PluginCall call) {
+        DownloadEngine.get(getContext()).setHold(call.getBoolean("hold", false));
+        call.resolve();
     }
 
     @PluginMethod
     public void downloadStatus(PluginCall call) {
         JSArray out = new JSArray();
+        DownloadEngine eng = DownloadEngine.get(getContext());
         try {
             JSArray ids = call.getArray("ids");
-            if (ids != null && ids.length() > 0) {
-                long[] list = new long[ids.length()];
+            List<Long> legacy = new ArrayList<>();
+            if (ids != null) {
                 for (int i = 0; i < ids.length(); i++) {
-                    list[i] = Long.parseLong(ids.getString(i));
+                    String id = ids.getString(i);
+                    if (eng.has(id)) {
+                        org.json.JSONObject st = eng.status(id);
+                        if (st != null) {
+                            out.put(st);
+                        }
+                    } else {
+                        try {
+                            legacy.add(Long.parseLong(id));
+                        } catch (NumberFormatException ignored) {
+                            // unknown id
+                        }
+                    }
+                }
+            }
+            if (!legacy.isEmpty()) {
+                long[] list = new long[legacy.size()];
+                for (int i = 0; i < list.length; i++) {
+                    list[i] = legacy.get(i);
                 }
                 Cursor c = dm().query(new DownloadManager.Query().setFilterById(list));
                 if (c != null) {
@@ -125,8 +175,7 @@ public class PlayerPlugin extends Plugin {
                         o.put("id", String.valueOf(c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_ID))));
                         int st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
                         o.put("status", st == DownloadManager.STATUS_SUCCESSFUL ? "done" : st == DownloadManager.STATUS_FAILED ? "failed"
-                                : st == DownloadManager.STATUS_PAUSED ? "paused" : st == DownloadManager.STATUS_RUNNING ? "running" : "pending");
-                        o.put("reason", c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)));
+                                : st == DownloadManager.STATUS_PAUSED ? "paused" : st == DownloadManager.STATUS_RUNNING ? "running" : "queued");
                         o.put("bytes", c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)));
                         o.put("total", c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)));
                         String local = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
@@ -157,7 +206,12 @@ public class PlayerPlugin extends Plugin {
         String id = call.getString("id");
         try {
             if (id != null) {
-                dm().remove(Long.parseLong(id));
+                DownloadEngine eng = DownloadEngine.get(getContext());
+                if (eng.has(id)) {
+                    eng.remove(id);
+                } else {
+                    dm().remove(Long.parseLong(id));
+                }
             }
             call.resolve();
         } catch (Exception e) {
@@ -173,7 +227,7 @@ public class PlayerPlugin extends Plugin {
     public void castScan(PluginCall call) {
         CastHelper.main.post(() -> CastHelper.startScan(getContext()));
         new Thread(() -> {
-            java.util.List<DlnaHelper.Device> dl = DlnaHelper.discover(getContext(), 3500);
+            java.util.List<DlnaHelper.Device> dl = DlnaHelper.discover(getContext(), 2500);
             CastHelper.main.post(() -> {
                 JSArray out = new JSArray();
                 for (String[] c : CastHelper.devices()) {
@@ -226,7 +280,7 @@ public class PlayerPlugin extends Plugin {
             if (data.startsWith("data:") && comma > 0) {
                 try {
                     String srt = new String(android.util.Base64.decode(data.substring(comma + 1), android.util.Base64.DEFAULT), java.nio.charset.StandardCharsets.UTF_8);
-                    String[] urls = SubServer.publish(srt);
+                    String[] urls = SubServer.publish(srt, call.getData().optLong("subOffset", 0L));
                     if (urls != null) {
                         srtUrl = urls[0];
                         vttUrl = urls[1];
@@ -341,22 +395,70 @@ public class PlayerPlugin extends Plugin {
         });
     }
 
-    /** Screen mirroring (Smart View on Samsung, "Caster" / "Diffuser l'écran" elsewhere). */
+    /** Screen mirroring: Samsung Smart View, else Android's "Cast" screen, only if this phone has it. */
     @PluginMethod
     public void castMirror(PluginCall call) {
-        String[] actions = {"android.settings.CAST_SETTINGS", "android.settings.WIFI_DISPLAY_SETTINGS", android.provider.Settings.ACTION_WIRELESS_SETTINGS};
-        for (String a : actions) {
+        android.content.pm.PackageManager pm = getContext().getPackageManager();
+        java.util.List<Intent> tries = new java.util.ArrayList<>();
+        Intent smart = pm.getLaunchIntentForPackage("com.samsung.android.smartmirroring");
+        if (smart != null) {
+            tries.add(smart);
+        }
+        Intent sv = new Intent("com.samsung.android.smartmirroring.CAPTURE");
+        tries.add(sv);
+        tries.add(new Intent("android.settings.CAST_SETTINGS"));
+        tries.add(new Intent("android.settings.WIFI_DISPLAY_SETTINGS"));
+        for (Intent i : tries) {
+            if (i.resolveActivity(pm) == null) {
+                continue;
+            }
             try {
-                Intent i = new Intent(a);
                 i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 getContext().startActivity(i);
-                call.resolve();
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
                 return;
             } catch (Exception ignored) {
-                // try the next screen
+                // try the next one
             }
         }
-        call.reject("Ouvre « Smart View » ou « Diffuser l'écran » depuis les réglages rapides (glisse depuis le haut de l'écran).");
+        JSObject ret = new JSObject();
+        ret.put("opened", false);
+        call.resolve(ret);
+    }
+
+    /** Opens Android's share sheet (Messages, WhatsApp, mail...) with a text. */
+    @PluginMethod
+    public void shareText(PluginCall call) {
+        try {
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_SUBJECT, call.getString("title", ""));
+            send.putExtra(Intent.EXTRA_TEXT, call.getString("text", ""));
+            Intent chooser = Intent.createChooser(send, "Partager TV Streamy");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Partage impossible : " + e.getMessage());
+        }
+    }
+
+    /** Tells the app whether it runs on a TV (Android TV, Google TV...). */
+    @PluginMethod
+    public void deviceInfo(PluginCall call) {
+        boolean tv = false;
+        try {
+            android.app.UiModeManager um = (android.app.UiModeManager) getContext().getSystemService(Context.UI_MODE_SERVICE);
+            tv = um != null && um.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
+            tv = tv || getContext().getPackageManager().hasSystemFeature("android.software.leanback");
+        } catch (Exception ignored) {
+            // phone
+        }
+        JSObject r = new JSObject();
+        r.put("tv", tv);
+        call.resolve(r);
     }
 
     @ActivityCallback
@@ -371,6 +473,8 @@ public class PlayerPlugin extends Plugin {
             ret.put("positionMs", data.getLongExtra(PlayerActivity.RESULT_POSITION, 0L));
             ret.put("durationMs", data.getLongExtra(PlayerActivity.RESULT_DURATION, 0L));
             ret.put("ended", data.getBooleanExtra(PlayerActivity.RESULT_ENDED, false));
+            ret.put("subOffsetMs", data.getLongExtra(PlayerActivity.RESULT_SUB_OFFSET, 0L));
+            ret.put("usedFallback", data.getBooleanExtra(PlayerActivity.RESULT_USED_FALLBACK, false));
             String error = data.getStringExtra(PlayerActivity.RESULT_ERROR);
             if (error != null) {
                 ret.put("error", error);
@@ -386,7 +490,8 @@ public class PlayerPlugin extends Plugin {
             Intent intent = pendingIntent;
             pendingCall = null;
             pendingIntent = null;
-            startActivityForResult(next, intent, "onPlayerClosed");
+            // give the provider a moment to see the previous stream closed
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> startActivityForResult(next, intent, "onPlayerClosed"), 700);
         }
     }
 }
