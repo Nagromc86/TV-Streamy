@@ -925,17 +925,19 @@ function loadTrends(force){
   if(!PREFS.tmdb||trendLoading)return Promise.resolve(TREND);
   var day=new Date().toDateString();
   return kget('trend').then(function(c){
-    if(c&&c.v===3&&c.day===day&&!force){TREND=c;return c}
+    if(c&&c.v===4&&c.day===day&&!force){TREND=c;return c}
     if(navigator.onLine===false){TREND=c&&c.v>=2?c:null;return TREND}
     trendLoading=true;
-    var get=function(pl,kind){return Promise.all([1,2].map(function(pg){
-      return tmdbReq('/discover/'+kind+'?watch_region=FR&with_watch_providers='+pl.id+'&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page='+pg).then(function(r){return r.results||[]},function(e){if(pg===1)throw e;return []})
+    /* fresh=true: only what came out on the platform these last 3 months (new films, new series or new seasons) */
+    var since=new Date(Date.now()-90*86400000).toISOString().slice(0,10);
+    var get=function(pl,kind,fresh){return Promise.all([1,2].map(function(pg){
+      return tmdbReq('/discover/'+kind+'?watch_region=FR&with_watch_providers='+pl.id+'&with_watch_monetization_types=flatrate&sort_by=popularity.desc&page='+pg+(fresh?(kind==='movie'?'&primary_release_date.gte=':'&air_date.gte=')+since+'&vote_count.gte='+(kind==='movie'?5:2):'')).then(function(r){return r.results||[]},function(e){if(pg===1)throw e;return []})
     })).then(function(a){return [].concat.apply([],a).map(function(t){return {id:t.id,t:[t.title||t.name,t.original_title||t.original_name].filter(Boolean),y:String(t.release_date||t.first_air_date||'').slice(0,4),v:t.vote_average||0,pop:t.popularity||0}})})};
-    var out={day:day,v:3,p:{},week:[]};
+    var out={day:day,v:4,p:{},n:{},week:[]};
     var week=Promise.all([1,2,3].map(function(pg){return tmdbReq('/trending/all/week?page='+pg).then(function(r){return r.results||[]},function(e){if(pg===1)throw e;return []})})).then(function(a){
       out.week=[].concat.apply([],a).filter(function(t){return t.media_type==='movie'||t.media_type==='tv'}).map(function(t){return {id:t.id,mt:t.media_type,t:[t.title||t.name,t.original_title||t.original_name].filter(Boolean),y:String(t.release_date||t.first_air_date||'').slice(0,4),v:t.vote_average||0,pop:t.popularity||0}});
     });
-    return Promise.all(PLAT.map(function(pl){return Promise.all([get(pl,'movie'),get(pl,'tv')]).then(function(r){out.p[pl.k]={movie:r[0],tv:r[1]}})}).concat([week])).then(function(){TREND=out;kset('trend',out);return out});
+    return Promise.all(PLAT.map(function(pl){return Promise.all([get(pl,'movie'),get(pl,'tv'),get(pl,'movie',true).catch(function(){return []}),get(pl,'tv',true).catch(function(){return []})]).then(function(r){out.p[pl.k]={movie:r[0],tv:r[1]};out.n[pl.k]={movie:r[2],tv:r[3]}})}).concat([week])).then(function(){TREND=out;kset('trend',out);return out});
   }).catch(function(e){if(force)throw e;return TREND}).then(function(t){trendLoading=false;return t},function(e){trendLoading=false;throw e});
 }
 /* match TMDB titles with the provider's catalogue: by TMDB id when the provider gives it, else by title (+ year) */
@@ -976,6 +978,15 @@ function platTopRaw(pk,kind,cat){
   var P=TREND.p[pk];
   if(kind==='mix')return platTop(pk,'movie',cat).concat(platTop(pk,'series',cat)).sort(function(a,b){return b.pop-a.pop});
   return matchIn(kind,kind==='movie'?P.movie:P.tv,cat,pk);
+}
+/* trends of a platform: its recent releases that are rising, without the titles already in its Top */
+function platNew(pk,kind){
+  if(!TREND||!TREND.n||!TREND.n[pk])return [];
+  return memo('pnew|'+pk+'|'+kind,function(){
+    var N=TREND.n[pk],L=kind==='mix'?matchIn('movie',N.movie,null,pk).concat(matchIn('series',N.tv,null,pk)).sort(function(a,b){return b.pop-a.pop}):matchIn(kind,kind==='movie'?N.movie:N.tv,null,pk);
+    var top={};platTop(pk,kind,null).slice(0,10).forEach(function(o){top[o.kind+':'+(o.x.stream_id||o.x.series_id)]=1});
+    return L.filter(function(o){return !top[o.kind+':'+(o.x.stream_id||o.x.series_id)]});
+  });
 }
 function weekTop(kind,cat){
   if(!TREND||!TREND.week)return [];
@@ -1100,7 +1111,9 @@ function platRows(kind){
   if(!TREND)return '';var h='';
   var W=weekTop(kind,null).filter(function(o){return imgOf(o.kind,o.x)});
   if(W.length>=3)h+=rowHtml('Tendances de la semaine'+(kind==='movie'?' · films':kind==='series'?' · séries':''),rankRow(W));
-  PLAT.forEach(function(pl){var L=platTop(pl.k,kind,null).filter(function(o){return imgOf(o.kind,o.x)});if(L.length>=3)h+=rowHtml('Top 10 '+pl.name+(kind==='movie'?' · films':kind==='series'?' · séries':'')+' en ce moment',rankRow(L))});
+  var suf=kind==='movie'?' · films':kind==='series'?' · séries':'';
+  PLAT.forEach(function(pl){var L=platTop(pl.k,kind,null).filter(function(o){return imgOf(o.kind,o.x)});if(L.length>=3)h+=rowHtml('Top 10 '+pl.name+suf+' en ce moment',rankRow(L))});
+  PLAT.forEach(function(pl){var L=platNew(pl.k,kind).filter(function(o){return imgOf(o.kind,o.x)}).slice(0,20);if(L.length>=3)h+=rowHtml('Tendances '+pl.name+suf+' · nouveautés',L.map(function(o){return posterHtml(o.kind,o.x)}).join(''))});
   return h;
 }
 function top10(){
