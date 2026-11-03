@@ -123,6 +123,13 @@ body.tv .tvguide .gwrap{margin-top:4px}
 .tvch img,.tvch .ph{width:110px;height:62px;object-fit:contain;border-radius:8px;background:var(--surface2);display:flex;align-items:center;justify-content:center}
 .tvch span:last-child{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
 .tvch.tvf{box-shadow:0 0 0 3px #fff;transform:scale(1.04)}
+#tvsubs{position:absolute;left:10%;right:10%;bottom:12%;z-index:2;text-align:center;white-space:pre-line;font-size:2.1rem;font-weight:600;line-height:1.25;color:#fff;text-shadow:0 2px 4px #000,0 0 2px #000;pointer-events:none}
+#tvplayer:not(.idle) #tvsubs{bottom:26%}
+#tvpanel{position:absolute;right:50px;top:50px;z-index:3;width:440px;max-height:80%;overflow:hidden;background:rgba(16,16,20,.94);border-radius:18px;padding:18px 18px 10px;box-shadow:0 20px 50px rgba(0,0,0,.6)}
+#tvpanel h3{margin:10px 8px 6px;font-size:.85rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent2,#ff4d57)}
+.tvpi{padding:12px 14px;border-radius:10px;font-size:1.15rem;font-weight:600;color:#ddd}
+.tvpi.sel{background:#fff;color:#111}
+#tvpanel .hint{color:#999;margin:10px 8px 4px;font-size:.9rem}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -822,7 +829,6 @@ function subTrack(c){return {url:'data:application/x-subrip;base64,'+b64utf8(c.s
 function keepSubOffset(k,subs,r){if(!subs||!subs.length||!r||typeof r.subOffsetMs!=='number'||r.subOffsetMs===(subs[0].offset||0))return;kget('sub:'+k).then(function(c){if(c){c.offset=r.subOffsetMs;kset('sub:'+k,c)}})}
 /* returns [] or [one French track]; never blocks playback for long, never fails */
 function getSubs(key,meta,quiet){
-  if(TIZEN)return Promise.resolve([]);
   return kget('sub:'+key).then(function(c){
     if(c&&c.srt)return [subTrack(c)];
     if(!osOn()||navigator.onLine===false)return [];
@@ -1021,7 +1027,7 @@ function playLive(item){
    has none (and the audio is not French), or when the OpenSub button is pressed. Saved ones go in at once. */
 var CURSUB=null;
 function subsFor(k,meta){
-  if(!NATIVE||S.castDev||TIZEN)return getSubs(k,meta).then(function(L){return {now:L,box:{L:L}}});
+  if((!NATIVE&&!TIZEN)||(NATIVE&&S.castDev))return getSubs(k,meta).then(function(L){return {now:L,box:{L:L}}});
   var box={L:[]};CURSUB={k:k,meta:meta,box:box};
   return kget('sub:'+k).then(function(c){
     if(c&&c.srt){box.L=[subTrack(c)];return {now:box.L,box:box}}
@@ -2044,6 +2050,8 @@ function renderSheetInner(){
     h+=syncSheetHtml();
   }else if(sheet.kind==='cast'){
     h+=castSheetHtml();
+  }else if(sheet.kind==='exit'){
+    h+='<div class="in gut" style="text-align:center;padding:30px 20px"><h2 style="margin:0 0 8px">Quitter TV Streamy ?</h2><p class="hint" style="margin:0 0 18px">Tu retrouveras tout comme tu l\'as laissé.</p><div class="acts" style="justify-content:center"><button type="button" class="btn" data-exitapp>Quitter</button><button type="button" class="btn ghost" data-close>Annuler</button></div></div>';
   }else if(sheet.kind==='chguide'){
     h+=chGuideHtml();
   }else if(sheet.kind==='groups'){
@@ -2174,7 +2182,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -2234,6 +2242,7 @@ document.addEventListener('click',function(e){
   if(d.tab==='live'&&TV)S.liveView='list';
   if(d.tab){S.confirmDl=null;if(d.tab===S.tab&&d.tab==='movies')S.vodCat='all';if(d.tab===S.tab&&d.tab==='series')S.serCat='all';if(d.tab===S.tab&&d.tab==='favs')S.favCat='all';S.tab=d.tab;if(d.tab!=='search')S.q=S.q;render();window.scrollTo(0,0);if(d.tab==='search')setTimeout(function(){var q=$('#q');if(q)q.focus()},30);return}
   if(d.open){var p=d.open.split(':');openItem(p[0],p.slice(1).join(':'));return}
+  if(t.hasAttribute('data-exitapp')){closeSheet();exitApp();return}
   if(d.kb!==undefined){kbPress(d.kb);return}
   if(d.tvsort){S.tvSort=S.tvSort||{};var so=['recent','rating','az'],ci=so.indexOf(S.tvSort[d.tvsort]||'recent');S.tvSort[d.tvsort]=so[(ci+1)%3];render();return}
   if(d.stor){nat('setStorage',{id:d.stor}).then(loadStorage);toast(d.stor==='sd'?'Les prochains téléchargements iront sur la carte SD.':'Les prochains téléchargements iront dans le téléphone.');return}
@@ -2319,7 +2328,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&sheet)close
 
 /* Android back button */
 if(NATIVE){
-  try{window.Capacitor.addListener('App','backButton',function(){if(!goBack())exitApp()})}catch(e){}
+  try{window.Capacitor.addListener('App','backButton',function(){backOrExit()})}catch(e){}
 }
 
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')dailyRefresh()});
@@ -2575,7 +2584,7 @@ function tvPlay(o){
     if(o._since){var since=o._since,poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},20000)}
     TVP={o:o,res:res,pos:o.startMs||0,dur:0,ended:false,paused:false,buffering:true,urls:[o.url,o.fallbackUrl].filter(Boolean),u:0};
     document.documentElement.classList.add('avplaying');
-    el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'OK : infos · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ▲ ▼ : 1 min · Retour : quitter')+'</div></div>';
+    el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'OK : infos · ▼ : audio · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ⏩ ⏪ : 1 min · ▲ ▼ : sous-titres et audio · Retour : quitter')+'</div></div><div id="tvsubs" hidden></div><div id="tvpanel" hidden></div>';
     tvShowUi();tvOpen();
   });
 }
@@ -2590,17 +2599,78 @@ function tvOpen(){
     av.setListener({
       onbufferingstart:function(){t.buffering=true;tvPaint()},
       onbufferingcomplete:function(){t.buffering=false;tvPaint()},
-      oncurrentplaytime:function(ms){t.pos=ms;tvPaint()},
+      oncurrentplaytime:function(ms){t.pos=ms;tvPaint();if(t.sub&&t.sub.kind==='srt')tvSrtTick()},
       onstreamcompleted:function(){t.ended=true;tvStop()},
       onerror:function(e){tvFail(e)},
-      onevent:function(){},onsubtitlechange:function(){},ondrmevent:function(){}
+      onevent:function(){},ondrmevent:function(){},
+      onsubtitlechange:function(dur,text){if(t.sub&&t.sub.kind==='track')tvSubShow(String(text||'').replace(/<[^>]+>/g,''),+dur||3000)}
     });
+    try{av.setSilentSubtitle(false)}catch(e){}
     av.prepareAsync(function(){
       try{t.dur=av.getDuration()||0}catch(e){}
       if(t.pos>0&&!t.o.live){try{av.seekTo(Math.floor(t.pos))}catch(e){}}
       av.play();t.buffering=false;tvPaint();
+      if(!t.tracksDone){t.tracksDone=true;setTimeout(tvAutoSubs,800)}
     },function(e){tvFail(e)});
   }catch(e){tvFail(e)}
+}
+/* ---- subtitles & audio on the Samsung player ----
+   the video's own French subtitles first; OpenSubtitles only when it has none (or on request), drawn over the video */
+function isFr(s){return /(^|[^a-z])(fr|fre|fra|french|français)([^a-z]|$)/i.test(String(s||''))}
+function tvTracks(type){var av=webapis.avplay,out=[];try{(av.getTotalTrackInfo()||[]).forEach(function(tr){if(tr.type!==type)return;var info={};try{info=JSON.parse(tr.extra_info||'{}')}catch(e){}var lang=info.track_lang||info.language||info.lang||'';out.push({index:tr.index,lang:lang,label:lang?langName(lang):'Piste '+(out.length+1)})})}catch(e){}return out}
+function langName(l){l=String(l).toLowerCase().slice(0,3);return {fre:'Français',fra:'Français',fr:'Français',eng:'Anglais',en:'Anglais',ara:'Arabe',ar:'Arabe',spa:'Espagnol',es:'Espagnol',ger:'Allemand',deu:'Allemand',de:'Allemand',ita:'Italien',it:'Italien',por:'Portugais',pt:'Portugais',tur:'Turc',jpn:'Japonais',kor:'Coréen'}[l]||l.toUpperCase()}
+function tvSubShow(text,dur){var b=$('#tvsubs');if(!b)return;b.textContent=text;b.hidden=!text;clearTimeout(tvSubShow.t);if(text&&dur)tvSubShow.t=setTimeout(function(){b.hidden=true},dur)}
+function parseSrt(srt){var cues=[],rx=/(\d+):(\d{1,2}):(\d{1,2})[,.](\d{1,3})\s*-->\s*(\d+):(\d{1,2}):(\d{1,2})[,.](\d{1,3})/;
+  String(srt||'').replace(/\r/g,'').split(/\n\s*\n/).forEach(function(bl){var L=bl.trim().split('\n');for(var i=0;i<L.length;i++){var m=rx.exec(L[i]);if(!m)continue;var ms=function(a,b,c,d){return ((+a)*3600+(+b)*60+(+c))*1000+(+((d+'00').slice(0,3)))};cues.push([ms(m[1],m[2],m[3],m[4]),ms(m[5],m[6],m[7],m[8]),L.slice(i+1).join('\n').replace(/<[^>]+>|\{[^}]*\}/g,'')]);break}});return cues}
+function tvSrtTick(){var t=TVP,s=t&&t.sub;if(!s||s.kind!=='srt')return;var x=t.pos-(s.offset||0),c=null;for(var i=0;i<s.cues.length;i++){var q=s.cues[i];if(q[0]>x)break;if(x<q[1])c=q}var txt=c?c[2]:'';if(txt!==s.last){s.last=txt;tvSubShow(txt,0)}}
+function tvSetSub(sel){
+  var t=TVP,av=webapis.avplay;if(!t)return;tvSubShow('',0);
+  try{av.setSilentSubtitle(true)}catch(e){}
+  if(!sel){t.sub=null;return}
+  if(sel.kind==='track'){try{av.setSelectTrack('TEXT',sel.index);av.setSilentSubtitle(false)}catch(e){}t.sub=sel;return}
+  t.sub=sel;
+}
+function tvOpenSub(manual){
+  var t=TVP,c=CURSUB;if(!t||!c){if(manual)toast('Sous-titres OpenSubtitles indisponibles pour cette vidéo.');return}
+  if(!osOn()){if(manual)toast('OpenSubtitles n\'est pas configuré : Paramètres › OpenSubtitles.');return}
+  if(manual)toast('Recherche des sous-titres français…');
+  getSubs(c.k,c.meta,true).then(function(L){
+    if(TVP!==t)return;if(!L.length){if(manual)toast('Aucun sous-titre français sur OpenSubtitles.');return}
+    c.box.L=L;var srt='';try{srt=decodeURIComponent(escape(atob(L[0].url.split(',')[1])))}catch(e){}
+    tvSetSub({kind:'srt',cues:parseSrt(srt),offset:L[0].offset||0,label:'OpenSubtitles (FR)'});if(!manual)toast('Sous-titres français ajoutés.');
+  });
+}
+function tvAutoSubs(){
+  var t=TVP;if(!t||t.o.live)return;var mode=curSubMode();
+  var texts=tvTracks('TEXT'),auds=tvTracks('AUDIO'),frT=texts.filter(function(x){return isFr(x.lang)})[0],frA=auds.length&&auds.some(function(x){return isFr(x.lang)});
+  t.texts=texts;t.auds=auds;
+  if(mode==='never'){tvSetSub(null);return}
+  if(mode==='auto'&&frA){tvSetSub(null);return}
+  if(frT){tvSetSub({kind:'track',index:frT.index,label:frT.label});return}
+  var s0=t.o.subtitles&&t.o.subtitles[0];
+  if(s0){var srt='';try{srt=decodeURIComponent(escape(atob(s0.url.split(',')[1])))}catch(e){}tvSetSub({kind:'srt',cues:parseSrt(srt),offset:s0.offset||0,label:'OpenSubtitles (FR)'});return}
+  tvOpenSub(false);
+}
+/* the panel: ▲ / ▼ in the player */
+function tvPanel(open){
+  var t=TVP,el=$('#tvpanel');if(!t||!el)return;
+  if(!open){el.hidden=true;t.panel=null;return}
+  if(!t.texts){t.texts=tvTracks('TEXT');t.auds=tvTracks('AUDIO')}
+  var items=[{h:'Sous-titres'},{label:'Désactivés',act:function(){tvSetSub(null)},on:!t.sub}];
+  t.texts.forEach(function(x){items.push({label:x.label+' · de la vidéo',act:function(){tvSetSub({kind:'track',index:x.index,label:x.label})},on:t.sub&&t.sub.kind==='track'&&t.sub.index===x.index})});
+  if(osOn()&&!t.o.live)items.push({label:'Français · OpenSubtitles',act:function(){if(t.sub&&t.sub.kind==='srt')return;tvOpenSub(true)},on:t.sub&&t.sub.kind==='srt'});
+  if(t.sub&&t.sub.kind==='srt'){items.push({label:'Décalage −0,5 s',act:function(){t.sub.offset-=500;keepSubOffset(CURSUB&&CURSUB.k,CURSUB&&CURSUB.box.L,{subOffsetMs:t.sub.offset});toast('Décalage : '+(t.sub.offset/1000).toFixed(1).replace('.',',')+' s');t.sub.last=null},stay:true});items.push({label:'Décalage +0,5 s',act:function(){t.sub.offset+=500;keepSubOffset(CURSUB&&CURSUB.k,CURSUB&&CURSUB.box.L,{subOffsetMs:t.sub.offset});toast('Décalage : '+(t.sub.offset/1000).toFixed(1).replace('.',',')+' s');t.sub.last=null},stay:true})}
+  if(t.auds.length>1){items.push({h:'Audio'});t.auds.forEach(function(x,i){items.push({label:x.label,act:function(){try{webapis.avplay.setSelectTrack('AUDIO',x.index);t.audio=x.index}catch(e){}},on:t.audio===x.index||(t.audio==null&&i===0)})})}
+  var sel=items.findIndex(function(x){return x.on})<0?1:items.findIndex(function(x){return x.on});
+  t.panel={items:items,sel:sel};tvPanelPaint();el.hidden=false;
+}
+function tvPanelPaint(){var t=TVP,el=$('#tvpanel');if(!t||!t.panel||!el)return;el.innerHTML='<div class="tvpl">'+t.panel.items.map(function(x,i){return x.h?'<h3>'+esc(x.h)+'</h3>':'<div class="tvpi'+(i===t.panel.sel?' sel':'')+'">'+(x.on?'✓ ':'')+esc(x.label)+'</div>'}).join('')+'</div><p class="hint">▲ ▼ choisir · OK valider · Retour fermer</p>'}
+function tvPanelKey(k,c){
+  var t=TVP,p=t.panel,step=function(d){var i=p.sel;do{i+=d}while(p.items[i]&&p.items[i].h);if(p.items[i])p.sel=i;tvPanelPaint()};
+  if(c===38||k==='ArrowUp'){step(-1);return}
+  if(c===40||k==='ArrowDown'){step(1);return}
+  if(k==='Enter'||c===13){var it=p.items[p.sel];if(it&&it.act)it.act();if(it&&it.stay)return;tvPanel(false);return}
+  if(c===10009||k==='Escape'||c===37||c===39||k==='ArrowLeft'||k==='ArrowRight'){tvPanel(false)}
 }
 function tvFail(e){
   var t=TVP;if(!t)return;
@@ -2626,6 +2696,7 @@ function tvStop(){
 function tvKey(e){
   var t=TVP,av=window.webapis&&webapis.avplay,k=e.key,c=e.keyCode;if(!t||!av)return;
   e.preventDefault();tvShowUi();
+  if(t.panel){tvPanelKey(k,c);return}
   if(c===10009||k==='Escape'||c===413||k==='MediaStop'){tvStop();return}
   var seek=function(d){if(t.o.live||!t.dur)return;var to=Math.max(0,Math.min(t.dur-2000,t.pos+d));try{if(d>0)av.jumpForward(d);else av.jumpBackward(-d)}catch(x){try{av.seekTo(to)}catch(y){}}t.pos=to;tvPaint()};
   if(k==='Enter'||c===13||c===10252||k==='MediaPlayPause'||c===415||c===19||k==='MediaPlay'||k==='MediaPause'){
@@ -2633,10 +2704,9 @@ function tvKey(e){
     try{if(t.paused){av.play();t.paused=false}else{av.pause();t.paused=true}}catch(x){}tvPaint();return}
   if(c===39||k==='ArrowRight'){seek(10000);return}
   if(c===37||k==='ArrowLeft'){seek(-10000);return}
-  if(c===38||k==='ArrowUp'){seek(60000);return}
-  if(c===40||k==='ArrowDown'){seek(-60000);return}
-  if(c===417||k==='MediaFastForward'){seek(30000);return}
-  if(c===412||k==='MediaRewind'){seek(-30000);return}
+  if(c===38||k==='ArrowUp'||c===40||k==='ArrowDown'){tvPanel(true);return}
+  if(c===417||k==='MediaFastForward'){seek(60000);return}
+  if(c===412||k==='MediaRewind'){seek(-60000);return}
 }
 /* Samsung remote: media keys must be registered to be received */
 if(TIZEN){try{tizen.tvinputdevice.registerKeyBatch(['MediaPlayPause','MediaPlay','MediaPause','MediaStop','MediaFastForward','MediaRewind'])}catch(e){}
@@ -2741,11 +2811,13 @@ function goBack(){
   if(S.tab!=='home'){S.tab='home';render();window.scrollTo(0,0);return true}
   return false;
 }
-function exitApp(){if(NATIVE)window.Capacitor.nativePromise('App','exitApp',{});else if(TIZEN){try{tizen.application.getCurrentApplication().exit()}catch(e){}}}
+function exitApp(){if(NATIVE)window.Capacitor.nativePromise('App','exitApp',{});else if(TIZEN){try{tizen.application.getCurrentApplication().exit()}catch(e){try{tizen.application.getCurrentApplication().hide()}catch(x){}}}}
+/* on a TV, « Retour » at the top level asks before leaving */
+function backOrExit(){if(goBack())return;if(TV&&!(sheet&&sheet.kind==='exit')){openSheet({kind:'exit'});return}exitApp()}
 document.addEventListener('keydown',function(e){
   var k=e.key,c=e.keyCode;
   if(!$('#tvplayer').hidden){tvKey(e);e.stopPropagation();return}
-  if(c===10009||k==='Escape'||k==='GoBack'||k==='BrowserBack'){e.preventDefault();if(!goBack())exitApp();return}
+  if(c===10009||k==='Escape'||k==='GoBack'||k==='BrowserBack'){e.preventDefault();e.stopPropagation();backOrExit();return}
   if(!TV)return;
   var dir={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[k]||{38:'up',40:'down',37:'left',39:'right'}[c];
   if(!dir)return;
