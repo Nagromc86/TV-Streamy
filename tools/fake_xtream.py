@@ -84,6 +84,13 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if u.path.startswith('/bd/'):
+            k = u.path[4:-4]; h = (int(k) * 47) % 360
+            body = ('<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><defs><radialGradient id="g" cx=".7" cy=".35" r=".9"><stop offset="0" stop-color="hsl(%d,55%%,55%%)"/>'
+                    '<stop offset=".6" stop-color="hsl(%d,60%%,22%%)"/><stop offset="1" stop-color="hsl(%d,60%%,8%%)"/></radialGradient></defs><rect width="1280" height="720" fill="url(#g)"/>'
+                    '<circle cx="900" cy="260" r="160" fill="hsl(%d,70%%,75%%)" opacity=".25"/><rect x="0" y="520" width="1280" height="200" fill="hsl(%d,40%%,10%%)" opacity=".6"/></svg>') % (h, h + 30, h + 60, h + 180, h)
+            body = body.encode(); self.send_response(200); self.send_header('Content-Type', 'image/svg+xml')
+            self.send_header('Content-Length', str(len(body))); self.end_headers(); return self.wfile.write(body)
         if u.path.startswith('/img/'):
             k = u.path[5:-4]; h = (int(k) * 47) % 360
             body = ('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
@@ -124,7 +131,7 @@ class H(BaseHTTPRequestHandler):
             if not v: return self.send([])
             return self.send({'info': {'name': v['name'], 'plot': 'Résumé de test pour « %s ».' % v['name'], 'genre': 'Aventure',
                                        'director': 'Jeanne Martin', 'cast': 'Paul Durand, Léa Petit', 'duration': '01:52:00',
-                                       'releasedate': v['name'][-5:-1] + '-05-10', 'rating': v['rating'], 'tmdb_id': '12345', 'backdrop_path': []},
+                                       'releasedate': v['name'][-5:-1] + '-05-10', 'rating': v['rating'], 'tmdb_id': '12345', 'backdrop_path': ['http://localhost:8899/bd/%d.svg' % v['stream_id']]},
                               'movie_data': {'stream_id': v['stream_id'], 'container_extension': v['container_extension']}})
         if a == 'get_series_info':
             s = next((x for x in SERIES if str(x['series_id']) == q.get('series_id')), None)
@@ -133,7 +140,7 @@ class H(BaseHTTPRequestHandler):
             for season in (1, 2):
                 eps[str(season)] = [{'id': str(s['series_id'] * 100 + season * 10 + e), 'episode_num': e, 'title': 'Épisode %d' % e,
                                      'container_extension': 'mkv', 'season': season, 'info': {'duration': '00:45:00', 'plot': ''}} for e in range(1, 7)]
-            return self.send({'seasons': [{'season_number': 1}, {'season_number': 2}], 'info': s, 'episodes': eps})
+            return self.send({'seasons': [{'season_number': 1}, {'season_number': 2}], 'info': dict(s, backdrop_path=['http://localhost:8899/bd/%d.svg' % s['series_id']]), 'episodes': eps})
         if a == 'get_short_epg':
             sid = int(q.get('stream_id', '0'))
             start = NOW - (NOW % 1800) - 600
