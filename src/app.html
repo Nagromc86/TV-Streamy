@@ -555,6 +555,7 @@ body.tv #sheet .tvsim h2{font-size:1.2rem;text-shadow:none;margin:0 0 4px;line-h
 .tvhero.small .tvhlive{display:none}
 body.tv .tvrow .row{-webkit-mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.25) 20px,#000 var(--tvpad));mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.25) 20px,#000 var(--tvpad))}
 @media (max-width:1100px){body.tv .tvtop{gap:22px}body.tv .tvlogo b{display:none}}
+body.tv .tvgrid{padding:16px 14px}
 /* v2.1 fixes */
 body.tv .row,body.tv .chips{scroll-snap-type:none}
 body.tv .tvlive .ch .logo{width:64px;height:44px}
@@ -2075,7 +2076,7 @@ function tvBrowse(kind){
     '<button type="button" class="tvsort" data-tvsort="'+kind+'"><i></i>Tri : '+SORTL[srt]+'</button></div>';
   var g='<div class="tvgrid">'+pg.items.map(function(x){return posterHtml(kind,x,{prog:kind==='movie'?progressOf('movie:'+x.stream_id):null,fresh:true})}).join('')+'</div>'+(pg.more?moreHtml(key):'');
   if(!L.length)g='<div class="empty"><p>'+(cur==='fav'?'Ajoute des titres à ta liste depuis leur fiche.':'Rien dans cette catégorie.')+'</p></div>';
-  return '<div class="tvbrowse">'+tvSide(kind,cur,attr,kind==='movie'?'Films':'Séries')+'<div class="tvmainc">'+head+'<div class="tvscroll">'+g+'<div style="height:calc(var(--tvh,100vh) * .3)"></div></div></div></div>';
+  return '<div class="tvbrowse">'+tvSide(kind,cur,attr,kind==='movie'?'Films':'Séries')+'<div class="tvmainc">'+head+'<div class="tvscroll">'+g+'<div style="height:calc(var(--tvh,100vh) * .6)"></div></div></div></div>';
 }
 function tvLive(){
   var cur=S.liveCat||'all',L=filtered('live',cur),gv=S.liveView==='guide';
@@ -2190,7 +2191,10 @@ function parseM3uLink(v){
   return q.username&&q.password?{server:m[1],username:q.username,password:q.password}:null;
 }
 function openSheet(s){var a=document.activeElement;if(a&&!(a.closest&&a.closest('#sheet')))s.opener=focusKey(a);else if(sheet&&sheet.opener)s.opener=sheet.opener;sheet=s;renderSheet()}
-function closeSheet(){setTimeout(miniSync,0);if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
+function closeSheet(){setTimeout(miniSync,0);
+  /* TV: wherever the sheet was closed from, the focus goes back to what opened it */
+  if(TV&&sheet){var op=sheet.opener;setTimeout(function(){if(sheet||!$('#tvplayer').hidden||!$('#webplayer').hidden)return;var a=document.activeElement;if(a&&a!==document.body&&document.contains(a)&&visibleEl(a)&&!a.closest('#sheet'))return;var oe=op&&document.querySelector(op);if(oe&&visibleEl(oe))focusEl(oe);else keepFocus(function(){})},30)}
+if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 function renderSheet(){keepFocus(renderSheetInner);miniSync()}
 /* re-render an open sheet with fresher data without jumping back to the top */
 function softSheet(){var root=$('#sheet'),q=function(e){return e===root?null:'.'+String(e.className).trim().split(/\s+/).join('.')},sc=[].filter.call([root].concat([].slice.call(root.querySelectorAll('*'))),function(e){return e.scrollTop>0}).map(function(e){return [q(e),e.scrollTop]});renderSheet();sc.forEach(function(o){var e=o[0]?root.querySelector(o[0]):root;if(e)e.scrollTop=o[1]})}
@@ -2971,16 +2975,24 @@ function focusables(){
     return true;
   });
 }
+function tvZone(el){return el.closest('.tvside')?'side':el.closest('.tvmainc')?'main':el.closest('.tvprev')?'prev':null}
 function moveFocus(dir){
   var cur=document.activeElement,L=focusables();
   if(!L.length)return false;
-  if(!cur||cur===document.body||L.indexOf(cur)<0){focusEl(L[0]);return true}
+  if(!cur||cur===document.body||L.indexOf(cur)<0){
+    /* the focus got lost (screen redrawn, element removed): back to where it was, else the first item of the page */
+    var back=lastFocus&&document.contains(lastFocus)&&L.indexOf(lastFocus)>=0?lastFocus:null;
+    if(!back&&TV&&!sheet)back=[].filter.call(document.querySelectorAll('.tvmainc .poster,.tvmainc .ch .logo,.tvkb .key,.tvrows .poster,.tvrows .tvchc,.tvside [aria-current="true"]'),visibleEl)[0];
+    focusEl(back||L[0]);return true}
   var a=cur.getBoundingClientRect(),ax=a.left+a.width/2,ay=a.top+a.height/2,best=null,bs=1e9;
   var inNav=!!cur.closest('#nav'),vert=dir==='up'||dir==='down';
+  var curZone=TV?tvZone(cur):null;
   L.forEach(function(el){
     if(el===cur)return;
     /* up/down stay in the side menu or in the page; left/right switch between them */
     if(vert&&!!el.closest('#nav')!==inNav)return;
+    /* TV: up/down never jump between the category column and the page next to it */
+    if(vert&&curZone&&tvZone(el)&&tvZone(el)!==curZone)return;
     var b=el.getBoundingClientRect(),bx=b.left+b.width/2,by=b.top+b.height/2,dx=bx-ax,dy=by-ay,main,side,overlap;
     if(dir==='right'){if(b.left<a.right-4&&dx<=4)return;main=Math.max(0,b.left-a.right);side=Math.abs(dy);overlap=b.bottom>a.top&&b.top<a.bottom}
     else if(dir==='left'){if(b.right>a.left+4&&dx>=-4)return;main=Math.max(0,a.left-b.right);side=Math.abs(dy);overlap=b.bottom>a.top&&b.top<a.bottom}
@@ -2997,6 +3009,12 @@ function moveFocus(dir){
   if(best){focusEl(best);return true}
   return false;
 }
+/* TV: the focused item must always be on screen (after a redraw the lists may have moved back) */
+function tvEnsure(el){
+  if(!TV||!el||el===document.body)return;var r=el.getBoundingClientRect(),top=document.querySelector('.tvtop'),tb=top&&!sheet?top.getBoundingClientRect().bottom:0;
+  if(r.top<tb-4||r.bottom>innerHeight+2||r.left<-2||r.right>innerWidth+2){if(el.closest('.panel'))el.scrollIntoView({block:'nearest',inline:'nearest'});else tvScrollTo(el)}
+  tvPin();
+}
 function focusEl(el){
   var old=document.querySelector('.tvf');if(old&&old!==el)old.classList.remove('tvf');el.classList.add('tvf');
   try{el.focus({preventScroll:true})}catch(e){el.focus()}
@@ -3005,6 +3023,7 @@ function focusEl(el){
   if(row){var r=el.getBoundingClientRect(),rr=row.getBoundingClientRect();if(r.left<rr.left+10)row.scrollLeft-=rr.left+24-r.left;else if(r.right>rr.right-10)row.scrollLeft+=r.right-rr.right+24}
   var box=el.closest('.panel')||null,vr=el.getBoundingClientRect();
   if(box){var br=box.getBoundingClientRect();if(vr.top<br.top+20)box.scrollTop-=br.top+40-vr.top;else if(vr.bottom>br.bottom-20)box.scrollTop+=vr.bottom-br.bottom+40}
+  if(TV&&box){var vr2=el.getBoundingClientRect();if(vr2.top<0||vr2.bottom>innerHeight)el.scrollIntoView({block:'center',inline:'nearest'});tvPin();return}
   else if(!el.closest('#nav')){var top=110,bot=innerHeight-40;if(vr.top<top)window.scrollBy(0,vr.top-top-20);else if(vr.bottom>bot)window.scrollBy(0,vr.bottom-bot+20)}
 }
 /* keep the focus on "the same" item when the screen is redrawn */
@@ -3016,6 +3035,9 @@ function tvScrollTo(el){
     if(el.closest('.tvside'))el.scrollIntoView({block:'nearest'});
     else if(el.closest('.tvtiles')){var sc=el.closest('.tvscroll');if(sc)sc.scrollTop=0}
     else if(el.closest('.tvrow')&&el.closest('.tvrows')){el.closest('.tvrow').scrollIntoView({block:'start'});var rw=el.closest('.row');if(rw){var cell=el.closest('.top10')||el;rw.scrollLeft=Math.max(0,cell.offsetLeft-parseFloat(getComputedStyle(rw).paddingLeft||0))}}
+    else if(el.closest('.tvgrid')){var gs=el.closest('.tvscroll'),gr=el.getBoundingClientRect(),gsr=gs.getBoundingClientRect(),z=gs.clientHeight?gsr.height/gs.clientHeight:1;
+      /* grids move by whole rows: the row of the focused title at the top, nothing cut above it */
+      if(gr.top<gsr.top+8||gr.bottom>gsr.bottom-8)gs.scrollTop+=(gr.top-gsr.top)/z-16}
     else if(el.closest('.tvscroll,.gwrap')){el.scrollIntoView({block:'center',inline:'nearest'})}
     else{var sec=el.closest('.sec')||el;sec.scrollIntoView({block:'start',inline:'nearest'});el.scrollIntoView({block:'nearest',inline:'nearest'})}
   }catch(e){el.scrollIntoView(false)}
@@ -3030,9 +3052,9 @@ function keepFocus(fn){
   var k=document.activeElement===autoEl?null:focusKey(document.activeElement);fn();
   setTimeout(function(){
     var sc=navScope(),a=document.activeElement;
-    if(a&&a!==autoEl&&a!==document.body&&document.contains(a)&&sc.contains(a)&&visibleEl(a))return;
+    if(a&&a!==autoEl&&a!==document.body&&document.contains(a)&&sc.contains(a)&&visibleEl(a)){tvEnsure(a);return}
     var el=k&&sc.querySelector(k);
-    if(el&&visibleEl(el)){try{el.focus({preventScroll:true})}catch(e){}return}
+    if(el&&visibleEl(el)){try{el.focus({preventScroll:true})}catch(e){}tvEnsure(el);return}
     /* first useful item: the main button of a sheet or of the billboard, else the first item of the page */
     var L=focusables(),pick=(TV&&!sheet&&[].filter.call(document.querySelectorAll('.tvtile,.tvmainc .poster,.tvmainc .ch .logo,.tvkb .key,.tvrows .poster,.tvrows .tvchc'),visibleEl)[0])||L.filter(function(x){return x.matches('.btn:not(.ghost)')&&!x.closest('.top,.tvtop')})[0]||L.filter(function(x){return !x.closest('#nav')&&!x.closest('.top,.tvtop')&&!x.matches('[data-close].x,.iconbtn.x')})[0]||L[0];
     if(pick){focusEl(pick);autoEl=pick.closest('.top,.tvtop,#nav')?pick:null}
@@ -3043,7 +3065,7 @@ function goBack(){
   if(NXT){cancelNext();return true}
   if(!$('#tvplayer').hidden){tvStop();return true}
   if(!$('#webplayer').hidden)return true;
-  if(sheet){var op=sheet.opener;closeSheet();if(TV){var oe=op&&document.querySelector(op);if(oe&&visibleEl(oe))focusEl(oe);else keepFocus(function(){})}return true}
+  if(sheet){var op=sheet.opener;closeSheet();if(TV){var oe=op&&document.querySelector(op);if(oe&&visibleEl(oe)){focusEl(oe);setTimeout(function(){var a=document.activeElement;if(a===oe||!document.contains(oe))tvEnsure(document.activeElement)},60)}else keepFocus(function(){})}return true}
   if(S.pickProfile&&S.profileId){S.pickProfile=false;S.profEdit=false;render();return true}
   if(S.tab!=='home'){S.tab='home';render();window.scrollTo(0,0);return true}
   return false;
@@ -3056,13 +3078,23 @@ document.addEventListener('keydown',function(e){
   if(!$('#tvplayer').hidden){tvKey(e);e.stopPropagation();return}
   if(c===10009||k==='Escape'||k==='GoBack'||k==='BrowserBack'){e.preventDefault();e.stopPropagation();backOrExit();return}
   if(!TV)return;
+  if((k==='Enter'||c===13)&&(!document.activeElement||document.activeElement===document.body)){e.preventDefault();moveFocus('down');return}
   var dir={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right'}[k]||{38:'up',40:'down',37:'left',39:'right'}[c];
   if(!dir)return;
   var a=document.activeElement;
   if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&(dir==='left'||dir==='right')){var v=a.value||'';try{if(dir==='left'&&a.selectionStart>0)return;if(dir==='right'&&a.selectionEnd<v.length)return}catch(x){}}
   if(a&&a.tagName==='SELECT'&&(dir==='up'||dir==='down'))return;
-  if(moveFocus(dir))e.preventDefault();
+  /* never let the browser / the TV scroll the page or move the focus by itself: the menu would slide away */
+  e.preventDefault();moveFocus(dir);tvPin();
 },true);
+/* TV: the frame never scrolls (only the lists inside it do), whatever asked for it */
+function tvPin(){
+  if(!TV)return;var se=document.scrollingElement||document.documentElement;
+  [se,document.documentElement,document.body,$('#app'),document.querySelector('.tvmain'),document.querySelector('.tvbrowse'),document.querySelector('.tvmainc')].forEach(function(x){if(x&&(x.scrollTop||x.scrollLeft)){x.scrollTop=0;x.scrollLeft=0}});
+}
+document.addEventListener('scroll',function(e){if(!TV||!$('#tvplayer').hidden)return;var t=e.target;if(t===document||t===document.documentElement||t===document.body||(t.id&&t.id==='app')||(t.classList&&(t.classList.contains('tvmain')||t.classList.contains('tvbrowse')||t.classList.contains('tvmainc'))))tvPin()},true);
+var lastFocus=null;
+document.addEventListener('focusin',function(e){if(TV&&e.target&&e.target!==document.body)lastFocus=e.target});
 if(TV)document.body.classList.add('tv');
 if(NATIVE)nat('deviceInfo').then(function(r){if(r&&r.tv&&!TV){TV=true;document.body.classList.add('tv');tvScale();render()}},function(){});
 
