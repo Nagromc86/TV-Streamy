@@ -545,16 +545,16 @@ body.tv .tvrow .row::after{content:"";flex:0 0 calc(var(--tvw,100vw) - 260px)}
 .tvrq{flex-wrap:wrap;gap:10px;margin:0;padding:6px 0}
 .tvsim{margin-top:26px}
 body.tv #sheet .tvsim .tvrow .row{margin:0;padding:14px 4px}
-body.tv #sheet[data-kind="pair"]{justify-content:center;align-items:center}
-body.tv #sheet[data-kind="pair"] .panel{height:auto;width:720px;border-radius:22px;padding:34px 30px}
-.pair{text-align:center}.pair h2{margin:0 0 18px;font-family:var(--display);font-size:1.8rem}
-.paircode{font-family:var(--display);font-weight:800;font-size:4.2rem;letter-spacing:.14em;color:#fff1d6;display:flex;justify-content:center;gap:4px;margin:6px 0 14px}
-.paircode span{width:26px}
-.pairsteps{text-align:left;display:inline-block;margin:0 0 10px;padding-left:22px;line-height:1.9;font-size:1.05rem;color:#d7d7de}
-.pairst{font-size:1.2rem;margin:20px 0}
-body.tv .tvpairgo{justify-content:center;margin:6px 0 10px}body.tv .tvpairgo .btn{font-size:1.15rem;padding:14px 26px}
-body.tv .tvor{text-align:center;margin:10px 0 14px}
 body.tv #sheet .tvsim h2{font-size:1.2rem;text-shadow:none;margin:0 0 4px;line-height:1.3}
+.tvhlive{position:absolute;z-index:1;right:var(--tvpad);top:calc(72px + 8%);height:64%;aspect-ratio:16/9;border-radius:18px;background:linear-gradient(135deg,#26262f,#15151b);box-shadow:0 22px 50px rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.tvhlive .lgb{width:44%;height:44%;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;padding:14px}
+.tvhlive .lgb img{max-width:100%;max-height:100%;object-fit:contain}.tvhlive .ph{font-family:var(--display);font-weight:800;font-size:2.4rem;color:#333}
+.tvhlive .badge{position:absolute;left:16px;top:14px;background:var(--accent);font-size:.78rem}
+.tvhprog{display:block;width:min(420px,70%);height:4px;border-radius:2px;background:rgba(255,255,255,.18);margin:4px 0 10px;overflow:hidden}.tvhprog i{display:block;height:100%;background:var(--accent)}
+.tvhnext{margin:6px 0 0;color:var(--muted);font-size:.95rem}
+.tvhero.small .tvhlive{display:none}
+body.tv .tvrow .row{-webkit-mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.25) 20px,#000 var(--tvpad));mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.25) 20px,#000 var(--tvpad))}
+@media (max-width:1100px){body.tv .tvtop{gap:22px}body.tv .tvlogo b{display:none}}
 /* v2.1 fixes */
 body.tv .row,body.tv .chips{scroll-snap-type:none}
 body.tv .tvlive .ch .logo{width:64px;height:44px}
@@ -1222,7 +1222,7 @@ function epgHtml(id){
   var now=Date.now()/1000,pc=Math.max(0,Math.min(100,(now-n.start)/(n.end-n.start)*100));
   return '<span class="epg"><em>'+esc(n.title)+'</em> · '+hhmm(n.start)+'–'+hhmm(n.end)+(x?' · ensuite '+esc(x.title):'')+'</span><span class="prog"><i style="width:'+pc.toFixed(0)+'%"></i></span>';
 }
-function paintEpg(id){var el=document.querySelector('[data-epg="'+id+'"]');if(el)el.innerHTML=epgHtml(id);if(TV&&String(MINI.id)===String(id)){var inf=$('#tvpinfo'),x=byId('live',id);if(inf&&x)inf.innerHTML=tvPrevInfo(x)}}
+function paintEpg(id){var el=document.querySelector('[data-epg="'+id+'"]');if(el)el.innerHTML=epgHtml(id);if(TV){var cc=document.querySelectorAll('.tvchc[data-play="live:'+id+'"] small'),ce=epgCache[id],cn=ce&&ce.list&&ce.list[0];if(cn)for(var ci=0;ci<cc.length;ci++)cc[ci].textContent=cn.title}if(TV){var ae=document.activeElement,hp=ae&&ae.closest&&ae.closest('[data-play]');if(hp&&hp.getAttribute('data-play')==='live:'+id){var hb=document.getElementById('tvhero');if(hb)hb.removeAttribute('data-k');paintHero(ae)}}if(TV&&String(MINI.id)===String(id)){var inf=$('#tvpinfo'),x=byId('live',id);if(inf&&x)inf.innerHTML=tvPrevInfo(x)}}
 var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var id=e.target.getAttribute('data-epg');if(id)wantEpg(id);var g=e.target.getAttribute('data-grow');if(g)wantFull(g);if(e.target.hasAttribute('data-more'))e.target.click();io.unobserve(e.target)}})},{rootMargin:'200px'}):null;
 function observe(){if(!io)return;[].forEach.call(document.querySelectorAll('[data-epg],[data-more],[data-grow]'),function(el){io.observe(el)})}
 
@@ -1934,7 +1934,7 @@ function elsewhereHtml(kind,x){
 function bootHtml(){return '<div class="boot"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="114" fill="#fff1d6"/><g transform="translate(256 256) scale(.9) translate(-256 -256)"><path d="M168 84l88 104 88-104" fill="none" stroke="#e50914" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/><rect x="92" y="196" width="328" height="232" rx="72" fill="#e50914"/><circle cx="256" cy="378" r="21" fill="#fff1d6"/><path d="M212.15980000000002 334.1598A62 62 0 0 1 299.8402 334.1598" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/><path d="M176.8048 298.8048A112 112 0 0 1 335.1952 298.8048" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/></g></svg><b>TV Streamy</b><div class="spin"></div></div>'}
 function welcomeHtml(){
   return '<header class="top gut solid"><div class="in"><span class="brand"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="114" fill="#fff1d6"/><g transform="translate(256 256) scale(.9) translate(-256 -256)"><path d="M168 84l88 104 88-104" fill="none" stroke="#e50914" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/><rect x="92" y="196" width="328" height="232" rx="72" fill="#e50914"/><circle cx="256" cy="378" r="21" fill="#fff1d6"/><path d="M212.15980000000002 334.1598A62 62 0 0 1 299.8402 334.1598" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/><path d="M176.8048 298.8048A112 112 0 0 1 335.1952 298.8048" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/></g></svg>TV Streamy</span></div></header><main class="gut welcome"><section class="sec"><h1>Ton IPTV,<br>comme sur une plateforme.</h1>'+
-    '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur '+(TV?'cet appareil':'ce téléphone')+'.</p>'+(TV?'<div class="acts tvpairgo"><button type="button" class="btn" data-pair>'+IC.tv+'Se connecter avec mon téléphone</button></div><p class="hint tvor">ou saisis ton compte à la télécommande :</p>':'')+accountForm({})+'<div class="acts" style="margin-top:18px"><button type="button" class="btn ghost" data-syncsetup="login">'+IC.refresh+'Déjà utilisé sur un autre appareil ? Récupérer mes comptes</button></div></section></main>';
+    '<p class="muted" style="margin:0 0 18px;max-width:40ch">Ajoute ton compte Xtream Codes : adresse du serveur, identifiant et mot de passe donnés par ton fournisseur. Ils restent sur '+(TV?'cet appareil':'ce téléphone')+'.</p>'+accountForm({})+'<div class="acts" style="margin-top:18px"><button type="button" class="btn ghost" data-syncsetup="login">'+IC.refresh+'Déjà utilisé sur un autre appareil ? Récupérer mes comptes</button></div></section></main>';
 }
 function navHtml(){
   var t=[['home','Accueil',IC.home],['live','Direct',IC.tv],['movies','Films',IC.film],['series','Séries',IC.series],['favs','Ma liste',IC.star]];
@@ -2013,7 +2013,9 @@ function heroFor(el){
   else if(pm){kind='movie';x=byId('movie',pm)}
   else if(pl&&pl.indexOf('live:')===0){kind='live';x=byId('live',pl.slice(5))}
   if(!x)return null;
-  if(kind==='live'){var e=epgCache[x.stream_id],n=e&&e.list&&e.list[0];return {kick:'En direct',title:cleanName(x.name),meta:[tvCatName('live',x.category_id)],plot:n?hhmm(n.start)+'–'+hhmm(n.end)+' · '+n.title+(n.desc?' — '+n.desc:''):'',img:x.stream_icon,logo:true}}
+  if(kind==='live'){wantEpg(x.stream_id);var e=epgCache[x.stream_id],L=(e&&e.list)||[],n=L[0],nx=L[1],now=Date.now()/1000;
+    return {kick:'En direct · '+cleanName(x.name),title:n?n.title:cleanName(x.name),meta:n?[hhmm(n.start)+' – '+hhmm(n.end),tvCatName('live',x.category_id)]:[tvCatName('live',x.category_id)],plot:n&&n.desc?n.desc:(n?'':'Programme non communiqué par la chaîne.'),
+      prog:n?Math.max(0,Math.min(100,(now-n.start)/(n.end-n.start)*100)):null,next:nx?'Ensuite · '+hhmm(nx.start)+'  '+nx.title:'',live:x}}
   wantBillInfo(kind,x);
   var inf=billInfo[kind+':'+(x.stream_id||x.series_id)]||{},r=rate(x),yr=year(inf.releasedate||inf.releaseDate||x.releaseDate||x.name),g=String(inf.genre||x.genre||'').split(/[,\/]/).map(function(s){return s.trim()}).filter(Boolean).slice(0,2);
   var meta=[];if(r>0)meta.push('★ '+r.toFixed(1).replace('.',','));if(yr)meta.push(yr);meta=meta.concat(g);
@@ -2030,18 +2032,19 @@ var TVHERO={
 };
 function heroInner(H){
   if(!H)return '';
-  return '<div class="tvhtxt"><span class="kick">'+esc(H.kick||'')+'</span><h1>'+esc(H.title)+'</h1>'+(H.meta&&H.meta.length?'<p class="meta">'+H.meta.map(function(m){return '<span>'+esc(m)+'</span>'}).join('')+'</p>':'')+(H.plot?'<p class="plot">'+esc(H.plot)+'</p>':'')+'</div>';
+  return '<div class="tvhtxt"><span class="kick">'+esc(H.kick||'')+'</span><h1>'+esc(H.title)+'</h1>'+(H.meta&&H.meta.length?'<p class="meta">'+H.meta.map(function(m){return '<span>'+esc(m)+'</span>'}).join('')+'</p>':'')+(H.prog!=null?'<span class="tvhprog"><i style="width:'+H.prog.toFixed(0)+'%"></i></span>':'')+(H.plot?'<p class="plot">'+esc(H.plot)+'</p>':'')+(H.next?'<p class="tvhnext">'+esc(H.next)+'</p>':'')+'</div>';
 }
 function paintHero(el){
   var box=document.getElementById('tvhero');if(!box)return;var H=heroFor(el);if(!H)return;
   var k=H.title+'|'+(H.meta||[]).join()+'|'+H.plot;if(box.getAttribute('data-k')===k)return;box.setAttribute('data-k',k);
   box.querySelector('.tvhin').innerHTML=heroInner(H);
-  var bg=box.querySelector('.tvhbg'),u=H.logo?'':H.img||'';
+  var lv=box.querySelector('.tvhlive');if(lv){var x=H.live;lv.hidden=!x;if(x&&lv.getAttribute('data-id')!==String(x.stream_id)){lv.setAttribute('data-id',x.stream_id);lv.innerHTML='<span class="lgb">'+(x.stream_icon?'<img src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'<span class="ph">'+initials(x.name)+'</span>')+'</span><span class="badge">● En direct</span>'}}
+  var bg=box.querySelector('.tvhbg'),u=H.live?'':H.img||'';
   if(bg.getAttribute('data-u')!==u){bg.setAttribute('data-u',u);bg.style.backgroundImage=u?'url("'+String(u).replace(/"/g,'%22')+'")':'';bg.classList.toggle('wide',!!H.wide);bg.classList.toggle('card',!!u&&!H.wide)}
 }
 var heroRaf=0;
 document.addEventListener('focusin',function(e){if(!TV)return;var t=e.target,old=document.querySelectorAll('.tvf');for(var i=0;i<old.length;i++)if(old[i]!==t)old[i].classList.remove('tvf');if(t&&t.classList)t.classList.add('tvf');cancelAnimationFrame(heroRaf);heroRaf=requestAnimationFrame(function(){paintHero(t)})});
-function tvHeroBox(H){return '<section class="tvhero" id="tvhero"><span class="tvhbg"></span><div class="tvhin">'+heroInner(H)+'</div></section>'}
+function tvHeroBox(H){return '<section class="tvhero" id="tvhero"><span class="tvhbg"></span><span class="tvhlive" hidden></span><div class="tvhin">'+heroInner(H)+'</div></section>'}
 function tvRow(title,items){return items?'<section class="tvrow"><h2>'+esc(title)+'</h2><div class="row">'+items+'</div></section>':''}
 function tvPosters(L,kind,opt){return L.map(function(o){var k=o.kind||kind,x=o.x||o;var h=posterHtml(k,x,opt);return o.rank?h.replace('<span class="art">','<span class="art"><span class="rkb">N°'+o.rank+'</span>'):h}).join('')}
 function tvChCard(x){var e=epgCache[x.stream_id],n=e&&e.list&&e.list[0];wantEpg(x.stream_id);
@@ -2187,7 +2190,7 @@ function parseM3uLink(v){
   return q.username&&q.password?{server:m[1],username:q.username,password:q.password}:null;
 }
 function openSheet(s){var a=document.activeElement;if(a&&!(a.closest&&a.closest('#sheet')))s.opener=focusKey(a);else if(sheet&&sheet.opener)s.opener=sheet.opener;sheet=s;renderSheet()}
-function closeSheet(){setTimeout(miniSync,0);if(sheet&&sheet.kind==='pair')pairStop();if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
+function closeSheet(){setTimeout(miniSync,0);if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
 function renderSheet(){keepFocus(renderSheetInner);miniSync()}
 /* re-render an open sheet with fresher data without jumping back to the top */
 function softSheet(){var root=$('#sheet'),q=function(e){return e===root?null:'.'+String(e.className).trim().split(/\s+/).join('.')},sc=[].filter.call([root].concat([].slice.call(root.querySelectorAll('*'))),function(e){return e.scrollTop>0}).map(function(e){return [q(e),e.scrollTop]});renderSheet();sc.forEach(function(o){var e=o[0]?root.querySelector(o[0]):root;if(e)e.scrollTop=o[1]})}
@@ -2206,8 +2209,6 @@ function renderSheetInner(){
     });
     h+='<div class="acts"><button type="button" class="btn" data-addacc>'+IC.plus+'Ajouter un compte</button></div>'+secClose;
     h+=secOpen('sync','Synchro entre appareils',SYNC?esc(SYNC.email)+(syncErr?' · erreur':''):'Désactivée')+syncHtml()+secClose;
-    if(!TV)h+=secOpen('pair','Connecter une TV','Envoie tes comptes à la TV avec son code')+pairHtml()+secClose;
-    else h+='<div class="acts" style="margin:4px 0 12px"><button type="button" class="btn" data-pair>'+IC.tv+'Se connecter avec mon téléphone</button></div>';
     if(DATA){
       var nhAll=hidCount('live')+hidCount('vod')+hidCount('series');
       h+=secOpen('cat','Catalogue et filtres','Mise à jour chaque jour'+(nhAll?' · '+nhAll+' masqué'+(nhAll>1?'s':''):''))+'<p class="hint" style="margin:0">Mis à jour automatiquement une fois par jour, en arrière-plan. Le filtre masque des groupes (par langue ou pays) partout : listes, accueil, recherche. Tu peux aussi forcer une mise à jour :</p>';
@@ -2251,8 +2252,6 @@ function renderSheetInner(){
     h+=syncSheetHtml();
   }else if(sheet.kind==='cast'){
     h+=castSheetHtml();
-  }else if(sheet.kind==='pair'){
-    h+=pairSheetHtml();
   }else if(sheet.kind==='exit'){
     h+='<div class="in gut" style="text-align:center;padding:30px 20px"><h2 style="margin:0 0 8px">Quitter TV Streamy ?</h2><p class="hint" style="margin:0 0 18px">Tu retrouveras tout comme tu l\'as laissé.</p><div class="acts" style="justify-content:center"><button type="button" class="btn" data-exitapp>Quitter</button><button type="button" class="btn ghost" data-close>Annuler</button></div></div>';
   }else if(sheet.kind==='chguide'){
@@ -2392,11 +2391,9 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-tvq],[data-pair],[data-pairgo],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-tvq],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
-  if(t.hasAttribute('data-pair')){openSheet({kind:'pair'});return}
-  if(t.hasAttribute('data-pairgo')){pairStart();renderSheet();return}
   if(d.tvq!=null){S.q=d.tvq;var tq=document.getElementById('tvq');if(tq)tq.innerHTML=esc(S.q);var tr=document.getElementById('tvres');if(tr){tr.innerHTML=tvSearchRes();observe()}return}
   if(TV&&tvTab()==='search'&&(d.open||d.play||d.playmovie))tvKeepQ();
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -2523,7 +2520,7 @@ document.addEventListener('change',function(e){
   if(e.target.hasAttribute&&e.target.hasAttribute('data-hcat')&&sheet&&sheet.kind==='groups'){var ci=e.target.getAttribute('data-hcat');USER.hiddenCats=USER.hiddenCats||{};var hcs=USER.hiddenCats[sheet.sec]=USER.hiddenCats[sheet.sec]||{};if(e.target.checked)delete hcs[ci];else hcs[ci]=1;groupsChanged(sheet.sec);return}
   if(e.target.hasAttribute&&e.target.hasAttribute('data-grp')&&sheet&&sheet.kind==='groups'){var g=e.target.getAttribute('data-grp');USER.hidden=USER.hidden||{};var hs=USER.hidden[sheet.sec]=USER.hidden[sheet.sec]||{};if(e.target.checked)delete hs[g];else hs[g]=1;groupsChanged(sheet.sec);return}if(e.target.id==='subMode'){var cp=prof();if(cp){cp.subMode=e.target.value;cp.at=Date.now();saveProfiles()}toast('Réglage des sous-titres enregistré.')}if(e.target.id==='allowMobile'){PREFS.allowMobile=e.target.checked;kset('prefs',PREFS);toast(PREFS.allowMobile?'Les téléchargements utiliseront aussi les données mobiles.':'Les téléchargements attendront le Wi-Fi.')}});
 window.addEventListener('online',function(){render()});window.addEventListener('offline',function(){render()});
-document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target);if(e.target.id==='syncform')submitSync(e.target);if(e.target.id==='profform')submitProf();if(e.target.id==='tmdbform')submitTmdb(e.target);if(e.target.id==='pairform')pairSend(e.target)});
+document.addEventListener('submit',function(e){e.preventDefault();if(e.target.id==='accform')submitAccount(e.target);if(e.target.id==='osform')submitOs(e.target);if(e.target.id==='syncform')submitSync(e.target);if(e.target.id==='profform')submitProf();if(e.target.id==='tmdbform')submitTmdb(e.target)});
 function submitTmdb(f){
   var k=$('#tmdb-key').value.trim(),err=$('#tmdberr'),ok=$('#tmdbok');err.hidden=true;ok.hidden=true;PREFS.tmdb=k;savePrefs();TREND=null;kdel('trend');
   if(!k){ok.textContent='TMDB désactivé : suggestions à partir de ton catalogue.';ok.hidden=false;softRender();return}
@@ -2582,69 +2579,6 @@ var FBS={
     return fbFetch(FBS.url()+'?'+pre,{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{blob:{stringValue:blob},salt:{stringValue:SYNC.salt},v:{integerValue:'1'},at:{integerValue:String(Date.now())}}})}).then(function(d){return d.updateTime});
   })}
 };
-/* ---------- pairing a TV with the phone: no typing with the remote ----------
-   The TV shows a one-time code. The phone types it; it encrypts (AES-GCM, key from the code by PBKDF2) the accounts,
-   the TMDB / OpenSubtitles keys and the sync session, and leaves them in pair/<sha256(code)> for 10 minutes.
-   The TV reads, decrypts, deletes the note and restarts. Firestore only ever sees the hashed name and the encrypted blob. */
-var PAIRA='ABCDEFGHJKMNPQRSTUVWXYZ23456789',PAIR=null;
-function pairCode(){var r=crypto.getRandomValues(new Uint8Array(8)),c='';for(var i=0;i<8;i++)c+=PAIRA[r[i]%PAIRA.length];return c}
-function pairNorm(c){return String(c||'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
-function pairUrl(code){return crypto.subtle.digest('SHA-256',new TextEncoder().encode('tvs-pair:'+code)).then(function(h){var x=[].map.call(new Uint8Array(h),function(b){return ('0'+b.toString(16)).slice(-2)}).join('');return 'https://firestore.googleapis.com/v1/projects/'+FB.projectId+'/databases/(default)/documents/pair/'+x+'?key='+FB.apiKey})}
-function pairKey(code){return deriveKey('tvs-pair:'+code,new TextEncoder().encode('tv-streamy-pair-v1'))}
-function pairPayload(){
-  var sy=SYNC?{uid:SYNC.uid,email:SYNC.email,refresh:SYNC.refresh,key:SYNC.key,salt:SYNC.salt}:null;
-  return {v:1,at:Date.now(),accounts:S.accounts,active:S.activeId,prefs:{tmdb:PREFS.tmdb||'',os:PREFS.os||null},sync:sy};
-}
-/* phone side */
-function pairSend(form){
-  var code=pairNorm(form.querySelector('#pair-code').value),err=form.querySelector('#pairerr'),ok=form.querySelector('#pairok'),btn=form.querySelector('[type=submit]');
-  err.hidden=true;ok.hidden=true;
-  if(code.length!==8){err.textContent='Le code fait 8 caractères : recopie celui affiché sur la TV.';err.hidden=false;return}
-  if(!S.accounts.length){err.textContent='Ajoute d\'abord ton compte IPTV sur ce téléphone.';err.hidden=false;return}
-  btn.disabled=true;btn.textContent='Envoi…';
-  Promise.all([pairUrl(code),pairKey(code)]).then(function(r){
-    return encryptJson(r[1],pairPayload()).then(function(blob){
-      var u=r[0].replace('?key=','?currentDocument.exists=false&key=');
-      return fbFetch(u,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:{blob:{stringValue:blob},at:{integerValue:String(Date.now())}}})});
-    });
-  }).then(function(){ok.textContent='Envoyé ! La TV va redémarrer avec tes comptes'+(SYNC?' et ta synchro':'')+'.';ok.hidden=false;form.querySelector('#pair-code').value=''},function(e){
-    err.textContent=e&&(e.code==='ALREADY_EXISTS'||e.status===409)?'Ce code a déjà servi : affiche un nouveau code sur la TV.':(e&&e.code==='PERMISSION_DENIED'?'Firestore refuse : il manque la règle « pair » (voir le suivi du projet).':'Envoi impossible : '+errText(e));err.hidden=false;
-  }).then(function(){btn.disabled=false;btn.textContent='Envoyer à la TV'});
-}
-function pairHtml(){
-  return '<form class="form" id="pairform"><p class="hint" style="margin:0">Sur la TV : « Se connecter avec mon téléphone » affiche un code. Tape-le ici : la TV reçoit tes comptes'+(SYNC?', ta synchro (favoris, reprises)':'')+' et tes clés TMDB / OpenSubtitles, chiffrés avec ce code.</p>'+
-    '<div class="fld"><label for="pair-code">Code affiché sur la TV</label><input id="pair-code" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="11" placeholder="ex. K7P2 9QXM" style="text-transform:uppercase;letter-spacing:.12em;font-weight:700"></div>'+
-    '<p class="err" id="pairerr" hidden></p><p class="okmsg" id="pairok" hidden></p><div class="acts"><button type="submit" class="btn">Envoyer à la TV</button></div></form>';
-}
-/* TV side */
-function pairStart(){
-  pairStop();var code=pairCode(),p={code:code,until:Date.now()+600000,state:'wait'};PAIR=p;
-  Promise.all([pairUrl(code),pairKey(code)]).then(function(r){if(PAIR!==p)return;p.url=r[0];p.key=r[1];pairPoll(p)},function(){p.state='fail';softSheet()});
-  return p;
-}
-function pairStop(){if(PAIR){clearTimeout(PAIR.t);PAIR=null}}
-function pairPoll(p){
-  if(PAIR!==p)return;
-  if(Date.now()>p.until){p.state='expired';if(sheet&&sheet.kind==='pair')renderSheet();return}
-  fbFetch(p.url).then(function(d){
-    if(PAIR!==p)return;var b=d.fields&&d.fields.blob&&d.fields.blob.stringValue;if(!b)throw {status:404};
-    p.state='got';if(sheet&&sheet.kind==='pair')renderSheet();
-    return decryptJson(p.key,b).then(function(data){fetch(p.url,{method:'DELETE'}).catch(function(){});return pairApply(data)});
-  }).catch(function(e){if(PAIR!==p||p.state==='got')return;p.t=setTimeout(function(){pairPoll(p)},e&&e.status===404?3000:6000)});
-}
-function pairApply(d){
-  var jobs=[];
-  if(d.accounts&&d.accounts.length){var have={};S.accounts.forEach(function(a){have[a.id]=1});d.accounts.forEach(function(a){if(a&&a.id&&!have[a.id])S.accounts.push(a)});S.activeId=S.activeId&&S.accounts.some(function(a){return a.id===S.activeId})?S.activeId:(d.active||S.accounts[0].id);jobs.push(kset('accounts',{list:S.accounts,active:S.activeId,del:S.accDel||{}}))}
-  if(d.prefs){if(d.prefs.tmdb&&!PREFS.tmdb)PREFS.tmdb=d.prefs.tmdb;if(d.prefs.os&&!(PREFS.os&&PREFS.os.key))PREFS.os=d.prefs.os;jobs.push(kset('prefs',PREFS))}
-  if(d.sync&&d.sync.uid&&d.sync.key&&!SYNC)jobs.push(kset('sync',d.sync));
-  return Promise.all(jobs).then(function(){toast('Connecté ! TV Streamy redémarre…');setTimeout(function(){location.reload()},1200)});
-}
-function pairSheetHtml(){
-  var p=PAIR||pairStart(),c=p.code,left=Math.max(0,Math.ceil((p.until-Date.now())/60000));
-  var body=p.state==='got'?'<p class="pairst">Reçu ! Installation de tes comptes…</p>':p.state==='expired'?'<p class="pairst">Ce code a expiré.</p><div class="acts" style="justify-content:center"><button type="button" class="btn" data-pairgo>Nouveau code</button></div>':p.state==='fail'?'<p class="pairst">Cet appareil ne peut pas chiffrer : utilise le formulaire.</p>':
-    '<div class="paircode">'+c.slice(0,4)+'<span></span>'+c.slice(4)+'</div><ol class="pairsteps"><li>Sur ton téléphone, ouvre <b>TV Streamy</b></li><li><b>Paramètres › Connecter une TV</b></li><li>Tape ce code et appuie sur <b>Envoyer à la TV</b></li></ol><p class="hint">Code valable '+left+' min · en attente du téléphone…</p>';
-  return '<div class="in gut pair"><h2>Se connecter avec mon téléphone</h2>'+body+'<div class="acts" style="justify-content:center;margin-top:18px"><button type="button" class="btn ghost" data-close>Annuler</button></div></div>';
-}
 /* ---------- one screen at a time between synced devices ----------
    Starting a video writes « playing on device X since t » next to the synced data. A device that is playing checks
    this every few seconds and stops by itself when another one has taken over, so the provider's screen is freed. */
