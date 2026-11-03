@@ -955,7 +955,7 @@ function castSheetHtml(){
 }
 
 function play(o){
-  o.subMode=curSubMode();o.osOn=osOn()&&!o.live;
+  o.subMode=curSubMode();o.bgAudio=PREFS.bgAudio!==false&&!TV;o.osOn=osOn()&&!o.live;
   var stream=!/^(file|content):/.test(o.url)||!!(NATIVE&&S.castDev);
   var busy=Object.keys(USER.downloads||{}).some(function(k){return dlActive(USER.downloads[k])});
   if(NATIVE&&stream&&busy){
@@ -2030,7 +2030,8 @@ function renderSheetInner(){
       '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
     h+=secOpen('subs','Sous-titres',{auto:'Si la vidéo n\'est pas en français',always:'Toujours',never:'Jamais'}[curSubMode()]+' · réglage du profil')+
       '<div class="fld"><label for="subMode">Afficher les sous-titres français</label><select id="subMode"><option value="auto"'+(curSubMode()==='auto'?' selected':'')+'>Seulement si la vidéo n\'est pas en français</option><option value="always"'+(curSubMode()==='always'?' selected':'')+'>Toujours</option><option value="never"'+(curSubMode()==='never'?' selected':'')+'>Jamais (activables avec CC)</option></select></div>'+
-      '<p class="hint" style="margin:0">Pendant la lecture, le bouton « Sous-titres » du lecteur permet de les décaler s\'ils sont en avance ou en retard.</p>'+secClose+
+      '<p class="hint" style="margin:0">Pendant la lecture, le bouton « OpenSub » du lecteur permet de les décaler s\'ils sont en avance ou en retard.</p>'+
+      (NATIVE&&!TV?'<label class="chk"><input type="checkbox" id="bgAudio"'+(PREFS.bgAudio!==false?' checked':'')+'><span>Continuer le son quand l\'écran est verrouillé<br><span class="hint" style="font-weight:400">Le son continue, avec Pause et Arrêter sur l\'écran de verrouillage. Si cette option est décochée, la vidéo s\'arrête.</span></span></label>':'')+secClose+
       secOpen('os','OpenSubtitles',o.key?'Activé'+(o.user?' · '+esc(o.user):''):'Non configuré')+
       '<form class="form" id="osform">'+tutoHtml('os')+'<p class="hint" style="margin:0">Quand une vidéo n\'a pas de sous-titres, l\'appli peut les chercher sur OpenSubtitles (compte gratuit, environ 20 par jour). Ils sont gardés sur le téléphone, aussi pour les téléchargements.</p>'+
       '<div class="fld"><label for="os-key">Clé API OpenSubtitles</label><input id="os-key" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(o.key||'')+'" placeholder="Laisse vide pour ne pas l\'utiliser"></div>'+
@@ -2302,6 +2303,7 @@ function groupsChanged(sec){
   renderSheet();clearTimeout(groupsChanged.t);groupsChanged.t=setTimeout(function(){var y=window.scrollY;render();window.scrollTo(0,y)},250);
 }
 document.addEventListener('change',function(e){
+  if(e.target.id==='bgAudio'){PREFS.bgAudio=e.target.checked;savePrefs();toast(e.target.checked?'Le son continuera écran verrouillé.':'La vidéo s\'arrêtera quand l\'écran se verrouille.');return}
   if(e.target.hasAttribute&&e.target.hasAttribute('data-hcat')&&sheet&&sheet.kind==='groups'){var ci=e.target.getAttribute('data-hcat');USER.hiddenCats=USER.hiddenCats||{};var hcs=USER.hiddenCats[sheet.sec]=USER.hiddenCats[sheet.sec]||{};if(e.target.checked)delete hcs[ci];else hcs[ci]=1;groupsChanged(sheet.sec);return}
   if(e.target.hasAttribute&&e.target.hasAttribute('data-grp')&&sheet&&sheet.kind==='groups'){var g=e.target.getAttribute('data-grp');USER.hidden=USER.hidden||{};var hs=USER.hidden[sheet.sec]=USER.hidden[sheet.sec]||{};if(e.target.checked)delete hs[g];else hs[g]=1;groupsChanged(sheet.sec);return}if(e.target.id==='subMode'){var cp=prof();if(cp){cp.subMode=e.target.value;cp.at=Date.now();saveProfiles()}toast('Réglage des sous-titres enregistré.')}if(e.target.id==='allowMobile'){PREFS.allowMobile=e.target.checked;kset('prefs',PREFS);toast(PREFS.allowMobile?'Les téléchargements utiliseront aussi les données mobiles.':'Les téléchargements attendront le Wi-Fi.')}});
 window.addEventListener('online',function(){render()});window.addEventListener('offline',function(){render()});

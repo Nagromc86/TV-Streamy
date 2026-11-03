@@ -127,6 +127,11 @@ public class PlayerActivity extends Activity {
     private TextView goLiveButton;
     /* subtitles: the video's own French ones first (CC); OpenSubtitles only when the video has none, or on request */
     static final String EXTRA_OS_ON = "osOn";
+    static final String EXTRA_BG_AUDIO = "bgAudio";
+    /* sound goes on with the screen locked (foreground service + lock-screen controls) */
+    private boolean bgAudio;
+    private boolean inBackgroundAudio;
+    private androidx.media3.session.MediaSession mediaSession;
     private boolean osOn;
     private boolean embeddedFrench;
     private boolean osRequested;
@@ -271,6 +276,19 @@ public class PlayerActivity extends Activity {
                     .build());
         }
         player = pb.build();
+        // calls and other apps pause the video; unplugging headphones pauses too; CPU and Wi-Fi stay awake screen off
+        player.setAudioAttributes(new androidx.media3.common.AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true);
+        player.setHandleAudioBecomingNoisy(true);
+        player.setWakeMode(C.WAKE_MODE_NETWORK);
+        bgAudio = in.getBooleanExtra(EXTRA_BG_AUDIO, true);
+        try {
+            mediaSession = new androidx.media3.session.MediaSession.Builder(this, player).setId("tvs" + System.currentTimeMillis()).build();
+            AudioService.session = mediaSession;
+            AudioService.title = in.getStringExtra(EXTRA_TITLE) == null ? "TV Streamy" : in.getStringExtra(EXTRA_TITLE);
+            AudioService.text = in.getStringExtra(EXTRA_SUBTITLE) == null ? "" : in.getStringExtra(EXTRA_SUBTITLE);
+        } catch (Exception ignored) {
+            // no lock-screen controls on this device
+        }
         player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
                 .setPreferredAudioLanguage("fr")
                 .setPreferredTextLanguage("fr")
@@ -990,6 +1008,19 @@ public class PlayerActivity extends Activity {
         }
     }
 
+    void togglePlay() {
+        runOnUiThread(() -> {
+            if (player != null) {
+                player.setPlayWhenReady(!player.getPlayWhenReady());
+                AudioService.refresh(this);
+            }
+        });
+    }
+
+    boolean isPlayingNow() {
+        return player != null && player.getPlayWhenReady();
+    }
+
     /** Close from outside (another video is being started). */
     void closeForNewVideo() {
         finishWithResult();
@@ -1149,6 +1180,22 @@ public class PlayerActivity extends Activity {
             finishWithResult();
             return;
         }
+        if (player != null && !isFinishing() && bgAudio && player.getPlayWhenReady()) {
+            // screen locked / app left while playing: the sound goes on, with controls on the lock screen
+            inBackgroundAudio = true;
+            try {
+                if (Build.VERSION.SDK_INT >= 26) {
+                    startForegroundService(new Intent(this, AudioService.class));
+                } else {
+                    startService(new Intent(this, AudioService.class));
+                }
+            } catch (Exception e) {
+                inBackgroundAudio = false;
+            }
+            if (inBackgroundAudio) {
+                return;
+            }
+        }
         if (player != null && !isFinishing()) {
             // in the background: free the provider's screen (a paused stream still holds it), resume on return
             backgroundPos = player.getCurrentPosition();
@@ -1160,6 +1207,10 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onStart() {
         super.onStart();
+        if (inBackgroundAudio) {
+            inBackgroundAudio = false;
+            stopService(new Intent(this, AudioService.class));
+        }
         if (stoppedInBackground && player != null && !finishing) {
             stoppedInBackground = false;
             if (!live && backgroundPos > 0) {
@@ -1175,6 +1226,14 @@ public class PlayerActivity extends Activity {
         subHandler.removeCallbacksAndMessages(null);
         retryHandler.removeCallbacksAndMessages(null);
         watchHandler.removeCallbacksAndMessages(null);
+        stopService(new Intent(this, AudioService.class));
+        if (mediaSession != null) {
+            if (AudioService.session == mediaSession) {
+                AudioService.session = null;
+            }
+            mediaSession.release();
+            mediaSession = null;
+        }
         if (current == this) {
             current = null;
         }
