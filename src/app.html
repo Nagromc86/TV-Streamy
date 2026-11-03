@@ -130,6 +130,12 @@ body.tv .tvguide .gwrap{margin-top:4px}
 .tvpi{padding:12px 14px;border-radius:10px;font-size:1.15rem;font-weight:600;color:#ddd}
 .tvpi.sel{background:#fff;color:#111}
 #tvpanel .hint{color:#999;margin:10px 8px 4px;font-size:.9rem}
+.minivid{position:sticky;top:var(--toph,64px);z-index:30;background:var(--bg);margin:10px calc(-1 * max(16px,env(safe-area-inset-left,0px))) 0;padding:6px max(16px,env(safe-area-inset-left,0px)) 8px;box-shadow:0 10px 16px -10px rgba(0,0,0,.8)}
+.mv-box{aspect-ratio:16/9;border-radius:12px;background:#000;display:flex;align-items:center;justify-content:center;color:#888;font-size:.85rem}
+.mv-bar{display:flex;align-items:center;gap:8px;margin-top:8px}
+.mv-t{flex:1;min-width:0;display:flex;flex-direction:column}.mv-t b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv-t small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv-full{min-height:38px;padding:6px 12px;font-size:.85rem}.mv-full svg{width:18px;height:18px}
+.grow.on .glab{background:var(--accent);color:#fff}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -500,7 +506,7 @@ var IC={
 };
 
 /* ---------- state ---------- */
-var S={boot:true,liveView:(function(){try{return localStorage.getItem('lview')||'list'}catch(e){return 'list'}})(),accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
+var S={boot:true,liveView:(function(){try{return localStorage.getItem('lview')||(TV?'list':'guide')}catch(e){return 'list'}})(),accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
 var DATA=null;      /* catalogue of the active account */
 var USER={favs:{},prog:{},recent:[],downloads:{}};
 var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:''};  /* per-account personal data */
@@ -1211,7 +1217,7 @@ function viewGuide(L){
   var h=dayChips(off,'data-gridday',-7,3)+'<div class="gwrap" id="gwrap"><div class="ginner" style="width:'+(W+GLAB)+'px"><div class="gruler"><span class="glab"></span>';
   for(var t=0;t<24;t++)h+='<span class="gh" style="left:'+(GLAB+t*60*GPX)+'px">'+String(t).padStart(2,'0')+':00</span>';
   h+='</div>';
-  pg.items.forEach(function(x){h+='<div class="grow" data-grow="'+esc(x.stream_id)+'"><button type="button" class="glab" data-chguide="'+esc(x.stream_id)+'">'+(x.stream_icon?'<img loading="lazy" src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'')+'<span>'+esc(cleanName(x.name))+'</span></button><div class="gline">'+gridLine(x.stream_id)+'</div></div>'});
+  pg.items.forEach(function(x){h+='<div class="grow'+(miniOk()&&String(MINI.id)===String(x.stream_id)?' on':'')+'" data-grow="'+esc(x.stream_id)+'"><button type="button" class="glab" data-chguide="'+esc(x.stream_id)+'">'+(x.stream_icon?'<img loading="lazy" src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'')+'<span>'+esc(cleanName(x.name))+'</span></button><div class="gline">'+gridLine(x.stream_id)+'</div></div>'});
   if(off===0)h+='<span class="gnowline" style="left:'+(GLAB+(now-a0)/60*GPX).toFixed(0)+'px"></span>';
   return h+'</div></div>'+(pg.more?moreHtml('guide:'+S.liveCat):'')+'<p class="hint">Touche un programme passé marqué '+RICON.replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')+' pour le revoir (si ta chaîne propose le replay), le programme en cours pour le direct, ou le nom d\'une chaîne pour son programme complet.</p>';
 }
@@ -1587,11 +1593,64 @@ function filtered(kind,cat){
   if(cat!=='all')return dedupe((kind==='live'?DATA.live:kind==='movie'?DATA.vod:DATA.series).filter(function(x){return String(x.category_id)===String(cat)}));
   return L;
 }
+/* ---------- small live video at the top of « Direct » (phone): scroll the guide and zap without leaving ---------- */
+var MINI={id:null,on:false,playing:null,muted:false,rect:'',state:''};
+function miniOk(){return NATIVE&&!TV&&!TIZEN&&!S.castDev}
+function miniChannel(){var id=MINI.id||(USER.recent||[])[0];var x=id&&byId('live',id);if(!x){x=filtered('live',S.liveCat)[0]||DATA.live[0];}if(x)MINI.id=x.stream_id;return x}
+function miniHtml(){
+  var x=miniChannel();if(!x)return '';
+  return '<div class="minivid" id="minivid"><div class="mv-box" id="mvbox"><span class="mv-msg">'+esc(MINI.state==='error'?'Chaîne indisponible pour le moment':'Chargement…')+'</span></div><div class="mv-bar" id="mvbar">'+miniBarInner(x)+'</div></div>';
+}
+function miniBarInner(x){
+  var e=epgCache[x.stream_id],n=e&&e.list&&e.list[0];
+  return '<span class="mv-t"><b>'+esc(cleanName(x.name))+'</b><small>'+(n?esc(n.title)+' · '+hhmm(n.start)+'–'+hhmm(n.end):'En direct')+'</small></span>'+
+    '<button type="button" class="iconbtn" data-mvmute aria-label="'+(MINI.muted?'Remettre le son':'Couper le son')+'">'+(MINI.muted?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>')+'</button>'+
+    '<button type="button" class="btn ghost mv-full" data-mvfull aria-label="Plein écran"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Plein écran</button>';
+}
+function paintMiniBar(){var b=$('#mvbar'),x=MINI.id&&byId('live',MINI.id);if(b&&x)b.innerHTML=miniBarInner(x)}
+function miniRectNow(){
+  var el=$('#mvbox');if(!el)return null;var r=el.getBoundingClientRect(),vis=!sheet&&r.bottom>0&&r.top<innerHeight&&$('#webplayer').hidden;
+  return {x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height),visible:vis};
+}
+function miniSync(){
+  if(!NATIVE)return;
+  var want=S.tab==='live'&&miniOk()&&!!$('#mvbox')&&document.visibilityState!=='hidden'&&!S.pickProfile;
+  if(!want){if(MINI.on)miniStop();return}
+  var r=miniRectNow();if(!r)return;
+  if(MINI.on&&MINI.playing===MINI.id){var k=JSON.stringify(r);if(k!==MINI.rect){MINI.rect=k;nat('miniRect',r).catch(function(){})}return}
+  miniStart(r);
+}
+function miniStart(r){
+  var x=byId('live',MINI.id);if(!x)return;var ex=liveExt();MINI.on=true;MINI.playing=x.stream_id;MINI.rect=JSON.stringify(r);MINI.state='';
+  wantEpg(x.stream_id);
+  authPing(false).then(function(){
+    if(!MINI.on||MINI.playing!==x.stream_id)return;
+    var cur=miniRectNow()||r;
+    return nat('miniPlay',Object.assign({url:streamUrl('live',x,ex[0]),fallbackUrl:streamUrl('live',x,ex[1]),muted:MINI.muted},cur));
+  }).catch(function(){MINI.on=false});
+}
+function miniZap(x){
+  MINI.id=x.stream_id;USER.recent=[x.stream_id].concat((USER.recent||[]).filter(function(i){return String(i)!==String(x.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
+  var b=$('#mvbox');if(b)b.innerHTML='<span class="mv-msg">Chargement…</span>';paintMiniBar();
+  [].forEach.call(document.querySelectorAll('.grow'),function(e){e.classList.toggle('on',e.getAttribute('data-grow')===String(x.stream_id))});
+  var r=miniRectNow();if(r){MINI.on=false;miniStart(r)}
+  if(window.scrollY>0&&$('#minivid')&&$('#minivid').getBoundingClientRect().top<0)window.scrollTo(0,0);
+}
+function miniStop(){if(!MINI.on)return;MINI.on=false;MINI.playing=null;MINI.rect='';nat('miniStop').catch(function(){})}
+var miniRaf=0;window.addEventListener('scroll',function(){if(!MINI.on)return;cancelAnimationFrame(miniRaf);miniRaf=requestAnimationFrame(miniSync)},{passive:true});
+window.addEventListener('resize',function(){if(MINI.on)miniSync()});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')setTimeout(miniSync,300);else MINI.on=false});
+try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','miniState',function(e){
+  MINI.state=e.state;var m=document.querySelector('#mvbox .mv-msg');
+  if(e.state==='stopped'){MINI.on=false;MINI.playing=null;return}
+  if(m)m.textContent=e.state==='error'?'Chaîne indisponible pour le moment':e.state==='buffering'?'Chargement…':'';
+  if(e.state==='playing'&&e.detail==='fallback')noteLive(liveExt(),{usedFallback:true});
+})}catch(e){}
 function viewLive(){
   var L=filtered('live',S.liveCat),pg=pageOf(L,'live:'+S.liveCat,60);
   var gv=S.liveView==='guide';
   var h='<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+freshHtml('live')+'<section class="sec" style="margin-top:12px">'+catsHtml('live',S.liveCat,'data-lcat')+'</section>'+
-    '<div class="tabs" style="margin-top:10px"><button type="button" class="chip" data-lview="list" aria-pressed="'+!gv+'">Chaînes</button><button type="button" class="chip" data-lview="guide" aria-pressed="'+gv+'">'+GICON.replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"')+'Guide TV</button></div>';
+    (miniOk()?miniHtml():'')+'<div class="tabs" style="margin-top:10px"><button type="button" class="chip" data-lview="list" aria-pressed="'+!gv+'">Chaînes</button><button type="button" class="chip" data-lview="guide" aria-pressed="'+gv+'">'+GICON.replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"')+'Guide TV</button></div>';
   if(gv)return h+'<section class="sec" style="margin-top:12px">'+(L.length?viewGuide(L):'<div class="empty"><p>Aucune chaîne dans cette catégorie.</p></div>')+'</section>';
   h+='<section class="sec" style="margin-top:12px"><div class="chlist">';
   pg.items.forEach(function(x){h+=chHtml(x)});
@@ -1968,7 +2027,7 @@ function renderInner(){
   app.innerHTML=topHtml()+'<main class="gut">'+lead+(navigator.onLine===false?'<p class="offline">Hors connexion : les films et épisodes téléchargés restent lisibles (Ma liste).</p>':'')+(S.msg?'<p class="err" style="margin-top:8px">'+esc(S.msg)+'</p>':'')+v+'</main>';
   nav.innerHTML=navHtml();nav.hidden=false;
   if(hadFocus){var q=$('#q');if(q){q.focus();try{q.setSelectionRange(sel,sel)}catch(e){}}}
-  onScroll();observe();billSync();if(S.tab==='live'&&S.liveView==='guide')guideScroll();
+  onScroll();observe();billSync();if(S.tab==='live'&&S.liveView==='guide')guideScroll();var tb=$('#topbar');if(tb)document.documentElement.style.setProperty('--toph',tb.offsetHeight+'px');setTimeout(miniSync,0);
 }
 function onScroll(){var t=$('#topbar');if(t&&t.classList.contains('over'))t.classList.toggle('solid',window.scrollY>40)}
 window.addEventListener('scroll',onScroll,{passive:true});
@@ -1990,8 +2049,8 @@ function parseM3uLink(v){
   return q.username&&q.password?{server:m[1],username:q.username,password:q.password}:null;
 }
 function openSheet(s){var a=document.activeElement;if(a&&!(a.closest&&a.closest('#sheet')))s.opener=focusKey(a);else if(sheet&&sheet.opener)s.opener=sheet.opener;sheet=s;renderSheet()}
-function closeSheet(){if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
-function renderSheet(){keepFocus(renderSheetInner)}
+function closeSheet(){setTimeout(miniSync,0);if(sheet&&sheet.kind==='cast'&&NATIVE)nat('castStopScan').catch(function(){});sheet=null;var el=$('#sheet');el.hidden=true;el.innerHTML='';document.body.style.overflow=''}
+function renderSheet(){keepFocus(renderSheetInner);miniSync()}
 /* re-render an open sheet with fresher data without jumping back to the top */
 function softSheet(){var root=$('#sheet'),q=function(e){return e===root?null:'.'+String(e.className).trim().split(/\s+/).join('.')},sc=[].filter.call([root].concat([].slice.call(root.querySelectorAll('*'))),function(e){return e.scrollTop>0}).map(function(e){return [q(e),e.scrollTop]});renderSheet();sc.forEach(function(o){var e=o[0]?root.querySelector(o[0]):root;if(e)e.scrollTop=o[1]})}
 function renderSheetInner(){
@@ -2183,7 +2242,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
@@ -2255,11 +2314,13 @@ document.addEventListener('click',function(e){
   if(d.replay){var rp=d.replay.split('|'),rx=byId('live',rp[0]),pr=rx&&progOf(rp[0],rp[1]);if(pr)playReplay(rx,pr);return}
   if(d.gprog){
     var gp=d.gprog.split('|'),gx=byId('live',gp[0]),pp=gx&&progOf(gp[0],gp[1]),nw=Date.now()/1000;if(!pp)return;
-    if(pp.s<=nw&&nw<pp.e){playLive(gx);return}
+    if(pp.s<=nw&&nw<pp.e){if(miniOk()&&!sheet)miniZap(gx);else{miniStop();playLive(gx)}return}
     if(pp.e<=nw&&canReplay(gx,pp)){playReplay(gx,pp);return}
     toast(hhmm(pp.s)+'–'+hhmm(pp.e)+' · '+pp.t+(pp.e<=nw?' · pas de replay sur cette chaîne':'')+(pp.d?' — '+pp.d.slice(0,140):''));return;
   }
-  if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x)playLive(x);return}
+  if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x){if(pl[0]==='live'&&S.tab==='live'&&miniOk()&&!sheet)miniZap(x);else{miniStop();playLive(x)}}return}
+  if(t.hasAttribute('data-mvfull')){var mx=byId('live',MINI.id);if(mx){miniStop();playLive(mx)}return}
+  if(t.hasAttribute('data-mvmute')){MINI.muted=!MINI.muted;nat('miniMute',{muted:MINI.muted}).catch(function(){});paintMiniBar();return}
   if(d.fav){var f=d.fav.split(':'),it=byId(f[0],f.slice(1).join(':'));if(it){toggleFav(f[0],it);render();if(sheet)renderSheet()}return}
   if(d.lcat){S.liveCat=d.lcat;render();return}
   if(d.vcat){S.vodCat=d.vcat;if(d.goto)S.tab=d.goto;render();window.scrollTo(0,0);return}

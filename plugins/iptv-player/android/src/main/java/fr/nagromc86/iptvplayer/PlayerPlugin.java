@@ -47,6 +47,71 @@ public class PlayerPlugin extends Plugin {
         }
     }
 
+    /* ---------- small live video inside the "Direct" page ---------- */
+
+    private float[] rectOf(PluginCall call) {
+        return new float[] {call.getFloat("x", 0f), call.getFloat("y", 0f), call.getFloat("w", 1f), call.getFloat("h", 1f), call.getBoolean("visible", true) ? 1f : 0f};
+    }
+
+    @PluginMethod
+    public void miniPlay(PluginCall call) {
+        String url = call.getString("url", "");
+        if (TextUtils.isEmpty(url)) {
+            call.reject("Adresse manquante");
+            return;
+        }
+        float[] r = rectOf(call);
+        getActivity().runOnUiThread(() -> {
+            MiniPlayer.play(getActivity(), getBridge().getWebView(), url, call.getString("fallbackUrl", ""), call.getString("userAgent", ""), r, call.getBoolean("muted", false),
+                    (st, detail) -> {
+                        JSObject o = new JSObject();
+                        o.put("state", st);
+                        o.put("detail", detail);
+                        notifyListeners("miniState", o);
+                    });
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void miniRect(PluginCall call) {
+        float[] r = rectOf(call);
+        getActivity().runOnUiThread(() -> {
+            MiniPlayer.place(getActivity(), getBridge().getWebView(), r);
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void miniMute(PluginCall call) {
+        boolean m = call.getBoolean("muted", false);
+        getActivity().runOnUiThread(() -> {
+            MiniPlayer.mute(m);
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void miniStop(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            MiniPlayer.stop();
+            call.resolve();
+        });
+    }
+
+    @Override
+    protected void handleOnPause() {
+        super.handleOnPause();
+        // the app goes to the background (or the full-screen player opens): free the provider's screen
+        if (MiniPlayer.active() && getActivity() != null) {
+            getActivity().runOnUiThread(MiniPlayer::stop);
+            JSObject o = new JSObject();
+            o.put("state", "stopped");
+            o.put("detail", "pause");
+            notifyListeners("miniState", o);
+        }
+    }
+
     @PluginMethod
     public void playerMessage(PluginCall call) {
         PlayerActivity open = PlayerActivity.current;
@@ -97,6 +162,9 @@ public class PlayerPlugin extends Plugin {
             intent.putExtra(PlayerActivity.EXTRA_SUB_URLS, urls);
             intent.putExtra(PlayerActivity.EXTRA_SUB_LABELS, labels);
             intent.putExtra(PlayerActivity.EXTRA_SUB_LANGS, langs);
+        }
+        if (MiniPlayer.active()) {
+            getActivity().runOnUiThread(MiniPlayer::stop);
         }
         PlayerActivity open = PlayerActivity.current;
         if (open != null && !open.isFinishing()) {

@@ -835,7 +835,7 @@ public class PlayerActivity extends Activity {
      * Many providers only accept a stream after a recent sign-in from the same internet address (after a Wi-Fi / 4G
      * change for example). The stream address holds the account: /live|movie|series/user/password/id.ext
      */
-    private static void signInAgain(String streamUrl) {
+    static void signInAgain(String streamUrl) {
         if (streamUrl == null) {
             return;
         }
