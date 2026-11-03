@@ -142,6 +142,8 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_BG_AUDIO, call.getBoolean("bgAudio", true));
         intent.putExtra(PlayerActivity.EXTRA_TS_TPL, call.getString("tsTpl", ""));
         intent.putExtra(PlayerActivity.EXTRA_TS_TZ, call.getData().optInt("tsTz", 0));
+        intent.putExtra(PlayerActivity.EXTRA_CHANNELS, call.getString("channels", ""));
+        intent.putExtra(PlayerActivity.EXTRA_CH_INDEX, call.getData().optInt("chIndex", -1));
         intent.putExtra(PlayerActivity.EXTRA_WATCH_URL, call.getString("watchUrl", ""));
         intent.putExtra(PlayerActivity.EXTRA_WATCH_TOKEN, call.getString("watchToken", ""));
         intent.putExtra(PlayerActivity.EXTRA_WATCH_REFRESH, call.getString("watchRefresh", ""));
@@ -673,6 +675,10 @@ public class PlayerPlugin extends Plugin {
             ret.put("ended", data.getBooleanExtra(PlayerActivity.RESULT_ENDED, false));
             ret.put("subOffsetMs", data.getLongExtra(PlayerActivity.RESULT_SUB_OFFSET, 0L));
             ret.put("usedFallback", data.getBooleanExtra(PlayerActivity.RESULT_USED_FALLBACK, false));
+            String zsid = data.getStringExtra(PlayerActivity.RESULT_SID);
+            if (zsid != null) {
+                ret.put("sid", zsid);
+            }
             String taken = data.getStringExtra(PlayerActivity.RESULT_TAKEN_BY);
             if (taken != null) {
                 ret.put("takenBy", taken);

@@ -116,6 +116,9 @@ public class PlayerActivity extends Activity {
     private boolean frenchAudio;
     /* live pause: short pauses resume from memory; longer ones through the provider's replay (timeshift) */
     static final String EXTRA_TS_TPL = "tsTpl";
+    static final String EXTRA_CHANNELS = "channels";
+    static final String EXTRA_CH_INDEX = "chIndex";
+    static final String RESULT_SID = "sid";
     static final String EXTRA_TS_TZ = "tsTz";
     private String tsTpl;
     private int tsTz;
@@ -125,6 +128,14 @@ public class PlayerActivity extends Activity {
     private boolean onTimeshift;
     private long tsStartWall;
     private TextView goLiveButton;
+    /* TV: zapping without leaving the player (▲ ▼, CH+/CH−) and the channel list on OK */
+    private org.json.JSONArray channels;
+    private int chIndex = -1;
+    private String zapSid;
+    private LinearLayout chPanel;
+    private android.widget.ListView chList;
+    private int eatenKey = -1;
+    private final android.os.Handler zapHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     /* subtitles: the video's own French ones first (CC); OpenSubtitles only when the video has none, or on request */
     static final String EXTRA_OS_ON = "osOn";
     static final String EXTRA_BG_AUDIO = "bgAudio";
@@ -236,6 +247,20 @@ public class PlayerActivity extends Activity {
             actions.addView(pipButton);
         }
         root.addView(actions);
+        String chs = in.getStringExtra(EXTRA_CHANNELS);
+        if (live && !TextUtils.isEmpty(chs)) {
+            try {
+                channels = new org.json.JSONArray(chs);
+                chIndex = in.getIntExtra(EXTRA_CH_INDEX, -1);
+            } catch (Exception ignored) {
+                channels = null;
+            }
+            if (channels != null && channels.length() > 1) {
+                buildChannelPanel(root);
+            } else {
+                channels = null;
+            }
+        }
         rootView = root;
         actionsRow = actions;
         setContentView(root);
@@ -1113,6 +1138,177 @@ public class PlayerActivity extends Activity {
         return box;
     }
 
+    private void buildChannelPanel(FrameLayout root) {
+        chPanel = new LinearLayout(this);
+        chPanel.setOrientation(LinearLayout.VERTICAL);
+        chPanel.setBackgroundColor(0xF0101014);
+        chPanel.setPadding(dp(12), dp(18), dp(12), dp(12));
+        chPanel.setLayoutParams(new FrameLayout.LayoutParams(dp(400), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START));
+        TextView head = new TextView(this);
+        head.setText("Chaînes  ·  OK : regarder  ·  ► : fermer");
+        head.setTextColor(0xB3FFFFFF);
+        head.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        head.setPadding(dp(10), 0, 0, dp(10));
+        chPanel.addView(head);
+        final List<String> labels = new ArrayList<>();
+        labels.add("Audio, sous-titres et pause");
+        for (int i = 0; i < channels.length(); i++) {
+            org.json.JSONObject c = channels.optJSONObject(i);
+            String sub = c == null ? "" : c.optString("s", "");
+            labels.add((i + 1) + "   " + (c == null ? "" : c.optString("t", "")) + (TextUtils.isEmpty(sub) ? "" : "\n" + sub));
+        }
+        chList = new android.widget.ListView(this);
+        chList.setDivider(null);
+        GradientDrawable sel = new GradientDrawable();
+        sel.setColor(0xFFE50914);
+        sel.setCornerRadius(dp(10));
+        chList.setSelector(sel);
+        chList.setDrawSelectorOnTop(false);
+        chList.setAdapter(new android.widget.ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, labels) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                TextView t = (TextView) super.getView(position, convertView, parent);
+                t.setTextColor(Color.WHITE);
+                t.setTextSize(TypedValue.COMPLEX_UNIT_SP, position == 0 ? 14 : 16);
+                t.setMaxLines(2);
+                t.setEllipsize(TextUtils.TruncateAt.END);
+                t.setPadding(dp(14), dp(10), dp(14), dp(10));
+                t.setTypeface(null, position - 1 == chIndex ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+                t.setAlpha(position == 0 ? 0.8f : 1f);
+                return t;
+            }
+        });
+        chList.setOnItemClickListener((parent, view, position, id) -> {
+            hideChannels();
+            if (position == 0) {
+                playerView.showController();
+            } else if (position - 1 != chIndex) {
+                zapTo(position - 1);
+            }
+        });
+        chPanel.addView(chList, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        chPanel.setVisibility(View.GONE);
+        root.addView(chPanel);
+    }
+
+    private void showChannels() {
+        if (chPanel == null) {
+            return;
+        }
+        playerView.hideController();
+        chPanel.setVisibility(View.VISIBLE);
+        ((android.widget.BaseAdapter) chList.getAdapter()).notifyDataSetChanged();
+        int at = Math.max(0, chIndex) + 1;
+        chList.requestFocus();
+        chList.setSelectionFromTop(at, dp(160));
+    }
+
+    private void hideChannels() {
+        if (chPanel != null) {
+            chPanel.setVisibility(View.GONE);
+        }
+        playerView.requestFocus();
+    }
+
+    private void zapBy(int d) {
+        int n = channels.length();
+        zapTo(((Math.max(0, chIndex) + d) % n + n) % n);
+    }
+
+    private void zapTo(int i) {
+        org.json.JSONObject c = channels.optJSONObject(i);
+        if (c == null || player == null) {
+            return;
+        }
+        chIndex = i;
+        zapSid = c.optString("id", null);
+        String u = c.optString("u", "");
+        String title = c.optString("t", "");
+        String sub = (i + 1) + " · " + c.optString("s", "En direct");
+        getIntent().putExtra(EXTRA_TITLE, title);
+        fallbackUrl = c.optString("f", "");
+        tsTpl = c.optString("ts", "");
+        triedFallback = false;
+        fallbackWorked = false;
+        httpRetries = 0;
+        lastError = null;
+        onTimeshift = false;
+        behindMs = 0;
+        pausedAt = 0;
+        liveUrl = u;
+        currentUrl = u;
+        retryHandler.removeCallbacksAndMessages(null);
+        if (goLiveButton != null) {
+            goLiveButton.setVisibility(View.GONE);
+        }
+        TextView t0 = (TextView) titleBox.getChildAt(0);
+        t0.setText((i + 1) + "   " + title);
+        if (titleBox.getChildCount() > 1) {
+            ((TextView) titleBox.getChildAt(1)).setText(sub);
+        }
+        AudioService.title = title;
+        AudioService.text = sub;
+        titleBox.setVisibility(View.VISIBLE);
+        zapHandler.removeCallbacksAndMessages(null);
+        zapHandler.postDelayed(() -> {
+            if (!playerView.isControllerFullyVisible()) {
+                titleBox.setVisibility(View.GONE);
+            }
+        }, 3500);
+        // a short delay, so running through several channels opens only the last one
+        zapHandler.postDelayed(() -> {
+            if (player == null || finishing || !u.equals(liveUrl)) {
+                return;
+            }
+            player.setMediaItem(buildItem(u, title));
+            player.prepare();
+            player.play();
+        }, 400);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        if (channels != null && !inPip) {
+            int k = e.getKeyCode();
+            if (e.getAction() == android.view.KeyEvent.ACTION_UP && k == eatenKey) {
+                eatenKey = -1;
+                return true;
+            }
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                boolean open = chPanel != null && chPanel.getVisibility() == View.VISIBLE;
+                boolean eat = false;
+                if (open) {
+                    if (k == android.view.KeyEvent.KEYCODE_BACK || k == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) {
+                        hideChannels();
+                        eat = true;
+                    }
+                } else if (k == android.view.KeyEvent.KEYCODE_CHANNEL_UP) {
+                    zapBy(-1);
+                    eat = true;
+                } else if (k == android.view.KeyEvent.KEYCODE_CHANNEL_DOWN) {
+                    zapBy(1);
+                    eat = true;
+                } else if (!playerView.isControllerFullyVisible()) {
+                    if (k == android.view.KeyEvent.KEYCODE_DPAD_UP) {
+                        zapBy(-1);
+                        eat = true;
+                    } else if (k == android.view.KeyEvent.KEYCODE_DPAD_DOWN) {
+                        zapBy(1);
+                        eat = true;
+                    } else if (k == android.view.KeyEvent.KEYCODE_DPAD_CENTER || k == android.view.KeyEvent.KEYCODE_ENTER) {
+                        showChannels();
+                        eat = true;
+                    }
+                }
+                if (eat) {
+                    eatenKey = k;
+                    return true;
+                }
+            }
+        }
+        return super.dispatchKeyEvent(e);
+    }
+
     private int dp(int v) {
         return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics()));
     }
@@ -1156,6 +1352,9 @@ public class PlayerActivity extends Activity {
         data.putExtra(RESULT_ENDED, ended);
         data.putExtra(RESULT_SUB_OFFSET, subOffset);
         data.putExtra(RESULT_USED_FALLBACK, fallbackWorked);
+        if (zapSid != null) {
+            data.putExtra(RESULT_SID, zapSid);
+        }
         if (takenBy != null) {
             data.putExtra(RESULT_TAKEN_BY, takenBy);
         }
@@ -1165,6 +1364,7 @@ public class PlayerActivity extends Activity {
         setResult(RESULT_OK, data);
         retryHandler.removeCallbacksAndMessages(null);
         watchHandler.removeCallbacksAndMessages(null);
+        zapHandler.removeCallbacksAndMessages(null);
         if (player != null) {
             // close the connection to the provider right now, so the next video gets the screen
             player.stop();
