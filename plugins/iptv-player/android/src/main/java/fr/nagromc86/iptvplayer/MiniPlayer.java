@@ -194,6 +194,13 @@ class MiniPlayer {
             });
             view.setPlayer(player);
         }
+        if (u.equals(url) && player.getPlayWhenReady() && player.getPlaybackState() != Player.STATE_IDLE) {
+            // same channel still playing (back from the floating window): no restart
+            player.setVolume(muted ? 0f : 1f);
+            place(act, webView, rect);
+            emit("playing", "");
+            return;
+        }
         url = u;
         fallback = fb;
         triedFallback = false;
