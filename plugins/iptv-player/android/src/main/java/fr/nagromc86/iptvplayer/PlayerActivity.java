@@ -135,10 +135,14 @@ public class PlayerActivity extends Activity {
     private LinearLayout chPanel;
     private android.widget.ListView chList;
     private int eatenKey = -1;
+    /* phone: videos start without sound; the Volume + key or the button brings it back */
+    private boolean muted;
+    private TextView muteButton;
     private final android.os.Handler zapHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     /* subtitles: the video's own French ones first (CC); OpenSubtitles only when the video has none, or on request */
     static final String EXTRA_OS_ON = "osOn";
     static final String EXTRA_BG_AUDIO = "bgAudio";
+    static final String EXTRA_MUTED = "startMuted";
     /* sound goes on with the screen locked (foreground service + lock-screen controls) */
     private boolean bgAudio;
     private boolean inBackgroundAudio;
@@ -246,7 +250,16 @@ public class PlayerActivity extends Activity {
             pipButton.setLayoutParams(plp);
             actions.addView(pipButton);
         }
+        muted = in.getBooleanExtra(EXTRA_MUTED, false);
+        muteButton = pill("Son coupé · toucher pour l'activer");
+        muteButton.setContentDescription("Activer le son");
+        muteButton.setOnClickListener(v -> setMuted(false));
+        FrameLayout.LayoutParams mlp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        mlp.setMargins(0, 0, 0, dp(96));
+        muteButton.setLayoutParams(mlp);
+        muteButton.setVisibility(muted ? View.VISIBLE : View.GONE);
         root.addView(actions);
+        root.addView(muteButton);
         String chs = in.getStringExtra(EXTRA_CHANNELS);
         if (live && !TextUtils.isEmpty(chs)) {
             try {
@@ -301,6 +314,9 @@ public class PlayerActivity extends Activity {
                     .build());
         }
         player = pb.build();
+        if (muted) {
+            player.setVolume(0f);
+        }
         // calls and other apps pause the video; unplugging headphones pauses too; CPU and Wi-Fi stay awake screen off
         player.setAudioAttributes(new androidx.media3.common.AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true);
         player.setHandleAudioBecomingNoisy(true);
@@ -852,6 +868,9 @@ public class PlayerActivity extends Activity {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
         inPip = isInPictureInPictureMode;
         playerView.setUseController(!inPip);
+        if (muteButton != null) {
+            muteButton.setVisibility(muted && !inPip ? View.VISIBLE : View.GONE);
+        }
         if (inPip) {
             playerView.hideController();
             titleBox.setVisibility(View.GONE);
@@ -1145,6 +1164,16 @@ public class PlayerActivity extends Activity {
         return box;
     }
 
+    private void setMuted(boolean m) {
+        muted = m;
+        if (player != null) {
+            player.setVolume(m ? 0f : 1f);
+        }
+        if (muteButton != null) {
+            muteButton.setVisibility(m && !inPip ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void buildChannelPanel(FrameLayout root) {
         chPanel = new LinearLayout(this);
         chPanel.setOrientation(LinearLayout.VERTICAL);
@@ -1275,6 +1304,10 @@ public class PlayerActivity extends Activity {
 
     @Override
     public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        // Volume + while the sound is off: the sound comes back (and the system raises the volume as usual)
+        if (muted && e.getAction() == android.view.KeyEvent.ACTION_DOWN && e.getKeyCode() == android.view.KeyEvent.KEYCODE_VOLUME_UP) {
+            setMuted(false);
+        }
         if (channels != null && !inPip) {
             int k = e.getKeyCode();
             if (e.getAction() == android.view.KeyEvent.ACTION_UP && k == eatenKey) {

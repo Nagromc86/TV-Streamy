@@ -1069,7 +1069,7 @@ function castSheetHtml(){
 }
 
 function play(o){
-  o.subMode=curSubMode();o.bgAudio=PREFS.bgAudio!==false&&!TV;o.osOn=osOn()&&!o.live;
+  o.subMode=curSubMode();o.bgAudio=PREFS.bgAudio!==false&&!TV;o.startMuted=!TV;o.osOn=osOn()&&!o.live;
   var stream=!/^(file|content):/.test(o.url)||!!(NATIVE&&S.castDev);
   var busy=Object.keys(USER.downloads||{}).some(function(k){return dlActive(USER.downloads[k])});
   if(NATIVE&&stream&&busy){
@@ -1709,7 +1709,8 @@ function filtered(kind,cat){
   return L;
 }
 /* ---------- small live video at the top of « Direct » (phone): scroll the guide and zap without leaving ---------- */
-var MINI={id:null,on:false,playing:null,muted:false,rect:'',state:''};
+/* phone: videos start without sound (Volume + or the button brings it back); TV: with sound */
+var MINI={id:null,on:false,playing:null,muted:!TV,rect:'',state:''};
 function miniOk(){return NATIVE&&!TV&&!TIZEN&&!S.castDev}
 function miniChannel(){var id=MINI.id||(USER.recent||[])[0];var x=id&&byId('live',id);if(!x){x=filtered('live',S.liveCat)[0]||DATA.live[0];}if(x)MINI.id=x.stream_id;return x}
 function miniHtml(){
@@ -1755,7 +1756,7 @@ function miniStop(){if(!MINI.on)return;MINI.on=false;MINI.playing=null;MINI.rect
 var miniRaf=0;window.addEventListener('scroll',function(){if(!MINI.on)return;cancelAnimationFrame(miniRaf);miniRaf=requestAnimationFrame(miniSync)},{passive:true});
 window.addEventListener('resize',function(){if(MINI.on)miniSync()});
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')setTimeout(miniSync,300);else MINI.on=false});
-try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','miniState',function(e){
+try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','miniState',function(e){if(e&&e.state==='unmuted'){MINI.muted=false;paintMiniBar();return}
   MINI.state=e.state;var m=document.querySelector('#mvbox .mv-msg');
   if(e.state==='stopped'){MINI.on=false;MINI.playing=null;return}
   if(m)m.textContent=e.state==='error'?'Chaîne indisponible pour le moment':e.state==='buffering'?'Chargement…':'';
@@ -3102,7 +3103,7 @@ document.addEventListener('scroll',function(e){if(!TV||!$('#tvplayer').hidden)re
 var lastFocus=null;
 document.addEventListener('focusin',function(e){if(TV&&e.target&&e.target!==document.body)lastFocus=e.target});
 if(TV)document.body.classList.add('tv');
-if(NATIVE)nat('deviceInfo').then(function(r){if(r&&r.tv&&!TV){TV=true;document.body.classList.add('tv');tvScale();render()}},function(){});
+if(NATIVE)nat('deviceInfo').then(function(r){if(r&&r.tv&&!TV){TV=true;document.body.classList.add('tv');MINI.muted=false;tvScale();render()}},function(){});
 
 /* ---------- start ---------- */
 /* TV: optionally start on the last channel watched */

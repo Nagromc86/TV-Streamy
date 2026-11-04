@@ -159,6 +159,7 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_SUB_OFFSET, call.getData().optLong("subOffset", 0L));
         intent.putExtra(PlayerActivity.EXTRA_OS_ON, call.getBoolean("osOn", false));
         intent.putExtra(PlayerActivity.EXTRA_BG_AUDIO, call.getBoolean("bgAudio", true));
+        intent.putExtra(PlayerActivity.EXTRA_MUTED, call.getBoolean("startMuted", false));
         intent.putExtra(PlayerActivity.EXTRA_TS_TPL, call.getString("tsTpl", ""));
         intent.putExtra(PlayerActivity.EXTRA_TS_TZ, call.getData().optInt("tsTz", 0));
         intent.putExtra(PlayerActivity.EXTRA_CHANNELS, call.getString("channels", ""));

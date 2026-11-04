@@ -116,9 +116,6 @@ class MiniPlayer {
             box.setClipToOutline(false);
             box.setVisibility(View.VISIBLE);
             box.bringToFront();
-            if (player != null) {
-                player.setVolume(1f);
-            }
         } else {
             box.setClipToOutline(true);
             place(act, web, lastRect);
@@ -196,7 +193,7 @@ class MiniPlayer {
         }
         if (u.equals(url) && player.getPlayWhenReady() && player.getPlaybackState() != Player.STATE_IDLE) {
             // same channel still playing (back from the floating window): no restart
-            player.setVolume(muted ? 0f : 1f);
+            mute(muted);
             place(act, webView, rect);
             emit("playing", "");
             return;
@@ -205,7 +202,8 @@ class MiniPlayer {
         fallback = fb;
         triedFallback = false;
         retries = 0;
-        player.setVolume(muted ? 0f : 1f);
+        mute(muted);
+        watchVolume(act);
         place(act, webView, rect);
         start(u);
         pipWatch.removeCallbacks(pipTick);
@@ -246,14 +244,51 @@ class MiniPlayer {
         box.setVisibility(rect.length > 4 && rect[4] == 0 ? View.GONE : View.VISIBLE);
     }
 
+    /* Volume + on the phone while the small video is silent: its sound comes back */
+    private static boolean muted;
+    private static android.database.ContentObserver volWatch;
+    private static int lastVol = -1;
+
+    private static void watchVolume(Activity a) {
+        if (volWatch != null) {
+            return;
+        }
+        final android.media.AudioManager am = (android.media.AudioManager) a.getSystemService(android.content.Context.AUDIO_SERVICE);
+        if (am == null) {
+            return;
+        }
+        lastVol = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+        volWatch = new android.database.ContentObserver(new android.os.Handler(android.os.Looper.getMainLooper())) {
+            @Override
+            public void onChange(boolean self) {
+                int v = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC);
+                if (v > lastVol && muted && player != null) {
+                    mute(false);
+                    emit("unmuted", "");
+                }
+                lastVol = v;
+            }
+        };
+        a.getContentResolver().registerContentObserver(android.provider.Settings.System.CONTENT_URI, true, volWatch);
+    }
+
+    private static void unwatchVolume() {
+        if (volWatch != null && act != null) {
+            act.getContentResolver().unregisterContentObserver(volWatch);
+        }
+        volWatch = null;
+    }
+
     static void mute(boolean m) {
-        if (player != null && !inPip) {
+        muted = m;
+        if (player != null) {
             player.setVolume(m ? 0f : 1f);
         }
     }
 
     static void stop() {
         pipWatch.removeCallbacks(pipTick);
+        unwatchVolume();
         autoPip(false);
         inPip = false;
         if (player != null) {
