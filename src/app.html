@@ -1745,6 +1745,13 @@ function miniStart(r){
     return nat('miniPlay',Object.assign({url:streamUrl('live',x,ex[0]),fallbackUrl:streamUrl('live',x,ex[1]),muted:MINI.muted},cur));
   }).catch(function(){MINI.on=false});
 }
+/* phone: a channel started from search, home or favourites opens the Direct page with the small video on top and the list below */
+function liveInDirect(x){
+  var cat=S.liveCat||'all';if(cat!=='all'&&!filtered('live',cat).some(function(y){return String(y.stream_id)===String(x.stream_id)}))S.liveCat='all';
+  MINI.id=x.stream_id;USER.recent=[x.stream_id].concat((USER.recent||[]).filter(function(i){return String(i)!==String(x.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
+  MINI.on=false;S.tab='live';render();window.scrollTo(0,0);setTimeout(miniSync,50);
+  setTimeout(function(){var row=document.querySelector('.chlist [data-play="live:'+x.stream_id+'"],.grow[data-grow="'+x.stream_id+'"]');if(row){var top=($('#minivid')&&$('#minivid').getBoundingClientRect().bottom)||0,r=row.getBoundingClientRect();if(r.top<top||r.bottom>innerHeight-80)window.scrollBy(0,r.top-top-12)}},250);
+}
 function miniZap(x){
   MINI.id=x.stream_id;USER.recent=[x.stream_id].concat((USER.recent||[]).filter(function(i){return String(i)!==String(x.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
   var b=$('#mvbox');if(b)b.innerHTML='<span class="mv-msg">Chargement…</span>';paintMiniBar();
@@ -2474,7 +2481,7 @@ document.addEventListener('click',function(e){
     if(pp.e<=nw&&canReplay(gx,pp)){playReplay(gx,pp);return}
     toast(hhmm(pp.s)+'–'+hhmm(pp.e)+' · '+pp.t+(pp.e<=nw?' · pas de replay sur cette chaîne':'')+(pp.d?' — '+pp.d.slice(0,140):''));return;
   }
-  if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x){if(pl[0]==='live'&&S.tab==='live'&&miniOk()&&!sheet)miniZap(x);else{miniStop();playLive(x)}}return}
+  if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x){if(pl[0]==='live'&&S.tab==='live'&&miniOk()&&!sheet)miniZap(x);else if(pl[0]==='live'&&miniOk()&&!sheet)liveInDirect(x);else{miniStop();playLive(x)}}return}
   if(t.hasAttribute('data-mvfull')){var mx=byId('live',MINI.id);if(mx){miniStop();playLive(mx)}return}
   if(t.hasAttribute('data-mvmute')){MINI.muted=!MINI.muted;nat('miniMute',{muted:MINI.muted}).catch(function(){});paintMiniBar();return}
   if(d.fav){var f=d.fav.split(':'),it=byId(f[0],f.slice(1).join(':'));if(it){toggleFav(f[0],it);render();if(sheet)renderSheet()}return}
