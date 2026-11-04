@@ -38,13 +38,102 @@ class MiniPlayer {
     private static boolean triedFallback;
     private static int retries;
     private static Listener listener;
+    /* picture in picture: when the user leaves the app (home / app switch), the small video goes on in a floating window */
+    static boolean inPip;
+    private static Activity act;
+    private static View web;
+    private static float[] lastRect;
+    private static final android.os.Handler pipWatch = new android.os.Handler(android.os.Looper.getMainLooper());
+    private static final Runnable pipTick = new Runnable() {
+        @Override
+        public void run() {
+            if (player == null || act == null) {
+                return;
+            }
+            boolean now = android.os.Build.VERSION.SDK_INT >= 26 && act.isInPictureInPictureMode();
+            if (now != inPip) {
+                setPip(now);
+            }
+            pipWatch.postDelayed(this, 300);
+        }
+    };
+
+    static boolean isTv(Activity a) {
+        android.app.UiModeManager um = (android.app.UiModeManager) a.getSystemService(android.content.Context.UI_MODE_SERVICE);
+        return um != null && um.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
+    }
+
+    static boolean pipAllowed(Activity a) {
+        return android.os.Build.VERSION.SDK_INT >= 26 && !isTv(a)
+                && a.getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE);
+    }
+
+    static android.app.PictureInPictureParams pipParams(boolean auto) {
+        android.app.PictureInPictureParams.Builder b = new android.app.PictureInPictureParams.Builder().setAspectRatio(new android.util.Rational(16, 9));
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            b.setAutoEnterEnabled(auto);
+            b.setSeamlessResizeEnabled(true);
+        }
+        return b.build();
+    }
+
+    /** Android 12+: the system opens the floating window by itself when the user leaves while the video plays. */
+    private static void autoPip(boolean on) {
+        if (act == null || android.os.Build.VERSION.SDK_INT < 31 || !pipAllowed(act)) {
+            return;
+        }
+        try {
+            act.setPictureInPictureParams(pipParams(on));
+        } catch (Exception ignored) {
+            // activity not declared for picture in picture
+        }
+    }
+
+    /** Android 8 to 11: called when the app is being left. True if the floating window opened. */
+    static boolean enterPipNow() {
+        if (player == null || act == null || !pipAllowed(act) || !player.getPlayWhenReady()) {
+            return false;
+        }
+        try {
+            return act.enterPictureInPictureMode(pipParams(true));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static void setPip(boolean on) {
+        inPip = on;
+        if (box == null || web == null) {
+            return;
+        }
+        if (on) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) box.getLayoutParams();
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            lp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            box.setLayoutParams(lp);
+            box.setTranslationX(0);
+            box.setTranslationY(0);
+            box.setClipToOutline(false);
+            box.setVisibility(View.VISIBLE);
+            box.bringToFront();
+            if (player != null) {
+                player.setVolume(1f);
+            }
+        } else {
+            box.setClipToOutline(true);
+            place(act, web, lastRect);
+        }
+    }
 
     static boolean active() {
         return player != null;
     }
 
-    static void play(Activity act, View webView, String u, String fb, String ua, float[] rect, boolean muted, Listener l) {
+    static void play(Activity a, View webView, String u, String fb, String ua, float[] rect, boolean muted, Listener l) {
         listener = l;
+        act = a;
+        web = webView;
+        final Activity act = a;
         if (box == null) {
             box = new FrameLayout(act);
             box.setBackgroundColor(Color.BLACK);
@@ -60,6 +149,8 @@ class MiniPlayer {
             view.setUseController(false);
             view.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FIT);
             view.setShutterBackgroundColor(Color.BLACK);
+            // a video is playing on the page: the screen does not go to sleep
+            view.setKeepScreenOn(true);
             box.addView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
             ViewGroup root = act.findViewById(android.R.id.content);
             root.addView(box, new FrameLayout.LayoutParams(10, 10));
@@ -75,6 +166,7 @@ class MiniPlayer {
                 public void onPlaybackStateChanged(int s) {
                     if (s == Player.STATE_READY) {
                         retries = 0;
+                        autoPip(true);
                         emit("playing", triedFallback ? "fallback" : "");
                     } else if (s == Player.STATE_BUFFERING) {
                         emit("buffering", "");
@@ -109,6 +201,8 @@ class MiniPlayer {
         player.setVolume(muted ? 0f : 1f);
         place(act, webView, rect);
         start(u);
+        pipWatch.removeCallbacks(pipTick);
+        pipWatch.postDelayed(pipTick, 300);
     }
 
     private static void start(String u) {
@@ -123,7 +217,10 @@ class MiniPlayer {
 
     /** rect = x, y, width, height in page pixels, visible (1/0). */
     static void place(Activity act, View webView, float[] rect) {
-        if (box == null || rect == null) {
+        if (rect != null) {
+            lastRect = rect;
+        }
+        if (box == null || rect == null || inPip) {
             return;
         }
         float d = act.getResources().getDisplayMetrics().density;
@@ -143,12 +240,15 @@ class MiniPlayer {
     }
 
     static void mute(boolean m) {
-        if (player != null) {
+        if (player != null && !inPip) {
             player.setVolume(m ? 0f : 1f);
         }
     }
 
     static void stop() {
+        pipWatch.removeCallbacks(pipTick);
+        autoPip(false);
+        inPip = false;
         if (player != null) {
             player.stop();
             player.release();

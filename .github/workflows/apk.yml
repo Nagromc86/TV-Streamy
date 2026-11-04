@@ -47,6 +47,11 @@ jobs:
           # Android TV: appear in the TV launcher, with a banner
           sed -i 's/<application/<application android:banner="@drawable\/tv_banner"/' android/app/src/main/AndroidManifest.xml
           sed -i 's#<category android:name="android.intent.category.LAUNCHER" />#<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />#' android/app/src/main/AndroidManifest.xml
+          # phone: the small Direct video goes on in a floating window when the app is left (picture in picture)
+          sed -i 's/android:name=".MainActivity"/android:name=".MainActivity" android:supportsPictureInPicture="true" android:resizeableActivity="true"/' android/app/src/main/AndroidManifest.xml
+          grep -q 'MainActivity" android:supportsPictureInPicture="true"' android/app/src/main/AndroidManifest.xml || { echo "::error title=manifest::PiP non ajouté"; grep -n "activity" android/app/src/main/AndroidManifest.xml; exit 1; }
+          # the page must not be rebuilt when the window shrinks
+          grep -q 'configChanges="[^"]*smallestScreenSize[^"]*"' android/app/src/main/AndroidManifest.xml && grep -q 'configChanges="[^"]*screenLayout[^"]*"' android/app/src/main/AndroidManifest.xml || { echo "::error title=manifest::configChanges incomplet"; grep -n "configChanges" android/app/src/main/AndroidManifest.xml; exit 1; }
           mkdir -p android/app/src/main/res/drawable-xhdpi && cp assets/tv-banner.png android/app/src/main/res/drawable-xhdpi/tv_banner.png
           grep -q LEANBACK_LAUNCHER android/app/src/main/AndroidManifest.xml || { echo "::error title=manifest::LEANBACK_LAUNCHER non ajouté"; grep -n "category" android/app/src/main/AndroidManifest.xml; exit 1; }
           VERSION=$(grep -o "var APP_VERSION='[0-9][^']*'" www/index.html | head -1 | cut -d"'" -f2)

@@ -480,6 +480,11 @@ public class PlayerActivity extends Activity {
 
     /* ---------- floating window (picture-in-picture) ---------- */
 
+    private boolean isTvDevice() {
+        android.app.UiModeManager um = (android.app.UiModeManager) getSystemService(UI_MODE_SERVICE);
+        return um != null && um.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
+    }
+
     private boolean pipSupported() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE);
@@ -834,8 +839,10 @@ public class PlayerActivity extends Activity {
     @Override
     protected void onUserLeaveHint() {
         super.onUserLeaveHint();
-        // Android 12+ enters the window by itself (auto-enter); older versions need this
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && player != null && player.isPlaying() && !finishing) {
+        // home / app switch while the video plays: it goes on in a floating window. Android 12+ usually does it by
+        // itself (auto-enter); asking again covers the cases where it did not (3-button navigation, some brands)
+        if (player != null && player.getPlayWhenReady() && !finishing && !inPip && !isTvDevice()
+                && !(Build.VERSION.SDK_INT >= 26 && isInPictureInPictureMode())) {
             enterPip(false);
         }
     }

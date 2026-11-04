@@ -102,6 +102,25 @@ public class PlayerPlugin extends Plugin {
     @Override
     protected void handleOnPause() {
         super.handleOnPause();
+        android.app.Activity a = getActivity();
+        // leaving the app with the small video playing: it goes on in a floating window (picture in picture)
+        if (MiniPlayer.active() && a != null && android.os.Build.VERSION.SDK_INT >= 26
+                && (a.isInPictureInPictureMode() || (android.os.Build.VERSION.SDK_INT < 31 && MiniPlayer.enterPipNow()))) {
+            return;
+        }
+        stopMiniBg();
+    }
+
+    @Override
+    protected void handleOnStop() {
+        super.handleOnStop();
+        // the floating window was closed
+        if (MiniPlayer.active() && MiniPlayer.inPip) {
+            stopMiniBg();
+        }
+    }
+
+    private void stopMiniBg() {
         // the app goes to the background (or the full-screen player opens): free the provider's screen
         if (MiniPlayer.active() && getActivity() != null) {
             getActivity().runOnUiThread(MiniPlayer::stop);
