@@ -1022,7 +1022,7 @@ function castNext(c){
   if(c.step<=2&&c.dev.type==='dlna'){c.step=2;return Object.assign({},c.args,{direct:true,subsOn:false,subtitles:[]})}
   return null;
 }
-function finishCast(c,ended){if(c.done)return;c.done=true;if(CAST===c)CAST=null;clearTimeout(castT);paintCast();c.res({positionMs:c.pos,durationMs:c.dur,ended:!!ended})}
+function finishCast(c,ended){if(c.done)return;c.done=true;if(NATIVE)nat('castControl',{action:'release'}).catch(function(){});if(CAST===c)CAST=null;clearTimeout(castT);paintCast();c.res({positionMs:c.pos,durationMs:c.dur,ended:!!ended})}
 function castPoll(){
   clearTimeout(castT);var c=CAST;if(!c)return;
   nat('castStatus').then(function(r){
@@ -1783,6 +1783,7 @@ function miniStop(){if(!MINI.on)return;MINI.on=false;MINI.playing=null;MINI.rect
 var miniRaf=0;window.addEventListener('scroll',function(){if(!MINI.on)return;cancelAnimationFrame(miniRaf);miniRaf=requestAnimationFrame(miniSync)},{passive:true});
 window.addEventListener('resize',function(){if(MINI.on)miniSync()});
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')setTimeout(miniSync,300);else MINI.on=false});
+try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','castStopped',function(){if(CAST){finishCast(CAST,false);toast('Diffusion arrêtée.')}})}catch(e){}
 try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','miniState',function(e){if(e&&e.state==='unmuted'){MINI.muted=false;paintMiniBar();return}
   MINI.state=e.state;var m=document.querySelector('#mvbox .mv-msg');
   if(e.state==='stopped'){MINI.on=false;MINI.playing=null;return}

@@ -35,6 +35,10 @@
             android:name="fr.nagromc86.iptvplayer.AudioService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="fr.nagromc86.iptvplayer.CastService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
         <activity
             android:name="fr.nagromc86.iptvplayer.PlayerActivity"
             android:exported="false"

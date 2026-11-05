@@ -443,6 +443,44 @@ public class PlayerPlugin extends Plugin {
 
     private DlnaHelper.Device dlnaActive;
 
+    /** The phone keeps relaying / steering the TV with the app in the background: foreground service on / off. */
+    private void castFg(boolean on, String title, String text) {
+        android.content.Context ctx = getContext();
+        try {
+            if (on) {
+                CastService.title = title;
+                CastService.text = text;
+                CastService.onStop = () -> {
+                    DlnaHelper.Device d = dlnaActive;
+                    SubServer.stopRelay();
+                    if (d != null) {
+                        try {
+                            DlnaHelper.soap(d, "Stop", "");
+                        } catch (Exception ignored) {
+                            // TV already off
+                        }
+                        dlnaActive = null;
+                    } else {
+                        CastHelper.main.post(() -> CastHelper.control("stop", 0));
+                    }
+                    JSObject o = new JSObject();
+                    o.put("state", "stopped");
+                    notifyListeners("castStopped", o);
+                };
+                Intent i = new Intent(ctx, CastService.class);
+                if (android.os.Build.VERSION.SDK_INT >= 26) {
+                    ctx.startForegroundService(i);
+                } else {
+                    ctx.startService(i);
+                }
+            } else {
+                ctx.stopService(new Intent(ctx, CastService.class));
+            }
+        } catch (Exception ignored) {
+            // no notification: casting still works while the app is open
+        }
+    }
+
     @PluginMethod
     public void castScan(PluginCall call) {
         CastHelper.main.post(() -> CastHelper.startScan(getContext()));
@@ -526,6 +564,7 @@ public class PlayerPlugin extends Plugin {
                     String viaPhone = call.getBoolean("direct", false) ? null : SubServer.relay(getContext(), url, m, live, ua, android.net.Uri.parse(dev.control).getHost());
                     DlnaHelper.play(dev, viaPhone != null ? viaPhone : url, title, m, live ? 0 : startMs, subsOn ? srtFinal : null, live);
                     dlnaActive = dev;
+                    castFg(true, title, "Diffusion sur " + dev.name);
                     call.resolve();
                 } catch (Exception e) {
                     call.reject("Envoi vers la TV impossible : " + e.getMessage());
@@ -537,6 +576,7 @@ public class PlayerPlugin extends Plugin {
         CastHelper.main.post(() -> CastHelper.play(getContext(), id, url, title, subtitle, image, mime, startMs, live, vttFinal, subsOn, new CastHelper.Done() {
             @Override
             public void ok() {
+                castFg(true, title, "Diffusion sur l'écran");
                 call.resolve();
             }
 
@@ -584,6 +624,13 @@ public class PlayerPlugin extends Plugin {
     @PluginMethod
     public void castControl(PluginCall call) {
         String action = call.getString("action", "");
+        if ("release".equals(action)) {
+            // the video ended or could not start: nothing to keep alive in the background any more
+            castFg(false, null, null);
+            SubServer.stopRelay();
+            call.resolve();
+            return;
+        }
         long ms = call.getData().optLong("ms", 0L);
         DlnaHelper.Device dev = dlnaActive;
         if (dev != null) {
@@ -601,6 +648,7 @@ public class PlayerPlugin extends Plugin {
                             break;
                         case "stop":
                         case "disconnect":
+                            castFg(false, null, null);
                             SubServer.stopRelay();
                             DlnaHelper.soap(dev, "Stop", "");
                             dlnaActive = null;
@@ -618,6 +666,9 @@ public class PlayerPlugin extends Plugin {
                 }
             }).start();
             return;
+        }
+        if ("stop".equals(action) || "disconnect".equals(action)) {
+            castFg(false, null, null);
         }
         CastHelper.main.post(() -> {
             CastHelper.control(action, ms);
