@@ -2939,7 +2939,7 @@ function tvOpen(){
       try{t.dur=av.getDuration()||0}catch(e){}
       if(t.pos>0&&!t.o.live){try{av.seekTo(Math.floor(t.pos))}catch(e){}}
       av.play();t.buffering=false;tvPaint();
-      if(!t.tracksDone){t.tracksDone=true;setTimeout(tvAutoAudio,500);setTimeout(tvAutoAudio,2500);setTimeout(tvAutoSubs,800)}
+      if(!t.tracksDone){t.tracksDone=true;setTimeout(function(){tvAutoAudio.late=false;tvAutoAudio()},500);setTimeout(function(){tvAutoAudio.late=true;tvAutoAudio()},2500);setTimeout(tvAutoSubs,800)}
     },function(e){tvFail(e)});
   }catch(e){tvFail(e)}
 }
@@ -2971,7 +2971,7 @@ function tvOpenSub(manual){
 }
 /* no sound track the TV can read: offer the other versions of the title (same provider, then the other lists) */
 function tvNoSound(){
-  var t=TVP;if(!t)return;var r=t.o.vref,x=r&&byId(r.kind,r.id),items=[{h:'Son non lu par la TV (DTS)'}];
+  var t=TVP;if(!t)return;var r=t.o.vref,x=r&&byId(r.kind,r.id),items=[{h:'Son non lu par la TV'}];
   if(x){
     versionsOf(r.kind,x).slice(0,8).forEach(function(y){var id=y.stream_id||y.series_id;items.push({label:'Version '+verLabel(r.kind,y),act:function(){tvStop();setTimeout(function(){if(r.kind==='movie'){var m=byId('movie',id);if(m)playMovie(m)}else openItem('series',id)},300)}})});
     if(S.accounts.length>1){loadXCats();var v=verParts(x.name),yr=year(x.releaseDate||x.name);
@@ -2987,7 +2987,8 @@ function tvNoSound(){
 function tvAutoAudio(){
   var t=TVP,av=window.webapis&&webapis.avplay;if(!t||!av)return;var L=[];
   try{L=(av.getTotalTrackInfo()||[]).filter(function(x){return x.type==='AUDIO'})}catch(e){return}
-  if(!L.length)return;
+  if(!L.length){var hasV=false;try{hasV=(av.getTotalTrackInfo()||[]).some(function(x){return x.type==='VIDEO'})}catch(e){}
+    if(hasV&&tvAutoAudio.late&&!t.o.live){var vr0=t.o.vref;dtsMark(vr0&&(vr0.ep?'ep:'+vr0.ep:vr0.kind+':'+vr0.id),1);if(!t.audioWarned){t.audioWarned=true;tvNoSound()}}return}
   var inf=function(x){try{return JSON.parse(x.extra_info||'{}')}catch(e){return {}}};
   var codec=function(x){var i=inf(x);return String(i.fourCC||i.codec||i.codec_fourcc||x.extra_info||'')};
   var bad=function(x){return /dts|dca|truehd|mlp/i.test(codec(x))};
@@ -3022,6 +3023,8 @@ function tvPanel(open){
   t.texts.forEach(function(x){items.push({label:x.label+' · de la vidéo',act:function(){tvSetSub({kind:'track',index:x.index,label:x.label})},on:t.sub&&t.sub.kind==='track'&&t.sub.index===x.index})});
   if(osOn()&&!t.o.live)items.push({label:'Français · OpenSubtitles',act:function(){if(t.sub&&t.sub.kind==='srt')return;tvOpenSub(true)},on:t.sub&&t.sub.kind==='srt'});
   if(t.sub&&t.sub.kind==='srt'){items.push({label:'Décalage −0,5 s',act:function(){t.sub.offset-=500;keepSubOffset(CURSUB&&CURSUB.k,CURSUB&&CURSUB.box.L,{subOffsetMs:t.sub.offset});toast('Décalage : '+(t.sub.offset/1000).toFixed(1).replace('.',',')+' s');t.sub.last=null},stay:true});items.push({label:'Décalage +0,5 s',act:function(){t.sub.offset+=500;keepSubOffset(CURSUB&&CURSUB.k,CURSUB&&CURSUB.box.L,{subOffsetMs:t.sub.offset});toast('Décalage : '+(t.sub.offset/1000).toFixed(1).replace('.',',')+' s');t.sub.last=null},stay:true})}
+  if(!t.auds.length)items.push({h:'Audio'},{label:'Aucune piste son reconnue par la TV',act:function(){},stay:true});
+  if(t.auds.length===1){items.push({h:'Audio'},{label:t.auds[0].label,on:true,act:function(){}})}
   if(t.auds.length>1){items.push({h:'Audio'});t.auds.forEach(function(x,i){items.push({label:x.label,act:function(){try{webapis.avplay.setSelectTrack('AUDIO',x.index);t.audio=x.index}catch(e){}},on:t.audio===x.index||(t.audio==null&&i===0)})})}
   var sel=items.findIndex(function(x){return x.on})<0?1:items.findIndex(function(x){return x.on});
   t.panel={items:items,sel:sel};tvPanelPaint();el.hidden=false;
