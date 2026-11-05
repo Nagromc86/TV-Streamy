@@ -556,6 +556,11 @@ body.tv #sheet .tvsim h2{font-size:1.2rem;text-shadow:none;margin:0 0 4px;line-h
 body.tv .tvrow .row{-webkit-mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.25) 20px,#000 var(--tvpad));mask-image:linear-gradient(90deg,transparent 0,rgba(0,0,0,.25) 20px,#000 var(--tvpad))}
 @media (max-width:1100px){body.tv .tvtop{gap:22px}body.tv .tvlogo b{display:none}}
 body.tv .tvgrid{padding:16px 14px}
+html.avprev,html.avprev body{background:transparent!important}
+html.avprev #tvpbox{background:transparent!important}
+.tvprev .mv-box{position:relative;border:0;padding:0;width:100%;color:inherit;font:inherit;cursor:pointer}
+.tvprev .mv-box .mv-msg{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:.85rem;color:#ddd;text-shadow:0 1px 4px #000}
+body.tv .tvprev .mv-box.tvf{box-shadow:0 0 0 4px #fff,0 14px 30px rgba(0,0,0,.5)}
 /* v2.1 fixes */
 body.tv .row,body.tv .chips{scroll-snap-type:none}
 body.tv .tvlive .ch .logo{width:64px;height:44px}
@@ -731,12 +736,12 @@ function refreshSection(sec,manual){
   if(navigator.onLine===false){if(manual)toast('Pas de connexion : mise à jour impossible pour l\'instant.');return Promise.resolve()}
   UPD[sec]=true;paintTop();if(sheet&&sheet.kind==='accounts'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('form')))renderSheet();
   var id=a.id;
-  return fetchSection(a,sec).then(function(r){
+  return withTimeout(fetchSection(a,sec).then(function(r){
     if(S.activeId!==id||!DATA)return;
     if(!r[1].length&&(DATA[SECT[sec].calls[1][0]]||[]).length)throw new Error('le serveur a renvoyé une liste vide');
     applySection(sec,r);repairFavs();
     return kset('cat:'+id,DATA).then(function(){if(manual)toast(SECT[sec].label+' à jour : '+r[1].length+' titres.')});
-  }).catch(function(e){if(manual)toast(SECT[sec].label+' : mise à jour impossible ('+errText(e)+').')}).then(function(){delete UPD[sec];softRender();if(sheet&&sheet.kind==='accounts'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('form')))renderSheet()});
+  }),TIZEN?240000:180000).catch(function(e){if(manual)toast(SECT[sec].label+' : mise à jour impossible ('+errText(e)+').')}).then(function(){delete UPD[sec];softRender();if(sheet&&sheet.kind==='accounts'&&!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('form')))renderSheet()});
 }
 /* once a day, in the background, one section after the other */
 function dailyRefresh(){
@@ -1112,6 +1117,7 @@ function playInner(o){
   var stream=!/^(file|content):/.test(o.url);
   if(!stream)return playRaw(o);
   if(NATIVE&&S.castDev)return authPing(false).then(function(){return playRaw(o)});
+  if(TIZEN){claimScreen().then(function(since){if(since&&TVP&&TVP.o===o)tvWatch(o,since)});return authPing(false).then(function(){return playRaw(o)})}
   return Promise.all([claimScreen(),authPing(false)]).then(function(x){if(x[0]){o._since=x[0];Object.assign(o,watchOpts(x[0]))}return playRaw(o)}).then(function(r){
     if(r&&r.takenBy){toast('Lecture arrêtée ici : elle a été lancée sur '+r.takenBy+'.');return r}
     if(!refused(r)||o._again||TIZEN||!NATIVE)return r;
@@ -2102,7 +2108,7 @@ function tvLive(){
 function tvPrevOk(){return NATIVE&&TV&&!S.castDev}
 function tvPrevHtml(L){
   var x=(MINI.id&&byId('live',MINI.id))||L[0];if(!x)return '';MINI.id=x.stream_id;
-  return '<aside class="tvprev"><div class="mv-box" id="'+(tvPrevOk()?'mvbox':'tvpbox')+'">'+(tvPrevOk()?'<span class="mv-msg">Chargement…</span>':'<span class="tvplogo">'+(x.stream_icon?'<img src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':initials(x.name))+'</span>')+'</div><div class="tvpinfo" id="tvpinfo">'+tvPrevInfo(x)+'</div></aside>';
+  return '<aside class="tvprev"><button type="button" class="mv-box" data-mvfull aria-label="Regarder en plein écran" id="'+(tvPrevOk()?'mvbox':'tvpbox')+'">'+(tvPrevOk()?'<span class="mv-msg">Chargement…</span>':'<span class="tvplogo">'+(x.stream_icon?'<img src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':initials(x.name))+'</span>')+'</button><div class="tvpinfo" id="tvpinfo">'+tvPrevInfo(x)+'</div></aside>';
 }
 function tvPrevInfo(x){
   var e=epgCache[x.stream_id],L=(e&&e.list)||[],n=L[0],nx=L[1],now=Date.now()/1000,pc=n?Math.max(0,Math.min(100,(now-n.start)/(n.end-n.start)*100)):0;
@@ -2110,12 +2116,35 @@ function tvPrevInfo(x){
     (nx?'<span class="tvpnext">Ensuite · '+hhmm(nx.start)+' '+esc(nx.title)+'</span>':'')+'<span class="hint">OK : plein écran'+(hasArchive(x)?' · '+'replay disponible':'')+'</span>';
 }
 var prevT=0;
+/* Samsung: the preview plays the selected channel in the small box (AVPlay draws under the page: the page lets it through) */
+var PREV={on:false,id:null,n:0};
+function avPrevOk(){return TIZEN&&!!(window.webapis&&webapis.avplay)}
+function tvRectOf(el){var r=el.getBoundingClientRect(),z=parseFloat(document.documentElement.style.zoom)||1,W=window.innerWidth||1920,k=r.right>W/z+2?1:z,f=1920/W;return [r.left*k*f,r.top*k*f,r.width*k*f,r.height*k*f].map(Math.round)}
+function tvPrevMsg(t){var m=document.querySelector('#tvpbox .mv-msg');if(m){m.textContent=t;m.hidden=!t}}
+function tvPrevPlay(x){
+  if(!avPrevOk()||TVP||S.tab!=='live'||S.liveView==='guide'||sheet||document.hidden)return;
+  var box=$('#tvpbox');if(!box)return;var av=webapis.avplay,ex=liveExt(),my=++PREV.n;
+  box.innerHTML='<object id="avprev" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><span class="mv-msg">Chargement…</span>';
+  document.documentElement.classList.add('avprev');PREV.on=true;PREV.id=x.stream_id;
+  try{av.stop()}catch(e){}try{av.close()}catch(e){}
+  try{
+    av.open(streamUrl('live',x,ex[0]));var R=tvRectOf(box);av.setDisplayRect(R[0],R[1],R[2],R[3]);
+    try{av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX')}catch(e){}
+    try{av.setBufferingParam('PLAYER_BUFFER_FOR_PLAY','PLAYER_BUFFER_SIZE_IN_SECOND',2)}catch(e){}
+    av.setListener({onbufferingstart:function(){},onbufferingcomplete:function(){if(PREV.n===my)tvPrevMsg('')},oncurrentplaytime:function(){},onstreamcompleted:function(){},onevent:function(){},ondrmevent:function(){},onsubtitlechange:function(){},
+      onerror:function(){if(PREV.n===my)tvPrevMsg('Aperçu indisponible · OK pour essayer en plein écran')}});
+    av.prepareAsync(function(){if(PREV.n!==my)return;try{av.play()}catch(e){}tvPrevMsg('')},function(){if(PREV.n===my)tvPrevMsg('Aperçu indisponible · OK pour essayer en plein écran')});
+  }catch(e){tvPrevMsg('Aperçu indisponible')}
+}
+function tvPrevStop(){if(!PREV.on)return;PREV.on=false;PREV.n++;try{webapis.avplay.stop()}catch(e){}try{webapis.avplay.close()}catch(e){}document.documentElement.classList.remove('avprev')}
+document.addEventListener('visibilitychange',function(){if(document.hidden)tvPrevStop()});
+
 document.addEventListener('focusin',function(e){
   if(!TV||S.tab!=='live'||S.liveView==='guide')return;var ch=e.target.closest&&e.target.closest('.tvlive .ch');if(!ch)return;
   var b=ch.querySelector('[data-play]');if(!b)return;var x=byId('live',b.getAttribute('data-play').slice(5));if(!x)return;
   wantEpg(x.stream_id);var inf=$('#tvpinfo');if(inf)inf.innerHTML=tvPrevInfo(x);
-  var box=$('#tvpbox');if(box)box.innerHTML='<span class="tvplogo">'+(x.stream_icon?'<img src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':initials(x.name))+'</span>';
-  clearTimeout(prevT);if(tvPrevOk()&&String(MINI.id)!==String(x.stream_id))prevT=setTimeout(function(){miniZap(x)},650);else MINI.id=x.stream_id;
+  var box=$('#tvpbox');if(box&&!(PREV.on&&String(PREV.id)===String(x.stream_id))){if(PREV.on)tvPrevStop();box.innerHTML='<span class="tvplogo">'+(x.stream_icon?'<img src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':initials(x.name))+'</span>';}
+  clearTimeout(prevT);if(tvPrevOk()&&String(MINI.id)!==String(x.stream_id))prevT=setTimeout(function(){miniZap(x)},650);else{MINI.id=x.stream_id;if(avPrevOk()&&!(PREV.on&&String(PREV.id)===String(x.stream_id)))prevT=setTimeout(function(){tvPrevPlay(x)},650)}
 });
 function tvFavs(){
   var F=Object.keys(USER.favs).map(function(k){return USER.favs[k]}).sort(function(a,b){return b.at-a.at});
@@ -2168,6 +2197,7 @@ function renderInner(){
   if(S.loading&&!DATA){app.innerHTML=topHtml()+'<main class="gut"><div class="loading" style="padding-top:140px"><div class="spin"></div><p>'+esc(S.loading)+'<br><span class="hint">Les fois suivantes, l\'appli s\'ouvre tout de suite sur le catalogue de la veille.</span></p></div></main>';nav.hidden=true;return}
   if(!DATA){app.innerHTML=topHtml()+'<main class="gut" style="padding-top:20px"><div class="empty"><p>'+esc(S.msg||'Catalogue indisponible.')+'</p><button type="button" class="btn" data-retry>'+IC.refresh+'Réessayer</button><button type="button" class="btn ghost" data-accounts>Gérer les comptes</button></div></main>';nav.hidden=true;return}
   if(TV){
+    tvPrevStop();
     BILL=false;var ae=document.activeElement,tsc=[].map.call(document.querySelectorAll('.tvscroll,.tvside,.gwrap'),function(e){return e.scrollTop+'|'+e.scrollLeft});
     app.innerHTML=tvTopHtml()+'<main class="tvmain tv-'+tvTab()+'">'+(navigator.onLine===false?'<p class="offline">Hors connexion.</p>':'')+(S.msg?'<p class="err">'+esc(S.msg)+'</p>':'')+tvRenderMain()+'</main>';
     nav.hidden=true;var ns=document.querySelectorAll('.tvscroll,.tvside,.gwrap');if(ns.length===tsc.length&&S.tvKeep===tvTab()+(S.vodCat||'')+(S.serCat||'')+(S.liveCat||''))[].forEach.call(ns,function(e,i){var v=tsc[i].split('|');e.scrollTop=+v[0];e.scrollLeft=+v[1]});
@@ -2485,7 +2515,7 @@ document.addEventListener('click',function(e){
     toast(hhmm(pp.s)+'–'+hhmm(pp.e)+' · '+pp.t+(pp.e<=nw?' · pas de replay sur cette chaîne':'')+(pp.d?' — '+pp.d.slice(0,140):''));return;
   }
   if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x){if(pl[0]==='live'&&S.tab==='live'&&miniOk()&&!sheet)miniZap(x);else if(pl[0]==='live'&&miniOk()&&!sheet)liveInDirect(x);else{miniStop();playLive(x)}}return}
-  if(t.hasAttribute('data-mvfull')){var mx=byId('live',MINI.id);if(mx){miniStop();playLive(mx)}return}
+  if(t.hasAttribute('data-mvfull')){var mx=byId('live',MINI.id);if(mx){tvPrevStop();miniStop();playLive(mx)}return}
   if(t.hasAttribute('data-mvmute')){MINI.muted=!MINI.muted;nat('miniMute',{muted:MINI.muted}).catch(function(){});paintMiniBar();return}
   if(d.fav){var f=d.fav.split(':'),it=byId(f[0],f.slice(1).join(':'));if(it){toggleFav(f[0],it);render();if(sheet)renderSheet()}return}
   if(d.lcat){S.liveCat=d.lcat;render();return}
@@ -2807,11 +2837,14 @@ function submitSync(f){
 
 /* ---------- Samsung TV player: AVPlay (plays TS, HLS, MP4, MKV with the TV's own decoder) ---------- */
 var TVP=null;
+/* another device took over the provider's screen: stop here */
+function tvWatch(o,since){var poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},20000)}
 function tvPlay(o){
+  tvPrevStop();
   return new Promise(function(res){
     var av=webapis.avplay,el=$('#tvplayer');
     if(TVP)tvStop();
-    if(o._since){var since=o._since,poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},20000)}
+    if(o._since)tvWatch(o,o._since);
     TVP={o:o,res:res,pos:o.startMs||0,dur:0,ended:false,paused:false,buffering:true,urls:[o.url,o.fallbackUrl].filter(Boolean),u:0};
     document.documentElement.classList.add('avplaying');
     el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'▲ ▼ : chaîne précédente / suivante · OK : liste des chaînes, audio et sous-titres · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ⏩ ⏪ : 1 min · ▲ ▼ : sous-titres et audio · Retour : quitter')+'</div></div><div id="tvsubs" hidden></div><div id="tvpanel" hidden></div>';
@@ -2826,6 +2859,8 @@ function tvOpen(){
     av.setDisplayRect(0,0,1920,1080);
     try{av.setDisplayMethod('PLAYER_DISPLAY_MODE_LETTER_BOX')}catch(e){}
     if(!t.o.live)try{av.setStreamingProperty('PREBUFFER_MODE','5000')}catch(e){}
+    /* start after 2 s of video instead of the default, resume after a stall with 3 s */
+    try{av.setBufferingParam('PLAYER_BUFFER_FOR_PLAY','PLAYER_BUFFER_SIZE_IN_SECOND',2);av.setBufferingParam('PLAYER_BUFFER_FOR_RESUME','PLAYER_BUFFER_SIZE_IN_SECOND',3)}catch(e){}
     av.setListener({
       onbufferingstart:function(){t.buffering=true;tvPaint()},
       onbufferingcomplete:function(){t.buffering=false;tvPaint()},
