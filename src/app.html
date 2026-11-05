@@ -1995,9 +1995,11 @@ function render(){keepFocus(renderInner)}
 /* ---------- TV layout (Android TV, Samsung): top menu, details of the focused title, side categories ----------
    One screen that never scrolls as a whole: the hero / details stay put, only the list under them moves. */
 var TVTABS=[['home','Accueil'],['live','Direct'],['guide','Guide TV'],['movies','Films'],['series','Séries'],['favs','Ma liste']];
+/* Samsung: no « Guide TV » tab (the Direct page already shows the programmes) */
+if(TIZEN)TVTABS=TVTABS.filter(function(t){return t[0]!=='guide'});
 var LOGO_SVG='<svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="114" fill="#fff1d6"/><g transform="translate(256 256) scale(.9) translate(-256 -256)"><path d="M168 84l88 104 88-104" fill="none" stroke="#e50914" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/><rect x="92" y="196" width="328" height="232" rx="72" fill="#e50914"/><circle cx="256" cy="378" r="21" fill="#fff1d6"/><path d="M212.16 334.16A62 62 0 0 1 299.84 334.16" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/><path d="M176.8 298.8A112 112 0 0 1 335.2 298.8" fill="none" stroke="#fff1d6" stroke-width="28" stroke-linecap="round"/></g></svg>';
 var SLIDERS='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>';
-function tvTab(){return S.tab==='live'&&S.liveView==='guide'?'guide':S.tab}
+function tvTab(){if(TIZEN&&S.liveView==='guide')S.liveView='list';return S.tab==='live'&&S.liveView==='guide'?'guide':S.tab}
 function tvClock(){var d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 setInterval(function(){var c=document.getElementById('tvclock');if(c)c.textContent=tvClock()},20000);
 function tvTopHtml(){
@@ -2537,7 +2539,7 @@ document.addEventListener('click',function(e){
     else if(pd.ep&&pd.series)playEpisode(pd.series,pd.ep,false);
     return}
   if(d.tab&&TV&&!t.closest('.tvtop'))setTimeout(function(){var c=[].filter.call(document.querySelectorAll('.tvmainc .poster,.tvmainc .ch .logo,.tvkb .key,.tvrows .poster'),visibleEl)[0];if(c)focusEl(c)},40);
-  if(d.tab==='guide'){S.tab='live';S.liveView='guide';render();return}
+  if(d.tab==='guide'){S.tab='live';S.liveView=TIZEN?'list':'guide';render();return}
   if(d.tab==='live'&&TV)S.liveView='list';
   if(d.tab){S.confirmDl=null;if(d.tab===S.tab&&d.tab==='movies')S.vodCat='all';if(d.tab===S.tab&&d.tab==='series')S.serCat='all';if(d.tab===S.tab&&d.tab==='favs')S.favCat='all';S.tab=d.tab;if(d.tab!=='search')S.q=S.q;render();window.scrollTo(0,0);if(d.tab==='search')setTimeout(function(){var q=$('#q');if(q)q.focus()},30);return}
   if(d.open){var p=d.open.split(':');openItem(p[0],p.slice(1).join(':'));return}
