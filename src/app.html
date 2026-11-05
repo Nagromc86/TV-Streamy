@@ -2921,14 +2921,14 @@ function tvOpen(){
       try{t.dur=av.getDuration()||0}catch(e){}
       if(t.pos>0&&!t.o.live){try{av.seekTo(Math.floor(t.pos))}catch(e){}}
       av.play();t.buffering=false;tvPaint();
-      if(!t.tracksDone){t.tracksDone=true;setTimeout(tvAutoAudio,500);setTimeout(tvAutoSubs,800)}
+      if(!t.tracksDone){t.tracksDone=true;setTimeout(tvAutoAudio,500);setTimeout(tvAutoAudio,2500);setTimeout(tvAutoSubs,800)}
     },function(e){tvFail(e)});
   }catch(e){tvFail(e)}
 }
 /* ---- subtitles & audio on the Samsung player ----
    the video's own French subtitles first; OpenSubtitles only when it has none (or on request), drawn over the video */
 function isFr(s){return /(^|[^a-z])(fr|fre|fra|french|français)([^a-z]|$)/i.test(String(s||''))}
-function tvTracks(type){var av=webapis.avplay,out=[];try{(av.getTotalTrackInfo()||[]).forEach(function(tr){if(tr.type!==type)return;var info={};try{info=JSON.parse(tr.extra_info||'{}')}catch(e){}var lang=info.track_lang||info.language||info.lang||'';out.push({index:tr.index,lang:lang,label:lang?langName(lang):'Piste '+(out.length+1)})})}catch(e){}return out}
+function tvTracks(type){var av=webapis.avplay,out=[];try{(av.getTotalTrackInfo()||[]).forEach(function(tr){if(tr.type!==type)return;var info={};try{info=JSON.parse(tr.extra_info||'{}')}catch(e){}var lang=info.track_lang||info.language||info.lang||'',cod=String(info.fourCC||info.codec||'').trim().toUpperCase(),chn=+info.channels||0;out.push({index:tr.index,lang:lang,label:(lang?langName(lang):'Piste '+(out.length+1))+(type==='AUDIO'&&cod?' · '+cod+(chn?' '+(chn>2?(chn-1)+'.1':chn===1?'mono':'stéréo'):'')+(/DTS|DCA|TRUEHD|MLP/.test(cod)?' (non lu par la TV)':''):'')})})}catch(e){}return out}
 function langName(l){l=String(l).toLowerCase().slice(0,3);return {fre:'Français',fra:'Français',fr:'Français',eng:'Anglais',en:'Anglais',ara:'Arabe',ar:'Arabe',spa:'Espagnol',es:'Espagnol',ger:'Allemand',deu:'Allemand',de:'Allemand',ita:'Italien',it:'Italien',por:'Portugais',pt:'Portugais',tur:'Turc',jpn:'Japonais',kor:'Coréen'}[l]||l.toUpperCase()}
 function tvSubShow(text,dur){var b=$('#tvsubs');if(!b)return;b.textContent=text;b.hidden=!text;clearTimeout(tvSubShow.t);if(text&&dur)tvSubShow.t=setTimeout(function(){b.hidden=true},dur)}
 function parseSrt(srt){var cues=[],rx=/(\d+):(\d{1,2}):(\d{1,2})[,.](\d{1,3})\s*-->\s*(\d+):(\d{1,2}):(\d{1,2})[,.](\d{1,3})/;
@@ -2963,7 +2963,7 @@ function tvAutoAudio(){
   var fr=function(x){var i=inf(x);return isFr(i.language||i.track_lang||i.lang||'')};
   var cur=null;try{(av.getCurrentStreamInfo()||[]).forEach(function(c){if(c.type==='AUDIO')cur=L.filter(function(x){return x.index===c.index})[0]||null})}catch(e){}
   var good=L.filter(function(x){return !bad(x)});
-  if(!good.length){toast('Le son de cette vidéo (DTS) n\'est pas pris en charge par la TV. Essaie une autre version du titre, ou le téléphone.');return}
+  if(!good.length){if(!t.audioWarned){t.audioWarned=true;toast('Le son de cette vidéo (DTS) n\'est pas pris en charge par la TV. Essaie une autre version du titre, ou le téléphone.')}return}
   var want=good.filter(fr)[0]||good[0];
   if(cur&&!bad(cur)&&(fr(cur)||!good.some(fr)))return;
   if(cur&&cur.index===want.index)return;
