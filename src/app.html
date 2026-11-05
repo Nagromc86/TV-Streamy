@@ -561,6 +561,10 @@ html.avprev #tvpbox{background:transparent!important}
 .tvprev .mv-box{position:relative;border:0;padding:0;width:100%;color:inherit;font:inherit;cursor:pointer}
 .tvprev .mv-box .mv-msg{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:.85rem;color:#ddd;text-shadow:0 1px 4px #000}
 body.tv .tvprev .mv-box.tvf{box-shadow:0 0 0 4px #fff,0 14px 30px rgba(0,0,0,.5)}
+body.tv .poster.dts .art::before{content:"";position:absolute;inset:0;border:4px solid #e50914;border-radius:inherit;z-index:2;pointer-events:none}
+body.tv .poster.dts .art::after{content:"Son non compatible Samsung";position:absolute;left:0;right:0;bottom:0;z-index:2;background:rgba(229,9,20,.94);color:#fff;font-size:.62rem;font-weight:800;line-height:1.2;text-align:center;padding:4px 3px}
+.dtsb{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:6px;background:#e50914;color:#fff;font-size:.78rem;font-weight:800;vertical-align:middle}
+body.tv #sheet .ep.dts{box-shadow:inset 3px 0 0 #e50914}
 /* v2.1 fixes */
 body.tv .row,body.tv .chips{scroll-snap-type:none}
 body.tv .tvlive .ch .logo{width:64px;height:44px}
@@ -1197,7 +1201,7 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({vref:{kind:'series',id:series.series_id},url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
+  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({vref:{kind:'series',id:series.series_id,ep:ep.id},url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
@@ -1252,7 +1256,7 @@ function posterHtml(kind,x,opts){
   opts=opts||{};
   var id=x.stream_id||x.series_id,img=imgOf(kind,x),name=cleanName(x.name),r=parseFloat(x.rating);
   var p=opts.prog,pc=p&&p.dur?Math.min(100,p.pos/p.dur*100):0;
-  return '<button type="button" class="poster'+(opts.labeled?' labeled':'')+'" data-open="'+kind+':'+esc(id)+'" aria-label="'+esc(name)+'"><span class="art"><span class="ph">'+esc(name)+'</span>'+(img?'<img loading="lazy" src="'+esc(img)+'" alt="" onerror="this.remove()">':'')+
+  return '<button type="button" class="poster'+(opts.labeled?' labeled':'')+(isDts(kind+':'+id)?' dts':'')+'" data-open="'+kind+':'+esc(id)+'" aria-label="'+esc(name)+'"><span class="art"><span class="ph">'+esc(name)+'</span>'+(img?'<img loading="lazy" src="'+esc(img)+'" alt="" onerror="this.remove()">':'')+
     (r>0&&opts.rate?'<span class="rate">★ '+r.toFixed(1)+'</span>':'')+(isFav(kind,id)?'<span class="fav">'+IC.starOn+'</span>':'')+(opts.fresh&&isNew(x)?'<span class="badge new">Nouveau</span>':'')+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span>'+
     '<span class="t">'+esc(opts.label||name)+'</span></button>';
 }
@@ -1546,10 +1550,24 @@ function billBadge(o){
   if(o.fresh)return '<span class="badge" style="background:#fff;color:#111">Nouveauté</span>';
   return '';
 }
+/* Samsung: titles whose sound is DTS / TrueHD (the TV plays them silently) get a red frame. Known from the provider's
+   file information (when a title is looked at) and from playback (1 = no readable sound, 0 = plays fine) */
+var DTS={};try{DTS=JSON.parse(localStorage.getItem('dts')||'{}')||{}}catch(e){}
+function dtsSave(){try{localStorage.setItem('dts',JSON.stringify(DTS))}catch(e){}}
+function isDtsCodec(c){return /dts|dca|truehd|mlp/i.test(String(c||''))}
+function isDts(k){return TIZEN&&DTS[k]===1}
+function dtsFromInfo(kind,id,r){
+  var ch=false,set=function(k,v){if(DTS[k]===0)return;if(v&&DTS[k]!==1){DTS[k]=1;ch=true}else if(!v&&DTS[k]===1){delete DTS[k];ch=true}};
+  if(kind==='movie'){var a=r.info&&r.info.audio;if(a&&a.codec_name)set('movie:'+id,isDtsCodec(a.codec_name))}
+  else if(kind==='series'){var known=0,d=0;Object.keys(r.episodes||{}).forEach(function(n){(r.episodes[n]||[]).forEach(function(e){var a=e.info&&e.info.audio;if(a&&a.codec_name){known++;var b=isDtsCodec(a.codec_name);if(b)d++;set('ep:'+e.id,b)}})});if(known)set('series:'+id,d===known)}
+  if(ch){dtsSave();dtsPaint(kind,id)}
+}
+function dtsPaint(kind,id){[].forEach.call(document.querySelectorAll('.poster[data-open="'+kind+':'+id+'"]'),function(el){el.classList.toggle('dts',isDts(kind+':'+id))})}
+function dtsMark(k,v){if(!k)return;if(DTS[k]===v)return;DTS[k]=v;dtsSave();var p=k.split(':');if(p[0]!=='ep')dtsPaint(p[0],p[1])}
 function wantBillInfo(kind,x){
   var id=x.stream_id||x.series_id,k=kind+':'+id;if(billInfo[k]||navigator.onLine===false)return;billInfo[k]={};
   kget('info:'+S.activeId+':'+kind+':'+id).then(function(c){if(c)return c;return api(acc(),kind==='movie'?'action=get_vod_info&vod_id='+id:'action=get_series_info&series_id='+id).then(function(r){kset('info:'+S.activeId+':'+kind+':'+id,r);return r})}).then(function(r){
-    billInfo[k]=(r&&r.info)||{};var el=document.querySelector('.bslide[data-k="'+k+'"] .tags');if(el)el.innerHTML=billTags(kind,x);
+    if(TIZEN&&r)dtsFromInfo(kind,id,r);billInfo[k]=(r&&r.info)||{};var el=document.querySelector('.bslide[data-k="'+k+'"] .tags');if(el)el.innerHTML=billTags(kind,x);
     var pl=document.querySelector('.bslide[data-k="'+k+'"] .tvplot');if(pl)pl.textContent=billPlot(kind,x);if(TV)tvBillBg();
   },function(){});
 }
@@ -2369,7 +2387,7 @@ function renderSheetInner(){
     var x=sheet.item,info=sheet.info||{},p=progressOf('movie:'+x.stream_id),bg=info.backdrop_path&&info.backdrop_path[0]||info.movie_image||info.cover_big||x.stream_icon;
     var r=parseFloat(info.rating||x.rating),yr=year(info.releasedate||info.release_date||x.name);
     h+='<div class="hero'+(bg?'':' noimg')+(info.backdrop_path&&info.backdrop_path[0]?' isbd':'')+'" style="background-image:url(\''+esc(bg||'')+'\')"><button type="button" class="iconbtn x" data-close aria-label="Fermer">'+IC.x+'</button></div><div class="in gut"><h2>'+esc(cleanName(info.name||x.name))+'</h2>'+
-      '<div class="meta">'+(r>0?'<b>★ '+r.toFixed(1)+'</b>':'')+(yr?'<span>'+yr+'</span>':'')+(info.duration?'<span>'+esc(info.duration)+'</span>':'')+(info.genre?'<span>'+esc(info.genre)+'</span>':'')+subAvailHtml('movie:'+x.stream_id)+'</div>'+
+      '<div class="meta">'+(r>0?'<b>★ '+r.toFixed(1)+'</b>':'')+(yr?'<span>'+yr+'</span>':'')+(info.duration?'<span>'+esc(info.duration)+'</span>':'')+(info.genre?'<span>'+esc(info.genre)+'</span>':'')+subAvailHtml('movie:'+x.stream_id)+(isDts('movie:'+x.stream_id)?'<span class="dtsb">Son DTS · non compatible Samsung</span>':'')+'</div>'+
       (sheet.loading?'<p class="hint">Chargement de la fiche…</p>':'')+((info.plot||info.description)?'<p class="plot">'+esc(info.plot||info.description)+'</p>':'')+
       ((info.director||info.cast||info.actors)?'<p class="hint">'+(info.director?'Réalisation : '+esc(info.director)+'<br>':'')+((info.cast||info.actors)?'Avec : '+esc(info.cast||info.actors):'')+'</p>':'')+
       '<div class="acts">'+(p&&!p.done?'<button type="button" class="btn" data-playmovie="'+esc(x.stream_id)+'">'+IC.play+'Reprendre à '+dur(p.pos)+'</button><button type="button" class="btn ghost" data-playmovie="'+esc(x.stream_id)+'" data-start="1">Depuis le début</button>':'<button type="button" class="btn" data-playmovie="'+esc(x.stream_id)+'">'+IC.play+'Lecture</button>')+
@@ -2403,7 +2421,7 @@ function renderSheetInner(){
           else if(dd.status==='failed')dlb='<button type="button" class="epdl warn" data-dlask="'+esc(dk)+'">Échec</button>';
           else dlb=epDlBtn(dk,dd);
         }
-        h+='<div class="ep"><button type="button" class="epplay" data-playep="'+esc(ep.id)+'"><span class="num">'+esc(ep.episode_num)+'</span><span><b>'+esc(ep.title||('Épisode '+ep.episode_num))+'</b>'+(ei.duration?'<small>'+esc(ei.duration)+'</small>':'')+(pe&&pe.done?' <span class="seen">· vu</span>':'')+(dd&&dd.status==='done'?' <span class="seen">· hors connexion</span>':'')+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span></button>'+dlb+'</div>';
+        h+='<div class="ep'+(isDts('ep:'+ep.id)?' dts':'')+'"><button type="button" class="epplay" data-playep="'+esc(ep.id)+'"><span class="num">'+esc(ep.episode_num)+'</span><span><b>'+esc(ep.title||('Épisode '+ep.episode_num))+'</b>'+(isDts('ep:'+ep.id)?'<span class="dtsb">Son non compatible Samsung</span>':'')+(ei.duration?'<small>'+esc(ei.duration)+'</small>':'')+(pe&&pe.done?' <span class="seen">· vu</span>':'')+(dd&&dd.status==='done'?' <span class="seen">· hors connexion</span>':'')+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span></button>'+dlb+'</div>';
       });
       h+='</div>';
     }else if(!sheet.loading)h+='<p class="hint">Aucun épisode trouvé pour cette série.</p>';
@@ -2446,7 +2464,7 @@ function openItem(kind,id){
   openSheet({kind:kind,item:x,loading:true});
   /* show the saved sheet at once, then refresh it from the provider in the background */
   var ck='info:'+S.activeId+':'+kind+':'+id,shown='',live=function(){return sheet&&sheet.item===x};
-  var show=function(r){var j=JSON.stringify(r||{});if(!live()||j===shown)return;var first=!shown;shown=j;sheet.loading=false;sheet.info=kind==='movie'?(r&&r.info)||{}:r||{};if(first){renderSheet();if(TV)setTimeout(function(){var pb=document.querySelector('#sheet .btn:not(.ghost)');if(pb)focusEl(pb)},20)}else softSheet()};
+  var show=function(r){if(TIZEN&&r)dtsFromInfo(kind,id,r);var j=JSON.stringify(r||{});if(!live()||j===shown)return;var first=!shown;shown=j;sheet.loading=false;sheet.info=kind==='movie'?(r&&r.info)||{}:r||{};if(first){renderSheet();if(TV)setTimeout(function(){var pb=document.querySelector('#sheet .btn:not(.ghost)');if(pb)focusEl(pb)},20)}else softSheet()};
   kget(ck).then(function(c){if(c&&!shown)show(c)},function(){});
   var p=kind==='movie'?api(acc(),'action=get_vod_info&vod_id='+id):api(acc(),'action=get_series_info&series_id='+id);
   p.then(function(r){kset(ck,r);show(r)},function(e){if(!live()||shown)return;kget(ck).then(function(c){if(c){show(c);return}sheet.loading=false;sheet.info={};renderSheet();if(navigator.onLine!==false)toast('Fiche indisponible : '+errText(e))})});
@@ -2976,7 +2994,9 @@ function tvAutoAudio(){
   var fr=function(x){var i=inf(x);return isFr(i.language||i.track_lang||i.lang||'')};
   var cur=null;try{(av.getCurrentStreamInfo()||[]).forEach(function(c){if(c.type==='AUDIO')cur=L.filter(function(x){return x.index===c.index})[0]||null})}catch(e){}
   var good=L.filter(function(x){return !bad(x)});
-  if(!good.length){if(!t.audioWarned){t.audioWarned=true;tvNoSound()}return}
+  var vr=t.o.vref,vk=vr&&(vr.ep?'ep:'+vr.ep:vr.kind+':'+vr.id);
+  if(!good.length){dtsMark(vk,1);if(!t.audioWarned){t.audioWarned=true;tvNoSound()}return}
+  dtsMark(vk,0);
   var want=good.filter(fr)[0]||good[0];
   if(cur&&!bad(cur)&&(fr(cur)||!good.some(fr)))return;
   if(cur&&cur.index===want.index)return;

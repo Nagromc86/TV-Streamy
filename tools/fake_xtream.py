@@ -131,7 +131,7 @@ class H(BaseHTTPRequestHandler):
             if not v: return self.send([])
             return self.send({'info': {'name': v['name'], 'plot': 'Résumé de test pour « %s ».' % v['name'], 'genre': 'Aventure',
                                        'director': 'Jeanne Martin', 'cast': 'Paul Durand, Léa Petit', 'duration': '01:52:00',
-                                       'releasedate': v['name'][-5:-1] + '-05-10', 'rating': v['rating'], 'tmdb_id': '12345', 'backdrop_path': ['http://localhost:8899/bd/%d.svg' % v['stream_id']]},
+                                       'releasedate': v['name'][-5:-1] + '-05-10', 'rating': v['rating'], 'tmdb_id': '12345', 'backdrop_path': ['http://localhost:8899/bd/%d.svg' % v['stream_id']], 'audio': {'codec_name': 'dts' if v['stream_id'] % 3 == 0 else 'aac', 'channels': 6}},
                               'movie_data': {'stream_id': v['stream_id'], 'container_extension': v['container_extension']}})
         if a == 'get_series_info':
             s = next((x for x in SERIES if str(x['series_id']) == q.get('series_id')), None)
