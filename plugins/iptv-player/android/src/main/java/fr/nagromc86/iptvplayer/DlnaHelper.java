@@ -61,11 +61,19 @@ class DlnaHelper {
                 lock.setReferenceCounted(false);
                 lock.acquire();
             }
-            sock = new DatagramSocket();
+            // send from the Wi-Fi address: with mobile data on, the search could leave by the wrong network
+            String ip = SubServer.lanIp();
+            if (ip != null) {
+                sock = new DatagramSocket(null);
+                sock.setReuseAddress(true);
+                sock.bind(new java.net.InetSocketAddress(InetAddress.getByName(ip), 0));
+            } else {
+                sock = new DatagramSocket();
+            }
             sock.setSoTimeout(300);
             InetAddress group = InetAddress.getByName("239.255.255.250");
             String[] targets = {"urn:schemas-upnp-org:device:MediaRenderer:1", "urn:schemas-upnp-org:service:AVTransport:1"};
-            for (int round = 0; round < 2; round++) {
+            for (int round = 0; round < 3; round++) {
                 for (String st : targets) {
                     String msg = "M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 2\r\nST: " + st
                             + "\r\nUSER-AGENT: Android UPnP/1.1 TVStreamy/1.0\r\n\r\n";
