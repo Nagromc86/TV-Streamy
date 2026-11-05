@@ -1188,7 +1188,7 @@ function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
   var local=dlReady(k),info=sheet&&sheet.kind==='movie'&&sheet.item===item?sheet.info:null;
-  subsFor(k,subMeta('movie',item,info)).then(function(sf){var subs=sf.now;return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
+  subsFor(k,subMeta('movie',item,info)).then(function(sf){var subs=sf.now;return play({vref:{kind:'movie',id:item.stream_id},url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended))saveProgress(k,r,{kind:'movie',id:item.stream_id,name:item.name,icon:item.stream_icon});
     render();if(sheet&&sheet.kind==='movie')renderSheet();
   });
@@ -1197,7 +1197,7 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
+  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({vref:{kind:'series',id:series.series_id},url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
@@ -2951,6 +2951,19 @@ function tvOpenSub(manual){
     tvSetSub({kind:'srt',cues:parseSrt(srt),offset:L[0].offset||0,label:'OpenSubtitles (FR)'});if(!manual)toast('Sous-titres français ajoutés.');
   });
 }
+/* no sound track the TV can read: offer the other versions of the title (same provider, then the other lists) */
+function tvNoSound(){
+  var t=TVP;if(!t)return;var r=t.o.vref,x=r&&byId(r.kind,r.id),items=[{h:'Son non lu par la TV (DTS)'}];
+  if(x){
+    versionsOf(r.kind,x).slice(0,8).forEach(function(y){var id=y.stream_id||y.series_id;items.push({label:'Version '+verLabel(r.kind,y),act:function(){tvStop();setTimeout(function(){if(r.kind==='movie'){var m=byId('movie',id);if(m)playMovie(m)}else openItem('series',id)},300)}})});
+    if(S.accounts.length>1){loadXCats();var v=verParts(x.name),yr=year(x.releaseDate||x.name);
+      otherAccounts().forEach(function(a){var xc=XCAT[a.id];if(!xc)return;var hit=xVisible(xc,r.kind).filter(function(y){var w=verParts(y.name);return w.key===v.key&&(!yr||!year(y.releaseDate||y.name)||year(y.releaseDate||y.name)===yr)})[0];
+        if(hit)items.push({label:'Dans ta liste « '+a.name+' »',act:function(){tvStop();switchAccount(a.id).then(function(){openItem(r.kind,hit.stream_id||hit.series_id)})}})})}
+  }
+  if(items.length===1)items.push({label:'Aucune autre version trouvée · regarde-la sur le téléphone',act:function(){}});
+  items.push({label:'Continuer sans le son',act:function(){}});
+  t.panel={items:items,sel:1,chan:false};tvPanelPaint();$('#tvpanel').hidden=false;
+}
 /* Samsung TVs do not decode some sound formats (DTS, TrueHD): a film whose first sound track is in one of them plays
    silently. Like the phone's player, take a French track the TV can play, else any track it can play. */
 function tvAutoAudio(){
@@ -2963,7 +2976,7 @@ function tvAutoAudio(){
   var fr=function(x){var i=inf(x);return isFr(i.language||i.track_lang||i.lang||'')};
   var cur=null;try{(av.getCurrentStreamInfo()||[]).forEach(function(c){if(c.type==='AUDIO')cur=L.filter(function(x){return x.index===c.index})[0]||null})}catch(e){}
   var good=L.filter(function(x){return !bad(x)});
-  if(!good.length){if(!t.audioWarned){t.audioWarned=true;toast('Le son de cette vidéo (DTS) n\'est pas pris en charge par la TV. Essaie une autre version du titre, ou le téléphone.')}return}
+  if(!good.length){if(!t.audioWarned){t.audioWarned=true;tvNoSound()}return}
   var want=good.filter(fr)[0]||good[0];
   if(cur&&!bad(cur)&&(fr(cur)||!good.some(fr)))return;
   if(cur&&cur.index===want.index)return;
