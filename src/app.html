@@ -1029,12 +1029,12 @@ function castPoll(){
     if(CAST!==c)return;
     var st=r.state;
     if(st==='playing'||st==='paused'){c.seen=true;c.miss=0;if(r.positionMs)c.pos=r.positionMs;if(r.durationMs)c.dur=r.durationMs}
-    if(st!=='unreachable')c.state=st;
+    if(st!=='unreachable')c.state=st;if(r.relayHits!=null)c.hits=Math.max(c.hits||0,r.relayHits);if(r.relayErr)c.rerr=r.relayErr;
     if(st==='finished'){finishCast(c,true);return}
     /* DLNA: the video goes through the phone first; if the TV does not start it, it gets the provider's address directly */
     /* not started: try again differently — without the subtitles (some TVs refuse them), then (DLNA) with the provider's address */
     if(!c.seen&&c.args&&(st==='error'||((st==='idle'||st==='none')&&Date.now()-c.t0>15000))){var nx=castNext(c);if(nx){c.t0=Date.now();toast('Nouvel essai, autrement…');nat('castPlay',nx).then(function(){castT=setTimeout(castPoll,1500)},function(e){toast((e&&e.message)||'Diffusion impossible.');finishCast(c,false)});return}}
-    if(st==='error'||(!c.seen&&(st==='idle'||st==='none')&&Date.now()-c.t0>15000)){toast('Cet écran n\'arrive pas à lire cette vidéo (format non pris en charge). Essaie « Dupliquer l\'écran » dans le menu de diffusion.');finishCast(c,false);return}
+    if(st==='error'||(!c.seen&&(st==='idle'||st==='none')&&Date.now()-c.t0>15000)){toast(c.dev.type==='dlna'&&c.rerr?'La TV n\'a pas pu lire : '+c.rerr+'. Ton abonnement autorise peut-être une seule connexion : arrête la lecture sur les autres appareils.':c.dev.type==='dlna'&&!c.hits?'La TV n\'arrive pas à joindre le téléphone. Vérifie qu\'ils sont sur le même Wi-Fi (pas un réseau « invité ») et coupe un éventuel VPN sur le téléphone.':'Cet écran n\'arrive pas à lire cette vidéo (format non pris en charge). Essaie « Dupliquer l\'écran » dans le menu de diffusion.');finishCast(c,false);return}
     if((st==='idle'||st==='none')&&(c.seen||Date.now()-c.t0>30000)){finishCast(c,!!(c.dur&&c.pos>c.dur*0.94));return}
     if(st==='unreachable'){c.miss=(c.miss||0)+1;if(c.miss>8){toast('La TV ne répond plus.');finishCast(c,false);return}}
     paintCast();castT=setTimeout(castPoll,1500);

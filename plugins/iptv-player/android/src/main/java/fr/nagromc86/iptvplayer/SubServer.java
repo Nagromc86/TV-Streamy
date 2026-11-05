@@ -36,8 +36,51 @@ class SubServer {
     private static android.os.PowerManager.WakeLock wake;
     private static android.net.wifi.WifiManager.WifiLock wifi;
 
-    static synchronized String relay(android.content.Context ctx, String url, String mime, boolean live, String ua) {
-        String ip = lanIp();
+    /* what happened on the relay, shown to the user when the TV does not start */
+    static volatile int relayHits;
+    static volatile String relayErr;
+
+    /** The phone's address on the same network as the TV (phones can have several: Wi-Fi, hotspot, VPN, Wi-Fi Direct). */
+    static String lanIpFor(String tvHost) {
+        try {
+            byte[] tv = InetAddress.getByName(tvHost).getAddress();
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp() || ni.isLoopback()) {
+                    continue;
+                }
+                for (java.net.InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                    InetAddress a = ia.getAddress();
+                    if (!(a instanceof Inet4Address)) {
+                        continue;
+                    }
+                    int bits = ia.getNetworkPrefixLength();
+                    if (bits <= 0 || bits > 32) {
+                        bits = 24;
+                    }
+                    byte[] me = a.getAddress();
+                    boolean same = true;
+                    for (int i = 0; i < bits; i++) {
+                        int m = 0x80 >> (i % 8);
+                        if ((me[i / 8] & m) != (tv[i / 8] & m)) {
+                            same = false;
+                            break;
+                        }
+                    }
+                    if (same) {
+                        return a.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // fall back to the usual Wi-Fi address
+        }
+        return lanIp();
+    }
+
+    static synchronized String relay(android.content.Context ctx, String url, String mime, boolean live, String ua, String tvHost) {
+        String ip = tvHost == null ? lanIp() : lanIpFor(tvHost);
+        relayHits = 0;
+        relayErr = null;
         if (ip == null) {
             return null;
         }
@@ -96,6 +139,7 @@ class SubServer {
     }
 
     private static void relayTo(Socket s, String method, String range, OutputStream o) throws IOException {
+        relayHits++;
         String target = relayUrl;
         java.net.HttpURLConnection c = null;
         // providers often allow one connection per account: the TV's previous request (probe, earlier position) is
@@ -130,6 +174,7 @@ class SubServer {
             upstreams.add(c);
             int code = c.getResponseCode();
             if (code >= 400) {
+                relayErr = "le fournisseur a refusé le flux (HTTP " + code + ")";
                 o.write(("HTTP/1.1 " + code + " Upstream\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
                 return;
             }
@@ -161,6 +206,11 @@ class SubServer {
                     o.write(b, 0, n);
                 }
             }
+        } catch (IOException e) {
+            if (relayId != null && relayHits <= 1) {
+                relayErr = "le fournisseur ne répond pas (" + e.getClass().getSimpleName() + ")";
+            }
+            throw e;
         } finally {
             if (c != null) {
                 upstreams.remove(c);

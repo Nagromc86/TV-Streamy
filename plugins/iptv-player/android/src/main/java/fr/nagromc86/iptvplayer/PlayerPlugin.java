@@ -523,7 +523,7 @@ public class PlayerPlugin extends Plugin {
                 try {
                     String m = DlnaHelper.mimeFor(dev, mime);
                     // the phone relays the stream to the TV (redirections, https, picky TVs); direct address if it cannot
-                    String viaPhone = call.getBoolean("direct", false) ? null : SubServer.relay(getContext(), url, m, live, ua);
+                    String viaPhone = call.getBoolean("direct", false) ? null : SubServer.relay(getContext(), url, m, live, ua, android.net.Uri.parse(dev.control).getHost());
                     DlnaHelper.play(dev, viaPhone != null ? viaPhone : url, title, m, live ? 0 : startMs, subsOn ? srtFinal : null, live);
                     dlnaActive = dev;
                     call.resolve();
@@ -562,6 +562,10 @@ public class PlayerPlugin extends Plugin {
                     ret.put("durationMs", pos[1]);
                 } catch (Exception e) {
                     ret.put("state", "unreachable");
+                }
+                ret.put("relayHits", SubServer.relayHits);
+                if (SubServer.relayErr != null) {
+                    ret.put("relayErr", SubServer.relayErr);
                 }
                 call.resolve(ret);
             }).start();
