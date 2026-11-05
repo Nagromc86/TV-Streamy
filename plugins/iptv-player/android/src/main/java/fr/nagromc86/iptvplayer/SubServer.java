@@ -29,6 +29,7 @@ class SubServer {
     /* ---------- relay of the video for DLNA TVs ----------
        Many TVs (Samsung in particular) cannot open the provider's address themselves: redirections, https, a refused
        player name, no "DLNA" headers. The phone fetches the stream and hands it to the TV on the Wi-Fi. */
+    private static final java.util.concurrent.atomic.AtomicInteger active = new java.util.concurrent.atomic.AtomicInteger();
     private static volatile String relayId, relayUrl, relayMime, relayUa;
     private static volatile boolean relayLive;
     private static final java.util.Set<java.net.HttpURLConnection> upstreams = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -97,6 +98,16 @@ class SubServer {
     private static void relayTo(Socket s, String method, String range, OutputStream o) throws IOException {
         String target = relayUrl;
         java.net.HttpURLConnection c = null;
+        // providers often allow one connection per account: the TV's previous request (probe, earlier position) is
+        // closed before asking for the new one
+        for (java.net.HttpURLConnection old : upstreams) {
+            try {
+                old.disconnect();
+            } catch (Exception ignored) {
+                // already closed
+            }
+        }
+        upstreams.clear();
         try {
             int hops = 0;
             while (true) {
@@ -132,7 +143,8 @@ class SubServer {
             if (cr != null && code == 206) {
                 h.append("Content-Range: ").append(cr).append("\r\n");
             }
-            if (!relayLive) {
+            boolean ranges = code == 206 || "bytes".equalsIgnoreCase(String.valueOf(c.getHeaderField("Accept-Ranges")));
+            if (!relayLive && ranges) {
                 h.append("Accept-Ranges: bytes\r\n");
             }
             h.append("transferMode.dlna.org: Streaming\r\ncontentFeatures.dlna.org: ").append(dlnaFeatures(relayLive)).append("\r\nConnection: close\r\n\r\n");
@@ -211,7 +223,20 @@ class SubServer {
             while (server != null && !server.isClosed()) {
                 try {
                     Socket s = server.accept();
-                    pool.execute(() -> handle(s));
+                    if (active.get() > 24) {
+                        s.close();
+                        continue;
+                    }
+                    Thread h = new Thread(() -> {
+                        active.incrementAndGet();
+                        try {
+                            handle(s);
+                        } finally {
+                            active.decrementAndGet();
+                        }
+                    });
+                    h.setDaemon(true);
+                    h.start();
                 } catch (IOException e) {
                     break;
                 }

@@ -270,7 +270,6 @@ class DlnaHelper {
                 + (subs ? "<sec:CaptionInfoEx sec:type=\"srt\">" + esc(srtUrl) + "</sec:CaptionInfoEx><sec:CaptionInfo sec:type=\"srt\">" + esc(srtUrl) + "</sec:CaptionInfo>" : "")
                 + "<res protocolInfo=\"http-get:*:" + mime + ":" + SubServer.dlnaFeatures(live) + "\">"
                 + esc(url) + "</res>"
-                + (subs ? "<res protocolInfo=\"http-get:*:text/srt:*\">" + esc(srtUrl) + "</res>" : "")
                 + "</item></DIDL-Lite>";
         soap(d, "SetAVTransportURI", "<CurrentURI>" + esc(url) + "</CurrentURI><CurrentURIMetaData>" + esc(didl) + "</CurrentURIMetaData>");
         // Samsung and others refuse "Play" while they are still loading the address (error 701): try again a few times
