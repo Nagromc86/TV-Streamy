@@ -1643,7 +1643,8 @@ function platRows(kind){
   var nf=function(k){return platTop('netflix',k,null).filter(function(o){return imgOf(o.kind,o.x)})};
   (kind==='mix'?['series','movie']:[kind]).forEach(function(k){var L=nf(k);if(L.length>=2)h+=rowHtml('Top 10 Netflix France · '+(k==='movie'?'films':'séries')+' de la semaine',rankRow(L,true))});
   PLAT.forEach(function(pl){if(pl.k==='netflix'||kind==='movie')return;var L=platTop(pl.k,'series',null).filter(function(o){return imgOf(o.kind,o.x)}).slice(0,20);if(L.length>=3)h+=rowHtml('Séries originales '+pl.name,L.map(function(o){return posterHtml(o.kind,o.x)}).join(''))});
-  PLAT.forEach(function(pl){var L=platNew(pl.k,kind).filter(function(o){return imgOf(o.kind,o.x)}).slice(0,20);if(L.length>=3)h+=rowHtml('Tendances '+pl.name+suf+' · nouveautés',L.map(function(o){return posterHtml(o.kind,o.x)}).join(''))});
+  /* « Tendances … · nouveautés »: not on the home page (asked), still on Films / Séries */
+  if(kind!=='mix')PLAT.forEach(function(pl){var L=platNew(pl.k,kind).filter(function(o){return imgOf(o.kind,o.x)}).slice(0,20);if(L.length>=3)h+=rowHtml('Tendances '+pl.name+suf+' · nouveautés',L.map(function(o){return posterHtml(o.kind,o.x)}).join(''))});
   return h;
 }
 function top10(){
