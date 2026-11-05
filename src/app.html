@@ -2920,7 +2920,7 @@ function tvOpen(){
       try{t.dur=av.getDuration()||0}catch(e){}
       if(t.pos>0&&!t.o.live){try{av.seekTo(Math.floor(t.pos))}catch(e){}}
       av.play();t.buffering=false;tvPaint();
-      if(!t.tracksDone){t.tracksDone=true;setTimeout(tvAutoSubs,800)}
+      if(!t.tracksDone){t.tracksDone=true;setTimeout(tvAutoAudio,500);setTimeout(tvAutoSubs,800)}
     },function(e){tvFail(e)});
   }catch(e){tvFail(e)}
 }
@@ -2949,6 +2949,24 @@ function tvOpenSub(manual){
     c.box.L=L;var srt='';try{srt=decodeURIComponent(escape(atob(L[0].url.split(',')[1])))}catch(e){}
     tvSetSub({kind:'srt',cues:parseSrt(srt),offset:L[0].offset||0,label:'OpenSubtitles (FR)'});if(!manual)toast('Sous-titres français ajoutés.');
   });
+}
+/* Samsung TVs do not decode some sound formats (DTS, TrueHD): a film whose first sound track is in one of them plays
+   silently. Like the phone's player, take a French track the TV can play, else any track it can play. */
+function tvAutoAudio(){
+  var t=TVP,av=window.webapis&&webapis.avplay;if(!t||!av)return;var L=[];
+  try{L=(av.getTotalTrackInfo()||[]).filter(function(x){return x.type==='AUDIO'})}catch(e){return}
+  if(!L.length)return;
+  var inf=function(x){try{return JSON.parse(x.extra_info||'{}')}catch(e){return {}}};
+  var codec=function(x){var i=inf(x);return String(i.fourCC||i.codec||i.codec_fourcc||x.extra_info||'')};
+  var bad=function(x){return /dts|dca|truehd|mlp/i.test(codec(x))};
+  var fr=function(x){var i=inf(x);return isFr(i.language||i.track_lang||i.lang||'')};
+  var cur=null;try{(av.getCurrentStreamInfo()||[]).forEach(function(c){if(c.type==='AUDIO')cur=L.filter(function(x){return x.index===c.index})[0]||null})}catch(e){}
+  var good=L.filter(function(x){return !bad(x)});
+  if(!good.length){toast('Le son de cette vidéo (DTS) n\'est pas pris en charge par la TV. Essaie une autre version du titre, ou le téléphone.');return}
+  var want=good.filter(fr)[0]||good[0];
+  if(cur&&!bad(cur)&&(fr(cur)||!good.some(fr)))return;
+  if(cur&&cur.index===want.index)return;
+  try{av.setSelectTrack('AUDIO',want.index);t.audio=want.index;t.auds=null}catch(e){}
 }
 function tvAutoSubs(){
   var t=TVP;if(!t||t.o.live)return;var mode=curSubMode();
