@@ -501,8 +501,8 @@ body.tv .top10 .rk{display:none}
 body.tv #sheet{inset:auto;left:0;top:0;width:var(--tvw,100vw);height:var(--tvh,100vh);align-items:stretch;justify-content:flex-end;background:rgba(0,0,0,.6)}
 body.tv #sheet .panel{max-width:none;width:min(600px,52%);height:100%;max-height:none;border-radius:0;animation:none;box-sizing:border-box;padding-top:24px}
 body.tv #sheet .grab{display:none}
-body.tv #sheet[data-kind="exit"]{justify-content:center;align-items:center}
-body.tv #sheet[data-kind="exit"] .panel{height:auto;width:520px;border-radius:18px}
+body.tv #sheet[data-kind="exit"],body.tv #sheet[data-kind="contrm"]{justify-content:center;align-items:center}
+body.tv #sheet[data-kind="exit"] .panel,body.tv #sheet[data-kind="contrm"] .panel{height:auto;width:560px;border-radius:18px}
 /* full-screen detail page for films and series */
 body.tv #sheet[data-kind="movie"],body.tv #sheet[data-kind="series"]{background:var(--bg)}
 body.tv #sheet[data-kind="movie"] .panel,body.tv #sheet[data-kind="series"] .panel{width:100%;background:var(--bg);position:relative;padding:0;overflow-y:auto;scrollbar-width:none}
@@ -824,7 +824,7 @@ function progressOf(k){return USER.prog[k]||null}
 function saveProgress(k,res,meta){
   var pos=res.positionMs||0,d=res.durationMs||0;
   if(res.ended||(d&&pos>d*0.94)){USER.prog[k]=Object.assign({},meta,{pos:0,dur:d,done:true,at:Date.now()})}
-  else if(pos>60000){USER.prog[k]=Object.assign({},meta,{pos:pos,dur:d,done:false,at:Date.now()})}
+  else if(pos>10000){USER.prog[k]=Object.assign({},meta,{pos:pos,dur:d,done:false,at:Date.now()})}
   saveUser();
 }
 
@@ -1623,11 +1623,11 @@ function catRows(kind,max){
   return h;
 }
 function continueRow(only){
-  var cont=Object.keys(USER.prog).map(function(k){return USER.prog[k]}).filter(function(p){return !p.done&&p.pos>0&&(only?p.kind===only:(p.kind==='movie'||p.kind==='series'))}).sort(function(a,b){return b.at-a.at}).slice(0,15);
+  var cont=Object.keys(USER.prog).map(function(k){return USER.prog[k]}).filter(function(p){return !p.done&&!p.hidden&&p.pos>0&&(only?p.kind===only:(p.kind==='movie'||p.kind==='series'))}).sort(function(a,b){return b.at-a.at}).slice(0,15);
   var h='';
   cont.forEach(function(p){
-    if(p.kind==='movie'){var m=byId('movie',p.id);if(m)h+=wideHtml('data-playmovie="'+esc(m.stream_id)+'"',m.stream_icon,cleanName(m.name),p.dur?p.pos/p.dur*100:0)}
-    else{var s=byId('series',p.id);if(s)h+=wideHtml('data-open="series:'+esc(s.series_id)+'"',s.cover,p.label+' · '+cleanName(s.name),p.dur?p.pos/p.dur*100:0)}
+    if(p.kind==='movie'){var m=byId('movie',p.id);if(m)h+=wideHtml('data-cont="movie:'+esc(m.stream_id)+'" data-playmovie="'+esc(m.stream_id)+'"',m.stream_icon,cleanName(m.name),p.dur?p.pos/p.dur*100:0)}
+    else{var s=byId('series',p.id);if(s)h+=wideHtml('data-cont="series:'+esc(s.series_id)+'" data-open="series:'+esc(s.series_id)+'"',s.cover,p.label+' · '+cleanName(s.name),p.dur?p.pos/p.dur*100:0)}
   });
   return rowHtml('Reprendre la lecture',h);
 }
@@ -2077,9 +2077,9 @@ function tvPosters(L,kind,opt){return L.map(function(o){var k=o.kind||kind,x=o.x
 function tvChCard(x){var e=epgCache[x.stream_id],n=e&&e.list&&e.list[0];wantEpg(x.stream_id);
   return '<button type="button" class="tvchc" data-play="live:'+esc(x.stream_id)+'"><span class="lg">'+(x.stream_icon?'<img loading="lazy" src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'<span class="ph">'+initials(x.name)+'</span>')+'</span><b>'+esc(cleanName(x.name))+'</b><small>'+(n?esc(n.title):'En direct')+'</small></button>'}
 function tvHome(){
-  var cont=Object.keys(USER.prog).map(function(k){return USER.prog[k]}).filter(function(p){return !p.done&&p.pos>0&&(p.kind==='movie'||p.kind==='series')}).sort(function(a,b){return b.at-a.at}).slice(0,15);
+  var cont=Object.keys(USER.prog).map(function(k){return USER.prog[k]}).filter(function(p){return !p.done&&!p.hidden&&p.pos>0&&(p.kind==='movie'||p.kind==='series')}).sort(function(a,b){return b.at-a.at}).slice(0,15);
   var h='<div class="tvscroll tvrows">';
-  h+=tvRow('Reprendre la lecture',cont.map(function(p){var k=p.kind==='movie'?'movie':'series',x=byId(k,p.id);if(!x)return '';var ph=posterHtml(k,x,{prog:p,label:p.kind==='series'?p.label:''});return k==='movie'?ph.replace('data-open="movie:','data-playmovie="'):ph}).join(''));
+  h+=tvRow('Reprendre la lecture',cont.map(function(p){var k=p.kind==='movie'?'movie':'series',x=byId(k,p.id);if(!x)return '';var ph=posterHtml(k,x,{prog:p,label:p.kind==='series'?p.label:''}).replace('<button ','<button data-cont="'+k+':'+esc(p.id)+'" ');return k==='movie'?ph.replace('data-open="movie:','data-playmovie="'):ph}).join(''));
   var rc=(USER.recent||[]).map(function(id){return byId('live',id)}).filter(Boolean);if(rc.length<6)rc=rc.concat(DATA.live.filter(function(x){return rc.indexOf(x)<0}).slice(0,12-rc.length));
   h+=tvRow(USER.recent&&USER.recent.length?'Tes chaînes':'Chaînes',rc.slice(0,15).map(tvChCard).join(''));
   var favs=Object.keys(USER.favs).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind!=='live'}).sort(function(a,b){return b.at-a.at}).slice(0,20);
@@ -2124,6 +2124,27 @@ function tvPrevInfo(x){
   return '<b class="tvpch">'+esc(cleanName(x.name))+'</b>'+(n?'<span class="tvpnow">'+hhmm(n.start)+' – '+hhmm(n.end)+'</span><span class="tvpt">'+esc(n.title)+'</span><span class="dlbar"><i style="width:'+pc.toFixed(0)+'%"></i></span>'+(n.desc?'<p class="tvpd">'+esc(n.desc)+'</p>':''):'<span class="tvpt">En direct</span>')+
     (nx?'<span class="tvpnext">Ensuite · '+hhmm(nx.start)+' '+esc(nx.title)+'</span>':'')+'<span class="hint">OK : plein écran'+(hasArchive(x)?' · '+'replay disponible':'')+'</span>';
 }
+/* long press on a « Reprendre la lecture » card: offer to remove it (finger on the phone, OK held on the TV) */
+function contAsk(el,byKey){var k=el.getAttribute('data-cont');if(!k)return;if(!byKey){contAsk.held=true;contAsk.until=Date.now()+1500}openSheet({kind:'contrm',key:k})}
+(function(){
+  var lp=null,sx=0,sy=0;
+  document.addEventListener('touchstart',function(e){var c=e.target.closest&&e.target.closest('[data-cont]');if(!c)return;var t=e.touches[0];sx=t.clientX;sy=t.clientY;clearTimeout(lp);lp=setTimeout(function(){lp=null;contAsk(c)},550)},{passive:true});
+  document.addEventListener('touchmove',function(e){if(!lp)return;var t=e.touches[0];if(Math.abs(t.clientX-sx)>10||Math.abs(t.clientY-sy)>10){clearTimeout(lp);lp=null}},{passive:true});
+  document.addEventListener('touchend',function(){clearTimeout(lp);lp=null;if(contAsk.held){contAsk.held=false;contAsk.until=Date.now()+500}},{passive:true});
+  document.addEventListener('contextmenu',function(e){if(e.target.closest&&e.target.closest('[data-cont]'))e.preventDefault()});
+  /* the click that follows a long press must not also open the title */
+  document.addEventListener('click',function(e){if(contAsk.until&&(contAsk.held||Date.now()<contAsk.until)){contAsk.until=0;e.preventDefault();e.stopPropagation()}},true);
+  /* TV: OK held on the card */
+  var okT=null,okEl=null,okLong=false;
+  document.addEventListener('keydown',function(e){
+    if(!TV||!(e.key==='Enter'||e.keyCode===13))return;if(okEl){e.preventDefault();e.stopPropagation();return}var a=document.activeElement;if(!a||!a.hasAttribute||!a.hasAttribute('data-cont')||sheet)return;
+    e.preventDefault();e.stopPropagation();if(e.repeat||okEl)return;
+    okEl=a;okLong=false;okT=setTimeout(function(){okLong=true;contAsk(a,true)},700);
+  },true);
+  document.addEventListener('keyup',function(e){
+    if(!okEl||!(e.key==='Enter'||e.keyCode===13))return;clearTimeout(okT);var a=okEl;okEl=null;e.preventDefault();if(!okLong)a.click();
+  },true);
+})();
 var prevT=0;
 /* Samsung: the preview plays the selected channel in the small box (AVPlay draws under the page: the page lets it through) */
 var PREV={on:false,id:null,n:0};
@@ -2312,6 +2333,9 @@ function renderSheetInner(){
     h+=syncSheetHtml();
   }else if(sheet.kind==='cast'){
     h+=castSheetHtml();
+  }else if(sheet.kind==='contrm'){
+    var cp=USER.prog[sheet.key]||{},cx=byId(sheet.key.split(':')[0],sheet.key.split(':').slice(1).join(':'));
+    h+='<div class="in gut" style="text-align:center;padding:26px 20px"><h2 style="margin:0 0 8px">'+esc(cx?cleanName(cx.name):(cp.name||'Ce titre'))+'</h2><p class="hint" style="margin:0 0 18px">Le retirer de « Reprendre la lecture » ? Il reviendra si tu le relances.</p><div class="acts" style="justify-content:center"><button type="button" class="btn ghost" data-contrm="'+esc(sheet.key)+'">Retirer</button><button type="button" class="btn" data-close>Annuler</button></div></div>';
   }else if(sheet.kind==='exit'){
     h+='<div class="in gut" style="text-align:center;padding:30px 20px"><h2 style="margin:0 0 8px">Quitter TV Streamy ?</h2><p class="hint" style="margin:0 0 18px">Tu retrouveras tout comme tu l\'as laissé.</p><div class="acts" style="justify-content:center"><button type="button" class="btn" data-exitapp>Quitter</button><button type="button" class="btn ghost" data-close>Annuler</button></div></div>';
   }else if(sheet.kind==='chguide'){
@@ -2451,9 +2475,10 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-tvq],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-contrm],[data-tvq],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
+  if(d.contrm){var cr=USER.prog[d.contrm];if(cr){USER.prog[d.contrm]=Object.assign({},cr,{hidden:true,at:Date.now()});saveUser()}closeSheet();toast('Retiré de « Reprendre la lecture ».');render();return}
   if(d.tvq!=null){S.q=d.tvq;var tq=document.getElementById('tvq');if(tq)tq.innerHTML=esc(S.q);var tr=document.getElementById('tvres');if(tr){tr.innerHTML=tvSearchRes();observe()}return}
   if(TV&&tvTab()==='search'&&(d.open||d.play||d.playmovie))tvKeepQ();
   if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
