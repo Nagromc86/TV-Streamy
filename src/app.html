@@ -2128,7 +2128,13 @@ var prevT=0;
 /* Samsung: the preview plays the selected channel in the small box (AVPlay draws under the page: the page lets it through) */
 var PREV={on:false,id:null,n:0};
 function avPrevOk(){return TIZEN&&!!(window.webapis&&webapis.avplay)}
-function tvRectOf(el){var r=el.getBoundingClientRect(),z=parseFloat(document.documentElement.style.zoom)||1,W=window.innerWidth||1920,k=r.right>W/z+2?1:z,f=1920/W;return [r.left*k*f,r.top*k*f,r.width*k*f,r.height*k*f].map(Math.round)}
+/* where the box is on the screen, in the 1920 x 1080 frame AVPlay uses. Measured against an invisible element that covers
+   the whole screen, so the result does not depend on how this TV reports sizes with the interface zoom. */
+function tvRectOf(el){
+  var pr=document.getElementById('scrprobe');if(!pr){pr=document.createElement('div');pr.id='scrprobe';pr.style.cssText='position:fixed;left:0;top:0;width:var(--tvw,100vw);height:var(--tvh,100vh);visibility:hidden;pointer-events:none;z-index:-1';document.body.appendChild(pr)}
+  var f=pr.getBoundingClientRect(),r=el.getBoundingClientRect(),sx=1920/(f.width||1920),sy=1080/(f.height||1080);
+  return [(r.left-f.left)*sx,(r.top-f.top)*sy,r.width*sx,r.height*sy].map(Math.round);
+}
 function tvPrevMsg(t){var m=document.querySelector('#tvpbox .mv-msg');if(m){m.textContent=t;m.hidden=!t}}
 function tvPrevPlay(x){
   if(!avPrevOk()||TVP||S.tab!=='live'||S.liveView==='guide'||sheet||document.hidden)return;
