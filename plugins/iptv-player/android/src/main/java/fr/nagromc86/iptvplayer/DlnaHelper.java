@@ -43,6 +43,9 @@ class DlnaHelper {
         String model;
         String control;
         String serviceType;
+        String cmControl;
+        String cmType;
+        String sink;
     }
 
     static final Map<String, Device> devices = new ConcurrentHashMap<>();
@@ -144,6 +147,14 @@ class DlnaHelper {
             Element root = doc.getDocumentElement();
             String base = text(root, "URLBase");
             NodeList services = root.getElementsByTagName("service");
+            String cmControl = null, cmType = null;
+            for (int i = 0; i < services.getLength(); i++) {
+                Element s = (Element) services.item(i);
+                if (text(s, "serviceType").contains(":ConnectionManager:")) {
+                    cmType = text(s, "serviceType");
+                    cmControl = new URL(new URL(base.isEmpty() ? location : base), text(s, "controlURL")).toString();
+                }
+            }
             for (int i = 0; i < services.getLength(); i++) {
                 Element s = (Element) services.item(i);
                 String type = text(s, "serviceType");
@@ -160,6 +171,8 @@ class DlnaHelper {
                 d.model = text(root, "modelName");
                 d.serviceType = type;
                 d.control = new URL(new URL(base.isEmpty() ? location : base), text(s, "controlURL")).toString();
+                d.cmControl = cmControl;
+                d.cmType = cmType;
                 return d;
             }
         } catch (Exception ignored) {
@@ -191,7 +204,52 @@ class DlnaHelper {
         return http("POST", d.control, body, h, 8000);
     }
 
+    /** The formats the TV says it can play (ConnectionManager / GetProtocolInfo, "Sink"). */
+    static String sink(Device d) {
+        if (d.sink != null || d.cmControl == null) {
+            return d.sink == null ? "" : d.sink;
+        }
+        try {
+            String body = "<?xml version=\"1.0\" encoding=\"utf-8\"?><s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                    + "<s:Body><u:GetProtocolInfo xmlns:u=\"" + d.cmType + "\"></u:GetProtocolInfo></s:Body></s:Envelope>";
+            Map<String, String> h = new HashMap<>();
+            h.put("Content-Type", "text/xml; charset=\"utf-8\"");
+            h.put("SOAPACTION", "\"" + d.cmType + "#GetProtocolInfo\"");
+            d.sink = tag(http("POST", d.cmControl, body, h, 4000), "Sink").replace("&amp;", "&");
+        } catch (Exception e) {
+            d.sink = "";
+        }
+        return d.sink;
+    }
+
+    /** The name the TV itself uses for this kind of file (Samsung: video/mp2t, video/vnd.dlna.mpeg-tts, video/mpeg...). */
+    static String mimeFor(Device d, String mime) {
+        String sk = sink(d).toLowerCase(java.util.Locale.ROOT);
+        String[] cand;
+        if (mime.contains("mp2t") || mime.contains("mpeg-tts")) {
+            cand = new String[] {"video/mp2t", "video/vnd.dlna.mpeg-tts", "video/mpeg", "video/mpeg2"};
+        } else if (mime.contains("matroska") || mime.contains("mkv")) {
+            cand = new String[] {"video/x-matroska", "video/x-mkv", "video/mkv"};
+        } else if (mime.contains("mpegurl")) {
+            cand = new String[] {"application/vnd.apple.mpegurl", "application/x-mpegurl", "audio/mpegurl"};
+        } else if (mime.contains("avi")) {
+            cand = new String[] {"video/x-msvideo", "video/avi"};
+        } else {
+            cand = new String[] {mime};
+        }
+        for (String c : cand) {
+            if (sk.contains(":" + c + ":")) {
+                return c;
+            }
+        }
+        return cand[0];
+    }
+
     static void play(Device d, String url, String title, String mime, long startMs, String srtUrl) throws IOException {
+        play(d, url, title, mime, startMs, srtUrl, false);
+    }
+
+    static void play(Device d, String url, String title, String mime, long startMs, String srtUrl, boolean live) throws IOException {
         try {
             soap(d, "Stop", "");
         } catch (IOException ignored) {
@@ -202,12 +260,30 @@ class DlnaHelper {
                 + " xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:sec=\"http://www.sec.co.kr/\"><item id=\"0\" parentID=\"-1\" restricted=\"1\">"
                 + "<dc:title>" + esc(title) + "</dc:title><upnp:class>object.item.videoItem</upnp:class>"
                 + (subs ? "<sec:CaptionInfoEx sec:type=\"srt\">" + esc(srtUrl) + "</sec:CaptionInfoEx><sec:CaptionInfo sec:type=\"srt\">" + esc(srtUrl) + "</sec:CaptionInfo>" : "")
-                + "<res protocolInfo=\"http-get:*:" + mime + ":DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000\">"
+                + "<res protocolInfo=\"http-get:*:" + mime + ":" + SubServer.dlnaFeatures(live) + "\">"
                 + esc(url) + "</res>"
                 + (subs ? "<res protocolInfo=\"http-get:*:text/srt:*\">" + esc(srtUrl) + "</res>" : "")
                 + "</item></DIDL-Lite>";
         soap(d, "SetAVTransportURI", "<CurrentURI>" + esc(url) + "</CurrentURI><CurrentURIMetaData>" + esc(didl) + "</CurrentURIMetaData>");
-        soap(d, "Play", "<Speed>1</Speed>");
+        // Samsung and others refuse "Play" while they are still loading the address (error 701): try again a few times
+        IOException last = null;
+        for (int i = 0; i < 8; i++) {
+            try {
+                soap(d, "Play", "<Speed>1</Speed>");
+                last = null;
+                break;
+            } catch (IOException e) {
+                last = e;
+                try {
+                    Thread.sleep(700);
+                } catch (InterruptedException ie) {
+                    break;
+                }
+            }
+        }
+        if (last != null) {
+            throw last;
+        }
         if (startMs > 0) {
             new Thread(() -> {
                 // most TVs only accept a seek once playback has really started

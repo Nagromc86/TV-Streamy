@@ -518,9 +518,13 @@ public class PlayerPlugin extends Plugin {
                 call.reject("TV introuvable, relance la recherche");
                 return;
             }
+            String ua = call.getString("userAgent", "");
             new Thread(() -> {
                 try {
-                    DlnaHelper.play(dev, url, title, mime, live ? 0 : startMs, subsOn ? srtFinal : null);
+                    String m = DlnaHelper.mimeFor(dev, mime);
+                    // the phone relays the stream to the TV (redirections, https, picky TVs); direct address if it cannot
+                    String viaPhone = call.getBoolean("direct", false) ? null : SubServer.relay(getContext(), url, m, live, ua);
+                    DlnaHelper.play(dev, viaPhone != null ? viaPhone : url, title, m, live ? 0 : startMs, subsOn ? srtFinal : null, live);
                     dlnaActive = dev;
                     call.resolve();
                 } catch (Exception e) {
@@ -593,6 +597,7 @@ public class PlayerPlugin extends Plugin {
                             break;
                         case "stop":
                         case "disconnect":
+                            SubServer.stopRelay();
                             DlnaHelper.soap(dev, "Stop", "");
                             dlnaActive = null;
                             break;
@@ -602,6 +607,7 @@ public class PlayerPlugin extends Plugin {
                     call.resolve();
                 } catch (Exception e) {
                     if ("stop".equals(action) || "disconnect".equals(action)) {
+                        SubServer.stopRelay();
                         dlnaActive = null;
                     }
                     call.reject("La TV ne répond pas : " + e.getMessage());

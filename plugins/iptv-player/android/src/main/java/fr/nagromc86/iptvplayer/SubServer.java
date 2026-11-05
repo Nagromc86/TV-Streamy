@@ -23,8 +23,139 @@ class SubServer {
     private static ServerSocket server;
     private static final Map<String, byte[]> files = new ConcurrentHashMap<>();
     /* a few requests at a time are plenty for a TV; a flood from the network cannot create endless threads */
-    private static final java.util.concurrent.ExecutorService pool = new java.util.concurrent.ThreadPoolExecutor(1, 4, 30, java.util.concurrent.TimeUnit.SECONDS,
+    private static final java.util.concurrent.ExecutorService pool = new java.util.concurrent.ThreadPoolExecutor(1, 8, 30, java.util.concurrent.TimeUnit.SECONDS,
             new java.util.concurrent.ArrayBlockingQueue<>(16), new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+
+    /* ---------- relay of the video for DLNA TVs ----------
+       Many TVs (Samsung in particular) cannot open the provider's address themselves: redirections, https, a refused
+       player name, no "DLNA" headers. The phone fetches the stream and hands it to the TV on the Wi-Fi. */
+    private static volatile String relayId, relayUrl, relayMime, relayUa;
+    private static volatile boolean relayLive;
+    private static final java.util.Set<java.net.HttpURLConnection> upstreams = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static android.os.PowerManager.WakeLock wake;
+    private static android.net.wifi.WifiManager.WifiLock wifi;
+
+    static synchronized String relay(android.content.Context ctx, String url, String mime, boolean live, String ua) {
+        String ip = lanIp();
+        if (ip == null) {
+            return null;
+        }
+        try {
+            start();
+        } catch (IOException e) {
+            return null;
+        }
+        stopRelay();
+        relayId = "v" + System.currentTimeMillis();
+        relayUrl = url;
+        relayMime = mime;
+        relayLive = live;
+        relayUa = ua;
+        try {
+            // the phone keeps the stream going with its screen off
+            android.os.PowerManager pm = (android.os.PowerManager) ctx.getApplicationContext().getSystemService(android.content.Context.POWER_SERVICE);
+            wake = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "tvstreamy:relay");
+            wake.acquire(6 * 3600 * 1000L);
+            android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) ctx.getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
+            wifi = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "tvstreamy:relay");
+            wifi.acquire();
+        } catch (Exception ignored) {
+            // locks are a comfort, not a requirement
+        }
+        String ext = mime.contains("mp2t") || mime.contains("mpeg-tts") || mime.equals("video/mpeg") ? ".ts" : mime.contains("matroska") || mime.contains("mkv") ? ".mkv" : mime.contains("mpegurl") ? ".m3u8" : ".mp4";
+        return "http://" + ip + ":" + server.getLocalPort() + "/" + relayId + ext;
+    }
+
+    static synchronized void stopRelay() {
+        relayId = null;
+        for (java.net.HttpURLConnection c : upstreams) {
+            try {
+                c.disconnect();
+            } catch (Exception ignored) {
+                // already closed
+            }
+        }
+        upstreams.clear();
+        try {
+            if (wake != null && wake.isHeld()) {
+                wake.release();
+            }
+            if (wifi != null && wifi.isHeld()) {
+                wifi.release();
+            }
+        } catch (Exception ignored) {
+            // already released
+        }
+        wake = null;
+        wifi = null;
+    }
+
+    static String dlnaFeatures(boolean live) {
+        return (live ? "DLNA.ORG_OP=00" : "DLNA.ORG_OP=01") + ";DLNA.ORG_CI=0;DLNA.ORG_FLAGS=" + (live ? "8D700000000000000000000000000000" : "01700000000000000000000000000000");
+    }
+
+    private static void relayTo(Socket s, String method, String range, OutputStream o) throws IOException {
+        String target = relayUrl;
+        java.net.HttpURLConnection c = null;
+        try {
+            int hops = 0;
+            while (true) {
+                c = (java.net.HttpURLConnection) new java.net.URL(target).openConnection();
+                c.setInstanceFollowRedirects(false);
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(30000);
+                c.setRequestProperty("User-Agent", relayUa == null || relayUa.isEmpty() ? "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0" : relayUa);
+                if (range != null && !relayLive) {
+                    c.setRequestProperty("Range", range);
+                }
+                int code = c.getResponseCode();
+                if (code >= 300 && code < 400 && c.getHeaderField("Location") != null && hops++ < 6) {
+                    target = new java.net.URL(new java.net.URL(target), c.getHeaderField("Location")).toString();
+                    c.disconnect();
+                    continue;
+                }
+                break;
+            }
+            upstreams.add(c);
+            int code = c.getResponseCode();
+            if (code >= 400) {
+                o.write(("HTTP/1.1 " + code + " Upstream\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                return;
+            }
+            StringBuilder h = new StringBuilder(code == 206 ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n");
+            h.append("Content-Type: ").append(relayMime).append("\r\n");
+            long len = c.getContentLengthLong();
+            if (len >= 0 && !relayLive) {
+                h.append("Content-Length: ").append(len).append("\r\n");
+            }
+            String cr = c.getHeaderField("Content-Range");
+            if (cr != null && code == 206) {
+                h.append("Content-Range: ").append(cr).append("\r\n");
+            }
+            if (!relayLive) {
+                h.append("Accept-Ranges: bytes\r\n");
+            }
+            h.append("transferMode.dlna.org: Streaming\r\ncontentFeatures.dlna.org: ").append(dlnaFeatures(relayLive)).append("\r\nConnection: close\r\n\r\n");
+            o.write(h.toString().getBytes(StandardCharsets.US_ASCII));
+            o.flush();
+            if ("HEAD".equals(method)) {
+                return;
+            }
+            s.setSoTimeout(0);
+            try (java.io.InputStream in = c.getInputStream()) {
+                byte[] b = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(b)) > 0) {
+                    o.write(b, 0, n);
+                }
+            }
+        } finally {
+            if (c != null) {
+                upstreams.remove(c);
+                c.disconnect();
+            }
+        }
+    }
 
     /** Returns [srtUrl, vttUrl], or null when the phone has no local network address. */
     /** Shifts every "00:01:02,345 --> 00:01:04,000" line by offsetMs (positive = later). */
@@ -95,9 +226,12 @@ class SubServer {
             s.setSoTimeout(10000);
             BufferedReader r = new BufferedReader(new InputStreamReader(s.getInputStream(), StandardCharsets.US_ASCII));
             String first = r.readLine();
-            String line;
+            String line, range = null;
             while ((line = r.readLine()) != null && !line.isEmpty()) {
-                // skip request headers
+                int c = line.indexOf(':');
+                if (c > 0 && line.substring(0, c).trim().equalsIgnoreCase("Range")) {
+                    range = line.substring(c + 1).trim();
+                }
             }
             OutputStream o = s.getOutputStream();
             String[] parts = first == null ? new String[0] : first.split(" ");
@@ -109,7 +243,10 @@ class SubServer {
             }
             String name = path.startsWith("/") ? path.substring(1) : path;
             String cors = "Access-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n";
-            if ("OPTIONS".equals(method)) {
+            String rid = relayId;
+            if (rid != null && name.startsWith(rid + ".")) {
+                relayTo(s, method, range, o);
+            } else if ("OPTIONS".equals(method)) {
                 o.write(("HTTP/1.1 204 No Content\r\n" + cors + "Content-Length: 0\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
             } else {
                 byte[] d = files.get(name);

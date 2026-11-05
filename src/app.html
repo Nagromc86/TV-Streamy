@@ -996,6 +996,7 @@ function extOf(u){var m=/\.([a-z0-9]{2,4})(?:\?|$)/i.exec(u||'');return m?m[1].t
 function mimeOf(u){return {mp4:'video/mp4',m4v:'video/mp4',mkv:'video/x-matroska',webm:'video/webm',ts:'video/mp2t',m3u8:'application/x-mpegURL',avi:'video/x-msvideo',mov:'video/quicktime'}[extOf(u)]||'video/mp4'}
 function clock(ms){var s=Math.max(0,Math.floor(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0')}
 function castStart(o){
+  if(S.castDev&&S.castDev.type==='app')return appCast(o);
   var dev=S.castDev,url=o.castUrl||o.url;
   if(o.live){var c=[o.url,o.fallbackUrl].filter(Boolean),want=dev.type==='cast'?'m3u8':'ts';url=c.filter(function(u){return extOf(u)===want})[0]||c[0]}
   if(CAST)finishCast(CAST,false);
@@ -1049,7 +1050,7 @@ function scanCast(){
   var tok=++scanTok;S.castScanning=true;S.castErr='';if(sheet&&sheet.kind==='cast')renderSheet();
   var end=function(){if(tok!==scanTok)return;S.castScanning=false;if(sheet&&sheet.kind==='cast')renderSheet()};
   setTimeout(end,15000);
-  nat('castScan').then(function(r){if(tok===scanTok)S.castDevs=r.devices||[]},function(e){if(tok===scanTok){S.castDevs=S.castDevs||[];S.castErr=(e&&e.message)||'recherche impossible'}}).then(end);
+  Promise.all([nat('castScan').then(function(r){return r.devices||[]},function(e){if(tok===scanTok)S.castErr=(e&&e.message)||'recherche impossible';return []}),appTvs()]).then(function(x){if(tok===scanTok){S.castDevs=x[1].concat(x[0]);if(S.castDevs.length)S.castErr=''}}).then(end);
 }
 function stopScan(){scanTok++;S.castScanning=false;nat('castStopScan').catch(function(){});if(sheet&&sheet.kind==='cast')renderSheet()}
 function castSheetHtml(){
@@ -1057,7 +1058,7 @@ function castSheetHtml(){
   var L=S.castDevs||[];
   L.forEach(function(d){
     var on=S.castDev&&S.castDev.id===d.id;
-    h+='<button type="button" class="castdev" data-castdev="'+esc(d.id)+'" aria-pressed="'+!!on+'"><span class="di">'+(d.type==='cast'?IC.cast:IC.tv)+'</span><span><b>'+esc(d.name)+'</b><small>'+(d.type==='cast'?'Chromecast / Google TV':'TV compatible DLNA')+(d.model?' · '+esc(d.model):'')+'</small></span>'+(on?'<span style="color:var(--accent2)">'+IC.check+'</span>':'<span></span>')+'</button>';
+    h+='<button type="button" class="castdev" data-castdev="'+esc(d.id)+'" aria-pressed="'+!!on+'"><span class="di">'+(d.type==='cast'?IC.cast:IC.tv)+'</span><span><b>'+esc(d.name)+'</b><small>'+(d.type==='app'?d.sub:d.type==='cast'?'Chromecast / Google TV':'TV compatible DLNA')+(d.model?' · '+esc(d.model):'')+'</small></span>'+(on?'<span style="color:var(--accent2)">'+IC.check+'</span>':'<span></span>')+'</button>';
   });
   if(S.castScanning)h+='<div class="loading" style="padding:18px 0"><div class="spin"></div><p style="margin:0">Recherche des écrans sur ton Wi-Fi…<br><span class="hint">Quelques secondes</span></p></div>';
   else if(S.castErr)h+='<p class="err">Recherche impossible : '+esc(S.castErr)+'</p>';
@@ -1142,7 +1143,7 @@ function playLive(item){
   var ex=liveExt();
   USER.recent=[item.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(item.stream_id)})).slice(0,20);USER.recentAt=Date.now();saveUser();
   var e=epgCache[item.stream_id],now=e&&e.list&&e.list[0];
-  play(Object.assign({sid:item.stream_id,url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true},NATIVE&&!TIZEN?timeshiftOpts(item):{},zapList(item,ex))).then(function(r){noteLive(ex,r);if(r&&r.sid&&String(r.sid)!==String(item.stream_id)){var zx=byId('live',r.sid);if(zx){MINI.id=zx.stream_id;USER.recent=[zx.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(zx.stream_id)})).slice(0,20);saveUser()}}explainRefusal(r);if(S.tab==='home'||S.tab==='live')render()});
+  play(Object.assign({ref:'live:'+item.stream_id,sid:item.stream_id,url:streamUrl('live',item,ex[0]),fallbackUrl:streamUrl('live',item,ex[1]),image:item.stream_icon,title:cleanName(item.name),subtitle:now?now.title+' · '+hhmm(now.start)+'–'+hhmm(now.end):'En direct',live:true},NATIVE&&!TIZEN?timeshiftOpts(item):{},zapList(item,ex))).then(function(r){noteLive(ex,r);if(r&&r.sid&&String(r.sid)!==String(item.stream_id)){var zx=byId('live',r.sid);if(zx){MINI.id=zx.stream_id;USER.recent=[zx.stream_id].concat(USER.recent.filter(function(x){return String(x)!==String(zx.stream_id)})).slice(0,20);saveUser()}}explainRefusal(r);if(S.tab==='home'||S.tab==='live')render()});
 }
 /* Subtitles: the video's own French ones come first (CC). OpenSubtitles is only asked by the player when the video
    has none (and the audio is not French), or when the OpenSub button is pressed. Saved ones go in at once. */
@@ -1170,7 +1171,7 @@ function playMovie(item,fromStart){
   var k='movie:'+item.stream_id,p=progressOf(k);
   var start=!fromStart&&p&&!p.done?p.pos:0;
   var local=dlReady(k),info=sheet&&sheet.kind==='movie'&&sheet.item===item?sheet.info:null;
-  subsFor(k,subMeta('movie',item,info)).then(function(sf){var subs=sf.now;return play({url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
+  subsFor(k,subMeta('movie',item,info)).then(function(sf){var subs=sf.now;return play({ref:'movie:'+item.stream_id,url:local?local.localUri:streamUrl('movie',item),castUrl:streamUrl('movie',item),image:item.stream_icon,title:cleanName(item.name),subtitle:(local?'Hors connexion · ':'')+(year(item.name)||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended))saveProgress(k,r,{kind:'movie',id:item.stream_id,name:item.name,icon:item.stream_icon});
     render();if(sheet&&sheet.kind==='movie')renderSheet();
   });
@@ -1179,7 +1180,7 @@ function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
   var local=dlReady(k),info=sheet&&sheet.kind==='series'&&sheet.info?sheet.info.info:null;
-  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
+  subsFor(k,subMeta('series',series,info,ep)).then(function(sf){var subs=sf.now;return play({ref:'ep:'+series.series_id+':'+ep.id,url:local?local.localUri:streamUrl('episode',ep),castUrl:streamUrl('episode',ep),image:series.cover,title:cleanName(series.name)+' · '+label,subtitle:(local?'Hors connexion · ':'')+(ep.title||''),startMs:Math.round(start),live:false,subtitles:subs,subOffset:subs[0]?subs[0].offset||0:0}).then(function(r){keepSubOffset(k,sf.box.L,r);return r})}).then(function(r){
     if(r&&(r.positionMs||r.ended)){
       saveProgress(k,r,{kind:'ep',id:ep.id,series:series.series_id,label:label,name:series.name,icon:series.cover,season:ep.season,num:ep.episode_num});
       USER.prog['series:'+series.series_id]={kind:'series',id:series.series_id,name:series.name,icon:series.cover,last:ep.id,label:label,at:Date.now(),pos:(USER.prog[k]||{}).pos||0,dur:(USER.prog[k]||{}).dur||0,done:false};
@@ -2591,6 +2592,67 @@ var FBS={
     return fbFetch(FBS.url()+'?'+pre,{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{blob:{stringValue:blob},salt:{stringValue:SYNC.salt},v:{integerValue:'1'},at:{integerValue:String(Date.now())}}})}).then(function(d){return d.updateTime});
   })}
 };
+/* ---------- « TV Streamy sur ma TV » : the phone sends what to play to the app open on a TV of the same sync account.
+   Only the reference (channel / film / episode number and account id) goes through Firestore, never an address with
+   the account's password: the TV builds the address itself with its own copy of the account. */
+function syncDocUrl(n){return 'https://firestore.googleapis.com/v1/projects/'+FB.projectId+'/databases/(default)/documents/users/'+SYNC.uid+'/sync/'+n}
+var APPID='TvStrmy001.TVStreamy';
+function tvName(){return TIZEN?'TV Samsung':'TV Android'}
+function appTvs(){
+  if(!SYNC||!SYNC.uid||TV)return Promise.resolve([]);
+  return withTimeout(FBS.token().then(function(tk){return fbFetch(syncDocUrl('tvs'),{headers:{Authorization:'Bearer '+tk}})}),6000).then(function(d){
+    var m=d.fields&&d.fields.d&&d.fields.d.mapValue&&d.fields.d.mapValue.fields||{},out=[];
+    Object.keys(m).forEach(function(k){var f=(m[k].mapValue||{}).fields||{},at=+(f.at&&f.at.integerValue)||0;if(Date.now()-at>30*86400000)return;var on=Date.now()-at<150000;
+      out.push({id:'app:'+k,type:'app',dev:k,name:'TV Streamy · '+((f.name&&f.name.stringValue)||'TV'),ip:(f.ip&&f.ip.stringValue)||'',at:at,tizen:/Samsung/.test((f.name&&f.name.stringValue)||''),sub:on?'Appli ouverte sur la TV · meilleure qualité':'Appli fermée : elle s\'ouvrira si la TV le permet'})});
+    return out.sort(function(a,b){return b.at-a.at});
+  },function(){return []});
+}
+function appCast(o){
+  var dev=S.castDev;
+  if(!o.ref){toast('Cette vidéo ne peut pas être envoyée à TV Streamy sur la TV.');return Promise.resolve({})}
+  if(!SYNC||!SYNC.uid){toast('Active la synchro pour envoyer à la TV.');return Promise.resolve({})}
+  var body={fields:{to:{stringValue:dev.dev},ref:{stringValue:o.ref},acc:{stringValue:S.activeId||''},start:{integerValue:String(Math.round(o.startMs||0))},at:{integerValue:String(Date.now())},from:{stringValue:'le téléphone'}}};
+  toast('Envoi à '+dev.name+'…');
+  return FBS.token().then(function(tk){return fbFetch(syncDocUrl('cast'),{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify(body)})}).then(function(){
+    var fresh=Date.now()-(dev.at||0)<150000;
+    if(dev.tizen&&dev.ip)fetch('http://'+dev.ip+':8001/api/v2/applications/'+APPID,{method:'POST'}).catch(function(){});
+    toast(fresh?'Envoyé : la vidéo démarre sur la TV.':'Envoyé. Si la TV n\'ouvre pas TV Streamy toute seule, ouvre-la : la vidéo démarrera.');
+    return {};
+  },function(e){toast('Envoi impossible : '+errText(e));return {}});
+}
+/* TV side: says « I'm here » to the phones, and picks up what they send */
+function tvHello(){
+  if(!TV||!SYNC||!SYNC.uid||navigator.onLine===false)return;var ip='';try{ip=TIZEN&&window.webapis&&webapis.network?webapis.network.getIp():''}catch(e){}
+  var ent={};ent[DEVID]={mapValue:{fields:{name:{stringValue:tvName()},at:{integerValue:String(Date.now())},ip:{stringValue:ip||''}}}};
+  FBS.token().then(function(tk){return fbFetch(syncDocUrl('tvs')+'?updateMask.fieldPaths=d.'+DEVID,{method:'PATCH',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{d:{mapValue:{fields:ent}}}})})}).catch(function(){});
+}
+var castSeen=0;try{castSeen=+(localStorage.getItem('castSeen')||0)}catch(e){}
+function tvCastPoll(){
+  if(!TV||!SYNC||!SYNC.uid||!DATA||document.hidden||navigator.onLine===false||S.pickProfile)return;
+  FBS.token().then(function(tk){return fbFetch(syncDocUrl('cast'),{headers:{Authorization:'Bearer '+tk}})}).then(function(d){
+    var f=d.fields||{},at=+(f.at&&f.at.integerValue)||0;
+    if(!at||at<=castSeen||(f.to&&f.to.stringValue)!==DEVID||Date.now()-at>600000)return;
+    castSeen=at;try{localStorage.setItem('castSeen',String(at))}catch(e){}
+    tvCastRun((f.ref&&f.ref.stringValue)||'',(f.acc&&f.acc.stringValue)||'');
+  },function(){});
+}
+function tvCastRun(ref,accId){
+  var p=ref.split(':');if(!p[0])return;
+  var go=function(){
+    if(sheet)closeSheet();if(typeof TVP!=='undefined'&&TVP)tvStop();
+    setTimeout(function(){
+      if(p[0]==='live'){var x=byId('live',p[1]);if(x){S.tab='live';render();playLive(x)}else toast('Chaîne introuvable dans cette liste.');return}
+      if(p[0]==='movie'){var m=byId('movie',p[1]);if(m)playMovie(m);else toast('Film introuvable dans cette liste.');return}
+      if(p[0]==='ep'){var se=byId('series',p[1]);if(!se){toast('Série introuvable dans cette liste.');return}
+        api(acc(),'action=get_series_info&series_id='+p[1]).then(function(r){var all=[];Object.keys((r&&r.episodes)||{}).forEach(function(k){all=all.concat(r.episodes[k])});var ep=all.filter(function(e){return String(e.id)===String(p[2])})[0];if(ep)playEpisode(se,ep);else toast('Épisode introuvable.')},function(){toast('Épisode impossible à charger.')})}
+    },350);
+  };
+  toast('Reçu du téléphone…');
+  if(accId&&accId!==S.activeId&&S.accounts.some(function(a){return a.id===accId}))switchAccount(accId).then(go);else go();
+}
+/* (TV may only be known a moment after start on Android TV: the functions check it themselves) */
+setTimeout(function(){syncReady.then(function(){tvHello();tvCastPoll()})},4000);setInterval(tvHello,60000);setInterval(tvCastPoll,4000);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){tvHello();tvCastPoll()}});
 /* ---------- one screen at a time between synced devices ----------
    Starting a video writes « playing on device X since t » next to the synced data. A device that is playing checks
    this every few seconds and stops by itself when another one has taken over, so the provider's screen is freed. */
