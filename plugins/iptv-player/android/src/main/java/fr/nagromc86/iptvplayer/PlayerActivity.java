@@ -305,7 +305,11 @@ public class PlayerActivity extends Activity {
                 .setConnectTimeoutMs(15000)
                 .setReadTimeoutMs(30000);
         DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http));
-        DefaultRenderersFactory renderers = new DefaultRenderersFactory(this).setEnableDecoderFallback(true);
+        // EXTENSION_RENDERER_MODE_ON : si l'extension FFmpeg est présente, elle sert de
+        // repli logiciel pour les formats audio non gérés par l'appareil (DTS, E-AC3, TrueHD).
+        DefaultRenderersFactory renderers = new DefaultRenderersFactory(this)
+                .setEnableDecoderFallback(true)
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON);
 
         ExoPlayer.Builder pb = new ExoPlayer.Builder(this, renderers).setMediaSourceFactory(sources);
         if (!live) {
