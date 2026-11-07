@@ -75,7 +75,8 @@ jobs:
           echo "== ABIS ciblées =="; grep -nE "^ANDROID_ABIS=" "$FFP/build_ffmpeg.sh" || true
           chmod +x "$FFP/build_ffmpeg.sh"
           echo "== compilation ffmpeg (peut prendre plusieurs minutes) =="
-          (cd "$FFP" && ./build_ffmpeg.sh "$FFP" "$NDK" linux-x86_64 dca ac3 eac3 truehd mlp) > ffbuild.log 2>&1 || true
+          # args : <module> <ndk> <host> <niveau API min> <décodeurs...>
+          (cd "$FFP" && ./build_ffmpeg.sh "$FFP" "$NDK" linux-x86_64 21 dca ac3 eac3 truehd mlp) > ffbuild.log 2>&1 || true
           tail -6 ffbuild.log || true
           if ! ls "$FFP/ffmpeg/android-libs/arm64-v8a/"*.a >/dev/null 2>&1; then
             echo "::error title=ffmpeg::FFmpeg non compilé — voir le log ci-dessous"
