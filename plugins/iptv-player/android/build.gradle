@@ -50,8 +50,6 @@ dependencies {
     implementation "androidx.media3:media3-session:$media3Version"
     implementation "com.google.android.gms:play-services-cast-framework:21.5.0"
     implementation "androidx.mediarouter:mediarouter:1.7.0"
-    // Extension FFmpeg (décodage logiciel DTS/E-AC3/TrueHD) — AAR compilé par la CI.
-    if (file("$projectDir/libs/media3-ffmpeg.aar").exists()) {
-        implementation files("$projectDir/libs/media3-ffmpeg.aar")
-    }
+    // L'extension FFmpeg (décodage DTS/E-AC3/TrueHD) est ajoutée au module app par la CI
+    // (un module bibliothèque ne peut pas embarquer un .aar local ; l'app, si).
 }

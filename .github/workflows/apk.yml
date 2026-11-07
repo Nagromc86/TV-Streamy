@@ -87,10 +87,12 @@ jobs:
           ( cd media3src && ./gradlew :lib-decoder-ffmpeg:assembleRelease --no-daemon ) > aar.log 2>&1 || { tail -60 aar.log; exit 1; }
           AAR=$(find media3src/libraries/decoder_ffmpeg -name '*.aar' | grep -i release | head -1)
           echo "AAR=$AAR"; test -n "$AAR"
-          mkdir -p plugins/iptv-player/android/libs
-          cp "$AAR" plugins/iptv-player/android/libs/media3-ffmpeg.aar
-          for p in $(find node_modules -maxdepth 4 -type d -path '*iptv-player/android' 2>/dev/null); do mkdir -p "$p/libs"; cp "$AAR" "$p/libs/media3-ffmpeg.aar"; done
-          echo "== .so embarqués =="; unzip -l plugins/iptv-player/android/libs/media3-ffmpeg.aar | grep -E '\.so'
+          # Un module application peut embarquer un .aar local (pas un module bibliothèque).
+          mkdir -p android/app/libs
+          cp "$AAR" android/app/libs/media3-ffmpeg.aar
+          grep -q "media3-ffmpeg.aar" android/app/build.gradle || sed -i '0,/dependencies {/s//dependencies {\n    implementation files("libs\/media3-ffmpeg.aar")/' android/app/build.gradle
+          echo "== dépendance ajoutée au module app =="; grep -n "media3-ffmpeg" android/app/build.gradle
+          echo "== .so embarqués =="; unzip -l android/app/libs/media3-ffmpeg.aar | grep -E '\.so'
 
       - name: Construire l'APK
         working-directory: android
