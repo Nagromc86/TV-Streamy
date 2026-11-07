@@ -26,11 +26,13 @@ import java.util.List;
 
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
+import androidx.media3.common.Format;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MediaMetadata;
 import androidx.media3.common.MimeTypes;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.TrackSelectionOverride;
 import androidx.media3.common.Tracks;
 import androidx.media3.common.VideoSize;
 import androidx.media3.common.util.UnstableApi;
@@ -103,6 +105,7 @@ public class PlayerActivity extends Activity {
     private long backgroundPos;
     private final android.os.Handler retryHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private boolean tracksChecked;
+    private boolean audioFixTried;
     private String subMode;
     private List<MediaItem.SubtitleConfiguration> extraSubs = new ArrayList<>();
 
@@ -402,6 +405,11 @@ public class PlayerActivity extends Activity {
 
             @Override
             public void onTracksChanged(Tracks tracks) {
+                // Son muet sur certaines vidéos : si la piste audio sélectionnée n'est
+                // pas décodable (ex. DTS), basculer vers une piste lisible.
+                if (!tracks.isEmpty() && tracks.containsType(C.TRACK_TYPE_AUDIO)) {
+                    ensureAudible(tracks);
+                }
                 // Tell once, when the video has loaded, whether it carries subtitles at all
                 if (tracksChecked || live || tracks.isEmpty() || !tracks.containsType(C.TRACK_TYPE_VIDEO)) {
                     return;
@@ -1075,6 +1083,65 @@ public class PlayerActivity extends Activity {
     /** Close from outside (another video is being started). */
     void closeForNewVideo() {
         finishWithResult();
+    }
+
+    /**
+     * Certaines vidéos ont une piste audio que le téléphone ne sait pas décoder
+     * (souvent DTS, parfois E-AC3/TrueHD) : le sélecteur la choisit quand même et
+     * la vidéo tourne sans son. On bascule alors sur une piste audio décodable
+     * (en préférant le français) ; s'il n'y en a aucune, on prévient l'utilisateur.
+     */
+    private void ensureAudible(Tracks tracks) {
+        if (audioFixTried || player == null) {
+            return;
+        }
+        boolean anyAudio = false, selectedSupported = false;
+        Tracks.Group best = null;
+        int bestIdx = -1, bestScore = -1;
+        for (Tracks.Group g : tracks.getGroups()) {
+            if (g.getType() != C.TRACK_TYPE_AUDIO) {
+                continue;
+            }
+            anyAudio = true;
+            for (int i = 0; i < g.length; i++) {
+                boolean sup = g.isTrackSupported(i);
+                if (g.isTrackSelected(i) && sup) {
+                    selectedSupported = true;
+                }
+                if (sup) {
+                    Format f = g.getTrackFormat(i);
+                    int score = 0;
+                    String lang = f.language;
+                    if (lang != null && (lang.startsWith("fr") || lang.equals("fre"))) {
+                        score += 10;
+                    }
+                    if ((f.selectionFlags & C.SELECTION_FLAG_DEFAULT) != 0) {
+                        score += 2;
+                    }
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = g;
+                        bestIdx = i;
+                    }
+                }
+            }
+        }
+        if (!anyAudio) {
+            return; // pas encore d'info audio : on réessaiera au prochain onTracksChanged
+        }
+        if (selectedSupported) {
+            audioFixTried = true;
+            return; // déjà audible
+        }
+        audioFixTried = true;
+        if (best != null) {
+            player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                    .addOverride(new TrackSelectionOverride(best.getMediaTrackGroup(), bestIdx))
+                    .build());
+            Toast.makeText(this, "Piste audio incompatible : passage à une autre piste.", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Son indisponible : la piste audio de cette vidéo (ex. DTS) n'est pas prise en charge par ce téléphone.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private static boolean audioIsFrench(Tracks tracks) {
