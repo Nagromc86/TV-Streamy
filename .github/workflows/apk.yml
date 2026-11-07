@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace > gradle.log 2>&1 || { MSG=$(grep -E "FAILURE|What went wrong|error:|Error|Exception|> |\.java:" gradle.log | head -40 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g'); echo "::error title=gradle::$MSG"; tail -30 gradle.log; exit 1; }
+          ./gradlew assembleRelease --no-daemon --stacktrace > gradle.log 2>&1 || { echo "::error title=gradle::assembleRelease a échoué"; echo "==== erreurs ===="; grep -nE "FAILURE|What went wrong|Execution failed|Caused by|error:|Duplicate class|\.java:" gradle.log | tail -40; echo "==== fin du log ===="; tail -70 gradle.log; exit 1; }
           tail -5 gradle.log
 
       - name: Signer l'APK
