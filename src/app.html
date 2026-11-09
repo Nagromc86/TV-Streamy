@@ -165,6 +165,18 @@ body.tv .tvguide .gwrap{margin-top:4px}
 .spchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .spfol{padding:6px 12px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:.82rem;font-weight:700}
 .spform{display:flex;gap:8px}.spform input{flex:1;min-width:0}
+.chip b{margin-left:6px;opacity:.7;font-weight:700}
+.chips.wrap{flex-wrap:wrap;overflow:visible}
+.spcard.big{border-color:var(--gold)}
+.sptags{display:flex;flex-wrap:wrap;gap:6px}
+.spbigtag{display:inline-flex;align-items:center;font-size:.74rem;font-weight:800;color:#1b1b22;background:var(--gold);padding:2px 9px;border-radius:999px}
+#spsheet{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-end;justify-content:center}
+#spsheet .spbk{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+#spsheet .spdlg{position:relative;width:100%;max-width:560px;max-height:90vh;overflow:auto;background:var(--surface);border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+#spsheet h3{margin:0 0 12px;font-size:1.1rem}
+#spsheet .spf{display:block;margin-bottom:12px}
+#spsheet .spf>span{display:block;font-size:.78rem;color:var(--muted);font-weight:700;margin-bottom:6px}
+#spsheet .spf input,#spsheet .spf select{width:100%;box-sizing:border-box}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -1936,7 +1948,7 @@ function viewFavs(){
    Plusieurs listes en même temps (filtre « Source ») · notes IMDb / Rotten Tomatoes (OMDb) · hub Sport
    ====================================================================== */
 S.src=(function(){try{return localStorage.getItem('src')||null}catch(e){return null}})();
-S.sort='def';S.liveSports=false;S.spFilter='all';
+S.sort='def';S.liveSports=false;S.spFilter='all';S.spSport='all';S.spComp='';
 
 /* ---------- 1. Source : une liste, ou toutes à la fois ---------- */
 function multiAcc(){return S.accounts.length>1}
@@ -2151,20 +2163,50 @@ function submitOmdb(f){
   }).catch(function(e){err.textContent='OMDb : '+errText(e);err.hidden=false}).then(function(){b.disabled=false;b.textContent='Enregistrer et tester'});
 }
 
-/* ---------- 4. Hub Sport : en direct / à venir depuis le guide + équipes et compétitions suivies ---------- */
+/* ---------- 4. Hub Sport : en direct / à venir depuis le guide, suivis croisés (équipe × sport × genre × compétition), grosses affiches ---------- */
 var SPORT_COMPS=[
-  ['Ligue 1','ligue 1|ligue1'],['Ligue 2','ligue 2'],['Ligue des champions','ligue des champions|champions league'],['Ligue Europa','ligue europa|europa league'],['Ligue Europa Conférence','conference league'],
-  ['Premier League','premier league'],['LaLiga','laliga|la liga|\\bliga\\b'],['Serie A','serie a\\b'],['Bundesliga','bundesliga'],['Coupe de France','coupe de france'],
-  ['Top 14','top 14'],['Pro D2','pro d2'],['Champions Cup','champions cup'],['Tournoi des 6 Nations','6 nations|six nations'],['Coupe du monde','coupe du monde|world cup'],['Euro','championnat d.europe|\\beuro 20\\d\\d'],['Ligue des nations','ligue des nations'],
-  ['NBA','\\bnba\\b'],['NFL','\\bnfl\\b'],['NHL','\\bnhl\\b'],['Formule 1','formule 1|\\bf1\\b'],['MotoGP','moto ?gp'],['Roland-Garros','roland.garros'],['Tennis ATP / WTA','\\batp\\b|\\bwta\\b|wimbledon|us open|open d.australie|masters 1000'],['Tour de France','tour de france'],['UFC','\\bufc\\b'],['Euroleague','euroleague|betclic elite|liga endesa']
-].map(function(c){return {n:c[0],rx:new RegExp(c[1])}});
+  ['Ligue 1','ligue 1|ligue1','football'],['Ligue 2','ligue 2','football'],['Ligue des champions','ligue des champions|champions league','football'],['Ligue Europa','ligue europa|europa league','football'],['Ligue Europa Conférence','conference league','football'],
+  ['Premier League','premier league','football'],['LaLiga','laliga|la liga|\\bliga\\b','football'],['Serie A','serie a\\b','football'],['Bundesliga','bundesliga','football'],['Coupe de France','coupe de france','football'],
+  ['Top 14','top 14','rugby'],['Pro D2','pro d2','rugby'],['Champions Cup','champions cup','rugby'],['Tournoi des 6 Nations','6 nations|six nations','rugby'],['Coupe du monde','coupe du monde|world cup',''],['Euro','championnat d.europe|\\beuro 20\\d\\d',''],['Ligue des nations','ligue des nations',''],
+  ['NBA','\\bnba\\b','basket'],['NFL','\\bnfl\\b','nfl'],['NHL','\\bnhl\\b','hockey'],['Formule 1','formule 1|\\bf1\\b','auto'],['MotoGP','moto ?gp','auto'],['Roland-Garros','roland.garros','tennis'],['Tennis ATP / WTA','\\batp\\b|\\bwta\\b|wimbledon|us open|open d.australie|masters 1000','tennis'],['Tour de France','tour de france','cyclisme'],['UFC','\\bufc\\b','combat'],['Euroleague','euroleague|betclic elite|liga endesa','basket']
+].map(function(c){return {n:c[0],rx:new RegExp(c[1]),s:c[2]}});
+var SP_SPORTS=[['football','Football'],['rugby','Rugby'],['basket','Basket'],['handball','Handball'],['volley','Volley'],['tennis','Tennis'],['auto','Auto / Moto'],['cyclisme','Cyclisme'],['combat','Combat (UFC, boxe)'],['golf','Golf'],['nfl','Football US'],['hockey','Hockey']];
+var SP_SPORT_RX=[
+  ['nfl',/\bnfl\b|football americain|super bowl/],
+  ['rugby',/rugby|top 14|pro d2|6 nations|six nations|champions cup|xv de france/],
+  ['basket',/basket|\bnba\b|\bwnba\b|euroleague|betclic elite|liga endesa/],
+  ['handball',/hand ?ball|\blnh\b|starligue/],
+  ['volley',/volley/],
+  ['tennis',/tennis|roland.garros|\batp\b|\bwta\b|wimbledon|us open|open d.australie|masters 1000|coupe davis/],
+  ['hockey',/\bnhl\b|hockey/],
+  ['cyclisme',/cyclisme|tour de france|paris.roubaix|\bgiro\b|\bvuelta\b|dauphine|tour des flandres|liege.bastogne/],
+  ['auto',/formule 1|\bf1\b|moto ?gp|rallye|\bwrc\b|formule e|nascar|indycar|superbike|grand prix de/],
+  ['combat',/\bufc\b|boxe|\bmma\b/],
+  ['golf',/\bgolf\b|ryder cup/],
+  ['football',/\bfoot(?:ball)?\b|ligue 1|ligue 2|premier league|\bliga\b|laliga|serie a\b|bundesliga|ligue des champions|champions league|ligue europa|europa league|conference league|coupe de france/]
+];
+var SP_GENDER_SPORTS=['football','rugby','basket','handball','volley','tennis','hockey'];
 var SP_GENERIC=/^(football|foot|rugby|basket|basketball|tennis|handball|cyclisme|moto|formule 1|golf|boxe|natation|athletisme|volley|volleyball|hockey|sport|direct|live|en direct|match|documentaire|magazine)$/;
-var SP_ALIAS=[['psg','paris sg','paris saint germain'],['om','marseille','olympique de marseille'],['ol','lyon','olympique lyonnais'],['asse','saint etienne','st etienne'],['losc','lille'],['barca','barcelone','fc barcelone','barcelona'],['man city','manchester city'],['man united','manchester united','manchester utd'],['bayern','bayern munich'],['inter','inter milan'],['juve','juventus']];
+var SP_ALIAS=[['psg','paris sg','paris saint germain'],['om','marseille','olympique de marseille'],['ol','lyon','olympique lyonnais'],['asse','saint etienne','st etienne'],['losc','lille'],['barca','barcelone','fc barcelone','barcelona'],['man city','manchester city'],['man united','manchester united','manchester utd'],['bayern','bayern munich'],['inter milan','internazionale'],['juve','juventus']];
 var SP_CH=/sport|\bfoot\b|football|bein|dazn|eurosport|\brmc\b|l.equipe|rugby|tennis|\bnba\b|\bnfl\b|\bnhl\b|\bufc\b|golf|\bf1\b|moto ?gp|cyclisme|basket|handball|olymp|automoto|\btnt\b|eleven|infosport|viaplay|premier league|ligue 1|champions/;
 var SP_SKIP=/\(r\)|rediff|replay|differe|resume|magazine|debrief|highlights|best of|zapping|documentaire|reportage/;
 var SP_KEY=/\b(en direct|direct|live|finale|demi-finale|quart de finale|grand prix|qualifications?|essais libres|course|sprint|etape|tournoi|journee|match|rencontre|combat|gala|open|masters)\b/;
+var SP_YOUTH=/\bu ?(?:15|16|17|18|19|20|21|23)\b|espoirs|juniors?|\bjeunes\b|cadets/;
+var SP_BIGT=['PSG','Marseille','Lyon','Monaco','Lille','Real Madrid','Barcelone','Atletico Madrid','Bayern Munich','Borussia Dortmund','Liverpool','Manchester City','Manchester United','Arsenal','Chelsea','Tottenham','Juventus','Inter Milan','AC Milan','Naples','Napoli','AS Roma','Toulouse','Racing 92','Toulon','La Rochelle','Stade Francais','Leinster','France','Angleterre','Irlande','Ecosse','Pays de Galles','Italie','Allemagne','Espagne','Portugal','Bresil','Argentine','Belgique','Pays-Bas','Nouvelle-Zelande','Afrique du Sud','Australie','All Blacks'];
+var FLAME='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M12 2c1 3.5-1 5-2.5 7C8 11 7 12.5 7 15a5 5 0 0 0 10 0c0-2-1-3.5-2-4.5.2 1.5-.4 2.5-1.5 3 .8-3-.5-6.5-1.5-11.5z"/></svg>';
 function spNorm(s){return norm(s).replace(/[^a-z0-9+' ]+/g,' ').replace(/\s+/g,' ').trim()}
 function spComp(text){var t=norm(text);for(var i=0;i<SPORT_COMPS.length;i++)if(SPORT_COMPS[i].rx.test(t))return SPORT_COMPS[i].n;return null}
+function spCompSport(name){var c=SPORT_COMPS.filter(function(c){return c.n===name})[0];return c?c.s:''}
+function spSportName(k){var s=SP_SPORTS.filter(function(s){return s[0]===k})[0];return s?s[1]:''}
+function spSport(title,desc,comp){
+  var t=norm(title),i;
+  for(i=0;i<SP_SPORT_RX.length;i++)if(SP_SPORT_RX[i][1].test(t))return SP_SPORT_RX[i][0];
+  var cs=comp&&spCompSport(comp);if(cs)return cs;
+  var d=norm(desc||'');
+  for(i=0;i<SP_SPORT_RX.length;i++)if(SP_SPORT_RX[i][1].test(d))return SP_SPORT_RX[i][0];
+  return '';
+}
+function spGender(text){var t=norm(text);return /\b(feminin(?:e|es)?|dames|femmes|women|womens)\b|\(f\)/.test(t)?'f':'m'}
 function spCleanTeam(s){
   return String(s).replace(/\s*[\(\[].*$/,'').replace(/\s*[-–—]\s*\d+\s*(?:e|ème|eme|er)?\s*journée.*$/i,'').replace(/\s*\d+\s*(?:e|ème|eme)\s*journée.*$/i,'').replace(/[.!?,;:]+$/,'').trim();
 }
@@ -2207,103 +2249,223 @@ function sportChannels(){
     return out;
   });
 }
+function spHas(text,name){
+  var t=' '+spNorm(text)+' ';
+  return spNames(name).some(function(n){return n&&t.indexOf(' '+n+' ')>=0});
+}
+function spNames(name){var n=spNorm(name);for(var i=0;i<SP_ALIAS.length;i++)if(SP_ALIAS[i].indexOf(n)>=0)return SP_ALIAS[i];return [n]}
+function spBigTeam(n){return SP_BIGT.some(function(b){return spHas(n,b)})}
+/* « grosse affiche » : score d'après le titre et la description du guide (finale, classique, UFC numéroté, ténors face à face…) */
+function spBig(ev){
+  var t=norm(ev.t),text=norm(ev.t+' '+(ev.d||'')),sc=0,why=[];
+  var add=function(n,w){sc+=n;if(why.indexOf(w)<0)why.push(w)};
+  if(/\bufc ?\d{3}\b/.test(t))add(3,'UFC numéroté');
+  else if(ev.sport==='combat'&&/main card|carte principale|main event|combat principal/.test(text))add(2,'Carte principale');
+  if(ev.sport==='combat'&&/championnat du monde|ceinture|unification|title fight/.test(text))add(2,'Combat de titre');
+  if(/classique|clasico|derby|\ble choc\b|choc au sommet|affiche de choc/.test(text))add(2,'Choc / derby');
+  if(/demi-?finale|quarts? de finale/.test(text))add(2,'Phase finale');
+  if(/\bfinale\b/.test(text)&&!/demi|quart|huitieme|petite finale/.test(text))add(3,'Finale');
+  if(/super bowl|play-?offs?|barrage/.test(text))add(2,'Phase décisive');
+  if(ev.teams&&!ev.y&&ev.teams.every(spBigTeam))add(2,'Affiche entre ténors');
+  if(ev.sport==='auto'&&/grand prix/.test(t)&&!/essais|qualif|sprint shoot/.test(t))add(2,'Grand Prix');
+  if(ev.sport==='tennis'&&/\b(djokovic|alcaraz|sinner|nadal|federer|swiatek|sabalenka|gauff)\b/.test(text))add(1,'Têtes d\'affiche');
+  if(ev.sport==='cyclisme'&&/tourmalet|alpe d.huez|ventoux|galibier|etape reine|contre-la-montre/.test(text))add(2,'Étape clé');
+  return {n:sc,why:why};
+}
 function spEvents(){
-  var chs=sportChannels(),now=Date.now()/1000,lim=now+3*86400,map={},out=[];
+  var chs=sportChannels(),now=Date.now()/1000,lim=now+14*86400,map={},out=[];
   chs.forEach(function(x){
     var c=EPGF[x.stream_id];if(!c||!c.list)return;
     c.list.forEach(function(p){
       if(p.e<=now||p.s>=lim||p.e-p.s<1200)return;
       var cl=spClassify(p);if(!cl)return;
       var base=cl.teams?spNorm(cl.teams[0])+'|'+spNorm(cl.teams[1]):spNorm(p.t),k=base+'|'+Math.round(p.s/900),ev=map[k];
-      if(!ev){ev=map[k]={k:k,s:p.s,e:p.e,t:p.t,d:p.d,teams:cl.teams,comp:cl.comp,ch:[]};out.push(ev)}
+      if(!ev){
+        ev=map[k]={k:k,s:p.s,e:p.e,t:p.t,d:p.d,teams:cl.teams,comp:cl.comp,ch:[]};
+        ev.sport=spSport(p.t,p.d,cl.comp);ev.g=spGender(p.t+' '+(p.d||''));ev.y=SP_YOUTH.test(norm(p.t));
+        var b=spBig(ev);ev.big=b.n>=2;ev.why=b.why.slice(0,2);
+        out.push(ev);
+      }
       if(!ev.ch.some(function(y){return String(y.stream_id)===String(x.stream_id)}))ev.ch.push(x);
       if(!ev.comp&&cl.comp)ev.comp=cl.comp;
     });
   });
   return out.sort(function(a,b){return a.s-b.s||(a.t<b.t?-1:1)});
 }
-function spFollows(){var s=PREFS.sports||{};return {teams:s.teams||[],comps:s.comps||[]}}
-function spNames(name){var n=spNorm(name);for(var i=0;i<SP_ALIAS.length;i++)if(SP_ALIAS[i].indexOf(n)>=0)return SP_ALIAS[i];return [n]}
-function spHas(text,name){
-  var t=' '+spNorm(text)+' ';
-  return spNames(name).some(function(n){return n&&t.indexOf(' '+n+' ')>=0});
+function spGuideEnd(){
+  var m=0;sportChannels().forEach(function(x){var c=EPGF[x.stream_id];if(c&&c.list)c.list.forEach(function(p){if(p.e>m)m=p.e})});
+  return m;
 }
-function spTeamOn(name){return spFollows().teams.some(function(t){return spNames(t).indexOf(spNorm(name))>=0||spNorm(t)===spNorm(name)})}
-function spCompOn(name){return spFollows().comps.some(function(c){return norm(c)===norm(name)})}
-function spIsMine(ev){
-  var f=spFollows();
-  if(ev.comp&&f.comps.some(function(c){return norm(c)===norm(ev.comp)}))return true;
-  return f.teams.some(function(t){return spHas(ev.t,t)});
+
+/* suivis croisés : une règle = équipe ET/OU sport ET/OU genre ET/OU compétition (tous les critères renseignés doivent correspondre) */
+function spRules(){
+  var s=PREFS.sports,r=[];if(!s)return r;
+  if(s.rules)r=s.rules.slice();
+  else{(s.teams||[]).forEach(function(t){r.push({team:t})});(s.comps||[]).forEach(function(c){r.push({comp:c})})}
+  r.forEach(function(x,i){if(!x.id)x.id='m'+i});
+  return r;
 }
-function spToggle(kind,name){
-  var s=PREFS.sports=PREFS.sports||{teams:[],comps:[]};s.teams=s.teams||[];s.comps=s.comps||[];
-  var L=kind==='c'?s.comps:s.teams,n=norm(name),i=L.findIndex(function(v){return norm(v)===n});
-  if(i<0&&kind==='t'){var al=spNames(name);i=L.findIndex(function(v){return al.indexOf(spNorm(v))>=0})}
-  if(i>=0)L.splice(i,1);else L.push(name);
-  savePrefs();
+function spSetRules(L){PREFS.sports={rules:L,at:Date.now()};savePrefs()}
+function spRuleMatch(r,ev){
+  if(r.sport&&ev.sport&&ev.sport!==r.sport)return false;
+  if(r.sport&&!ev.sport&&!r.team&&!r.comp)return false;
+  if(r.g&&(ev.g||'m')!==r.g)return false;
+  if(r.comp&&norm(ev.comp||'')!==norm(r.comp))return false;
+  if(r.team){
+    if(!(ev.teams||[ev.t]).some(function(n){return spHas(n,r.team)}))return false;
+    if(ev.y&&!SP_YOUTH.test(spNorm(r.team)))return false;
+  }
+  return true;
 }
-function spCardHtml(ev,now){
-  var live=ev.s<=now,mine=spIsMine(ev);
-  var teams=ev.teams?ev.teams.map(function(t){return '<button type="button" class="sptm'+(spTeamOn(t)?' on':'')+'" data-sp="t|'+esc(t)+'" aria-label="Suivre '+esc(t)+'">'+esc(t)+'</button>'}).join('<span class="spvs">–</span>'):'<span class="spt">'+esc(ev.t)+'</span>';
-  return '<div class="spcard'+(live?' live':'')+(mine?' mine':'')+'"><div class="spwhen"><b>'+(live?'En direct':hhmm(ev.s))+'</b><small>'+(live?'jusqu\'à '+hhmm(ev.e):'→ '+hhmm(ev.e))+'</small></div><div class="spbody"><div class="spteams">'+teams+(mine?'<span class="spstar" aria-label="Dans mes équipes">★</span>':'')+'</div>'+
-    (ev.comp?'<button type="button" class="spcomp'+(spCompOn(ev.comp)?' on':'')+'" data-sp="c|'+esc(ev.comp)+'">'+esc(ev.comp)+'</button>':'')+
+function spIsMine(ev){return spRules().some(function(r){return spRuleMatch(r,ev)})}
+function spRuleLabel(r){
+  var a=[];if(r.team)a.push(r.team);if(r.comp)a.push(r.comp);if(r.sport)a.push(spSportName(r.sport));
+  if(r.g==='f')a.push('Féminin');else if(r.g==='m')a.push('Masculin');
+  return a.join(' · ');
+}
+function spDefG(ev){return SP_GENDER_SPORTS.indexOf(ev.sport)>=0?(ev.g||'m'):''}
+
+/* panneau « Suivre… » */
+function spOpen(d){
+  S.spDraft=Object.assign({id:null,team:'',sport:'',g:'',comp:''},d||{});
+  spSheetPaint();
+}
+function spClose(){S.spDraft=null;var el=document.getElementById('spsheet');if(el)el.remove()}
+function spDraftValid(d){return !!((d.team||'').trim()||d.comp||d.sport)}
+function spPrevText(){
+  var d=S.spDraft;if(!d)return '';
+  if(!spDraftValid(d))return 'Choisis au moins une équipe, un sport ou une compétition.';
+  var n=spEvents().filter(function(ev){return spRuleMatch(d,ev)}).length;
+  return n?n+' match'+(n>1?'s':'')+' correspond'+(n>1?'ent':'')+' dans le guide.':'Aucun match dans le guide pour l\'instant : ce suivi restera actif.';
+}
+function spSheetHtml(){
+  var d=S.spDraft,chip=function(grp,val,label){return '<button type="button" class="chip" data-spd="'+grp+'|'+esc(val)+'" aria-pressed="'+(String(d[grp]||'')===val)+'">'+esc(label)+'</button>'};
+  var comps=SPORT_COMPS.filter(function(c){return !d.sport||!c.s||c.s===d.sport||c.n===d.comp});
+  return '<div class="spbk" data-spclose></div><div class="spdlg" role="dialog" aria-modal="true" aria-label="Suivre"><h3>'+(d.id?'Modifier ce suivi':'Suivre…')+'</h3>'+
+    '<label class="spf"><span>Équipe (facultatif)</span><input id="sp-team" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="ex. France, PSG, Toulouse" value="'+esc(d.team)+'"></label>'+
+    '<div class="spf"><span>Sport</span><div class="chips wrap">'+chip('sport','','Tous')+SP_SPORTS.map(function(s){return chip('sport',s[0],s[1])}).join('')+'</div></div>'+
+    '<div class="spf"><span>Genre</span><div class="chips wrap">'+chip('g','','Tous')+chip('g','m','Masculin')+chip('g','f','Féminin')+'</div></div>'+
+    '<label class="spf"><span>Compétition</span><select id="sp-comp"><option value="">Toutes</option>'+comps.map(function(c){return '<option value="'+esc(c.n)+'"'+(d.comp===c.n?' selected':'')+'>'+esc(c.n)+'</option>'}).join('')+'</select></label>'+
+    '<p class="hint" id="sp-prev" style="margin:2px 0 12px">'+esc(spPrevText())+'</p>'+
+    '<div class="acts"><button type="button" class="btn" data-spsave>'+(d.id?'Enregistrer':'Suivre')+'</button>'+(d.id?'<button type="button" class="btn ghost" data-spdel>Retirer</button>':'')+'<button type="button" class="btn ghost" data-spclose>Annuler</button></div></div>';
+}
+function spSheetPaint(){
+  var el=document.getElementById('spsheet');
+  if(!S.spDraft){if(el)el.remove();return}
+  if(!el){el=document.createElement('div');el.id='spsheet';document.body.appendChild(el)}
+  el.innerHTML=spSheetHtml();
+}
+function spSave(){
+  var d=S.spDraft;if(!d||!spDraftValid(d))return;
+  var r={id:d.id||'r'+Date.now().toString(36)};
+  if((d.team||'').trim())r.team=d.team.trim();if(d.sport)r.sport=d.sport;if(d.g)r.g=d.g;if(d.comp)r.comp=d.comp;
+  var L=spRules(),i=L.findIndex(function(x){return x.id===r.id});
+  if(i>=0)L[i]=r;else L.push(r);
+  spSetRules(L);spClose();S.spFilter='mine';S.spSport='all';S.spComp='';render();
+}
+function spRepaint(){var e=$('#spev');if(e)e.innerHTML=spEventsHtml()}
+
+/* affichage */
+function spWhenHtml(ev,now,withDay){
+  var live=ev.s<=now,off=Math.round((new Date(ev.s*1000).setHours(0,0,0,0)/1000-dayStart(0))/86400);
+  return '<div class="spwhen">'+(withDay&&!live?'<small>'+esc(dayLabel(off))+'</small>':'')+'<b>'+(live?'En direct':hhmm(ev.s))+'</b><small>'+(live?'jusqu\'à '+hhmm(ev.e):'→ '+hhmm(ev.e))+'</small></div>';
+}
+function spCardHtml(ev,now,withDay){
+  var live=ev.s<=now,mine=spIsMine(ev),g=spDefG(ev),o=function(x){return esc(JSON.stringify(x))};
+  var teams=ev.teams?ev.teams.map(function(t){return '<button type="button" class="sptm" data-spo="'+o({team:t,sport:ev.sport||'',g:g})+'" aria-label="Suivre '+esc(t)+'">'+esc(t)+'</button>'}).join('<span class="spvs">–</span>'):'<span class="spt">'+esc(ev.t)+'</span>';
+  var tags='';
+  if(ev.big)tags+='<span class="spbigtag">'+FLAME+esc(ev.why[0]||'Grosse affiche')+'</span>';
+  if(ev.sport)tags+='<button type="button" class="spcomp" data-spo="'+o({sport:ev.sport,g:g})+'">'+esc(spSportName(ev.sport))+(ev.g==='f'?' · Féminin':'')+(ev.y?' · Jeunes':'')+'</button>';
+  if(ev.comp)tags+='<button type="button" class="spcomp" data-spo="'+o({comp:ev.comp,sport:ev.sport||''})+'">'+esc(ev.comp)+'</button>';
+  return '<div class="spcard'+(live?' live':'')+(mine?' mine':'')+(ev.big?' big':'')+'">'+spWhenHtml(ev,now,withDay)+'<div class="spbody"><div class="spteams">'+teams+(mine?'<span class="spstar" aria-label="Dans mes suivis">★</span>':'')+'</div>'+
+    (tags?'<div class="sptags">'+tags+'</div>':'')+
     '<div class="spch">'+ev.ch.slice(0,4).map(function(x){return '<button type="button" class="spchan" '+(live?'data-play="live:'+esc(x.stream_id)+'"':'data-chguide="'+esc(x.stream_id)+'"')+'>'+(live?IC.play:'')+esc(cleanName(x.name))+'</button>'}).join('')+'</div></div></div>';
 }
 function spEventsHtml(){
   var chs=sportChannels(),done=chs.filter(function(x){var c=EPGF[x.stream_id];return c&&!c.loading}).length;
-  var all=spEvents(),sel=S.spFilter||'all',now=Date.now()/1000,comps={};
-  all.forEach(function(ev){if(ev.comp)comps[ev.comp]=(comps[ev.comp]||0)+1});
-  var mine=all.filter(spIsMine);
-  if(sel!=='all'&&sel!=='mine'&&!comps[sel.slice(2)])sel=S.spFilter='all';
-  var chip=function(k,l,n){return '<button type="button" class="chip" data-spf="'+esc(k)+'" aria-pressed="'+(sel===k)+'">'+esc(l)+(n!=null?'<b>'+n+'</b>':'')+'</button>'};
-  var h='<div class="chips" style="margin-top:12px">'+chip('all','Tout',all.length)+chip('mine','Mes équipes',mine.length)+Object.keys(comps).sort(function(a,b){return comps[b]-comps[a]}).slice(0,10).map(function(c){return chip('c:'+c,c,comps[c])}).join('')+'</div>';
+  var all=spEvents(),now=Date.now()/1000,mine=all.filter(spIsMine),bigs=all.filter(function(ev){return ev.big});
+  var f=S.spFilter==='mine'||S.spFilter==='big'?S.spFilter:'all';
+  var base=f==='mine'?mine:f==='big'?bigs:all;
+  var sc={};base.forEach(function(ev){if(ev.sport)sc[ev.sport]=(sc[ev.sport]||0)+1});
+  if(S.spSport!=='all'&&!sc[S.spSport])S.spSport='all';
+  var bs=S.spSport==='all'?base:base.filter(function(ev){return ev.sport===S.spSport});
+  var cc={};bs.forEach(function(ev){if(ev.comp)cc[ev.comp]=(cc[ev.comp]||0)+1});
+  if(S.spComp&&!cc[S.spComp])S.spComp='';
+  var L=S.spComp?bs.filter(function(ev){return ev.comp===S.spComp}):bs;
+  var chip=function(attr,k,l,n,on){return '<button type="button" class="chip" '+attr+'="'+esc(k)+'" aria-pressed="'+on+'">'+esc(l)+(n!=null?'<b>'+n+'</b>':'')+'</button>'};
+  var h='<div class="chips" style="margin-top:12px">'+chip('data-spf','all','Tout',all.length,f==='all')+chip('data-spf','mine','Mes suivis',mine.length,f==='mine')+'<button type="button" class="chip" data-spf="big" aria-pressed="'+(f==='big')+'">'+FLAME+'Grosses affiches<b>'+bigs.length+'</b></button></div>';
+  var sk=SP_SPORTS.filter(function(s){return sc[s[0]]});
+  if(sk.length>1)h+='<div class="chips" style="margin-top:8px">'+chip('data-sps','all','Tous les sports',null,S.spSport==='all')+sk.map(function(s){return chip('data-sps',s[0],s[1],sc[s[0]],S.spSport===s[0])}).join('')+'</div>';
+  var ck=Object.keys(cc).sort(function(a,b){return cc[b]-cc[a]}).slice(0,10);
+  if(ck.length>1||S.spComp)h+='<div class="chips" style="margin-top:8px">'+chip('data-spc','','Toutes compétitions',null,!S.spComp)+ck.map(function(c){return chip('data-spc',c,c,cc[c],S.spComp===c)}).join('')+'</div>';
   if(!chs.length)return h+'<div class="empty"><p>Aucune chaîne de sport repérée dans cette liste (je cherche « sport », « foot », « bein », « eurosport », « rmc »…).</p></div>';
   if(done<chs.length)h+='<p class="hint" style="margin:10px 0 0">Analyse du guide : '+done+' / '+chs.length+' chaînes…</p>';
-  var L=sel==='all'?all:sel==='mine'?mine:all.filter(function(ev){return ev.comp===sel.slice(2)});
-  if(!L.length)return h+'<div class="empty"><p>'+(done<chs.length?'Un instant, le guide se charge…':sel==='mine'?(spFollows().teams.length||spFollows().comps.length?'Aucun match de tes équipes dans les 3 prochains jours.':'Suis des équipes ou des compétitions (touche un nom dans la liste, ou ajoute-les en bas) pour les retrouver ici.'):'Aucun match repéré dans les 3 prochains jours. Le guide de ton fournisseur ne couvre peut-être pas ces chaînes.')+'</p></div>';
-  var d0=dayStart(0),nowL=L.filter(function(ev){return ev.s<=now}),byDay={},days=[];
+  /* prochaine grosse affiche, pour le choix en cours (suivis, sport, compétition), sur tout le guide disponible */
+  if(f!=='big'){
+    var pool=(f==='mine'?mine:all).filter(function(ev){return (S.spSport==='all'||ev.sport===S.spSport)&&(!S.spComp||ev.comp===S.spComp)});
+    var nbs=[],ge=spGuideEnd(),seenB={},addB=function(ev){if(ev&&!seenB[ev.k]){seenB[ev.k]=1;nbs.push(ev)}};
+    if(f==='mine'&&S.spSport==='all'&&!S.spComp)spRules().slice(0,6).forEach(function(r){addB(pool.filter(function(ev){return ev.big&&ev.s>now&&spRuleMatch(r,ev)})[0])});
+    if(!nbs.length)addB(pool.filter(function(ev){return ev.big&&ev.s>now})[0]||pool.filter(function(ev){return ev.big})[0]);
+    nbs.sort(function(a,b){return a.s-b.s});var nb=nbs[0];
+    if(nb)h+='<section class="sec"><div class="sech"><h2>'+FLAME+(nbs.length>1?'Prochaines grosses affiches':'Prochaine grosse affiche')+'</h2></div>'+nbs.slice(0,4).map(function(ev){return spCardHtml(ev,now,true)}).join('')+'</section>';
+    else if((S.spSport!=='all'||S.spComp||f==='mine')&&done===chs.length&&pool.length+all.length>=0)h+='<p class="hint" style="margin:12px 0 0">Aucune grosse affiche repérée pour ce choix dans le guide de ton fournisseur'+(ge?' (il va jusqu\'au '+new Date(ge*1000).toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+')':'')+'.</p>';
+  }
+  if(!L.length)return h+'<div class="empty"><p>'+(done<chs.length?'Un instant, le guide se charge…':f==='mine'?(spRules().length?'Aucun match de tes suivis dans le guide.':'Choisis ce que tu veux suivre : touche une équipe, un sport ou une compétition dans la liste, ou utilise « Suivre » en bas.'):f==='big'?'Aucune grosse affiche repérée dans le guide.':'Aucun match repéré dans le guide. Le guide de ton fournisseur ne couvre peut-être pas ces chaînes.')+'</p></div>';
+  var narrow=f==='all'&&S.spSport==='all'&&!S.spComp,horizon=dayStart(0)+(S.spFar||!narrow?14:3)*86400,hidden=0,d0=dayStart(0),byDay={},days=[];
+  var nowL=[];
+  L.forEach(function(ev){
+    if(ev.s<=now){nowL.push(ev);return}
+    if(ev.s>=horizon){hidden++;return}
+    var o=Math.round((new Date(ev.s*1000).setHours(0,0,0,0)/1000-d0)/86400);if(!byDay[o]){byDay[o]=[];days.push(o)}byDay[o].push(ev);
+  });
   if(nowL.length)h+='<section class="sec"><div class="sech"><h2>En ce moment</h2></div>'+nowL.map(function(ev){return spCardHtml(ev,now)}).join('')+'</section>';
-  L.filter(function(ev){return ev.s>now}).forEach(function(ev){var o=Math.round((new Date(ev.s*1000).setHours(0,0,0,0)/1000-d0)/86400);if(!byDay[o]){byDay[o]=[];days.push(o)}byDay[o].push(ev)});
   days.forEach(function(o){h+='<section class="sec"><div class="sech"><h2>'+esc(dayLabel(o))+'</h2></div>'+byDay[o].map(function(ev){return spCardHtml(ev,now)}).join('')+'</section>'});
+  if(hidden)h+='<div class="sec"><button type="button" class="btn ghost" data-spfar>Voir les jours suivants ('+hidden+' événement'+(hidden>1?'s':'')+')</button></div>';
   return h;
 }
 function spFollowHtml(){
-  var f=spFollows(),chips=f.teams.map(function(t){return '<button type="button" class="spfol" data-sp="t|'+esc(t)+'">'+esc(t)+' <span aria-hidden="true">✕</span></button>'}).concat(f.comps.map(function(c){return '<button type="button" class="spfol" data-sp="c|'+esc(c)+'">'+esc(c)+' <span aria-hidden="true">✕</span></button>'})).join('');
-  return '<section class="sec spfollow"><div class="sech"><h2>Mes équipes et compétitions</h2></div>'+(chips?'<div class="spchips">'+chips+'</div>':'<p class="hint" style="margin:0 0 8px">Rien de suivi pour l\'instant. Touche le nom d\'une équipe ou d\'une compétition dans la liste, ou ajoute-la ici.</p>')+
-    '<form id="spform" class="spform"><input id="sp-add" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Équipe ou compétition (ex. PSG, Toulouse, Top 14)"><button type="submit" class="btn ghost">Suivre</button></form></section>';
+  var R=spRules();
+  return '<section class="sec spfollow"><div class="sech"><h2>Mes suivis</h2></div>'+
+    (R.length?'<div class="spchips">'+R.map(function(r){return '<button type="button" class="spfol" data-spedit="'+esc(r.id)+'">'+esc(spRuleLabel(r))+'</button>'}).join('')+'</div>':'<p class="hint" style="margin:0 0 10px">Rien de suivi pour l\'instant. Tu peux croiser équipe, sport, genre et compétition : par exemple « France · Football · Masculin ».</p>')+
+    '<button type="button" class="btn ghost" data-spnew>+ Suivre une équipe, un sport ou une compétition</button></section>';
 }
 function viewSports(){
+  if(!S.spInit){S.spInit=1;if(spRules().length)S.spFilter='mine'}
   sportChannels().forEach(function(x){wantFull(x.stream_id)});
   return '<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+liveToggleHtml()+'<div id="spev">'+spEventsHtml()+'</div>'+spFollowHtml();
 }
 function sportPaint(){
   clearTimeout(sportPaint.t);
-  sportPaint.t=setTimeout(function(){if(S.tab!=='live'||!S.liveSports||sheet)return;var e=$('#spev');if(e)e.innerHTML=spEventsHtml()},400);
+  sportPaint.t=setTimeout(function(){if(S.tab!=='live'||!S.liveSports||sheet||S.spDraft)return;spRepaint()},400);
 }
 
 /* ---------- events of the new controls (own listeners, the main handler is left untouched) ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest&&e.target.closest('[data-src],[data-sort],[data-spview],[data-spf],[data-sp]');if(!t)return;
-  var y=window.scrollY;
-  if(t.hasAttribute('data-src')){
-    S.src=t.getAttribute('data-src');try{localStorage.setItem('src',S.src)}catch(x){}
-    loadXCats();
-    render();window.scrollTo(0,0);return;
-  }
-  if(t.hasAttribute('data-sort')){var s=t.getAttribute('data-sort');S.sort=S.sort===s?'def':s;render();window.scrollTo(0,y);return}
+  var t=e.target.closest&&e.target.closest('[data-src],[data-sort],[data-spview],[data-spf],[data-sps],[data-spc],[data-spfar],[data-spo],[data-spnew],[data-spedit],[data-spd],[data-spsave],[data-spdel],[data-spclose]');if(!t)return;
+  var y=window.scrollY,g=function(a){return t.getAttribute(a)};
+  if(t.hasAttribute('data-src')){S.src=g('data-src');try{localStorage.setItem('src',S.src)}catch(x){}loadXCats();render();window.scrollTo(0,0);return}
+  if(t.hasAttribute('data-sort')){var s=g('data-sort');S.sort=S.sort===s?'def':s;render();window.scrollTo(0,y);return}
   if(t.hasAttribute('data-spview')){S.liveSports=true;MINI.on&&miniStop();render();window.scrollTo(0,0);return}
-  if(t.hasAttribute('data-spf')){S.spFilter=t.getAttribute('data-spf');var ev=$('#spev');if(ev)ev.innerHTML=spEventsHtml();return}
-  if(t.hasAttribute('data-sp')){var p=t.getAttribute('data-sp').split('|');spToggle(p[0],p.slice(1).join('|'));render();window.scrollTo(0,y);return}
+  if(t.hasAttribute('data-spf')){S.spFilter=g('data-spf');spRepaint();return}
+  if(t.hasAttribute('data-sps')){S.spSport=g('data-sps');S.spComp='';spRepaint();return}
+  if(t.hasAttribute('data-spc')){S.spComp=g('data-spc');spRepaint();return}
+  if(t.hasAttribute('data-spfar')){S.spFar=true;spRepaint();return}
+  if(t.hasAttribute('data-spo')){try{spOpen(JSON.parse(g('data-spo')))}catch(x){}return}
+  if(t.hasAttribute('data-spnew')){spOpen();return}
+  if(t.hasAttribute('data-spedit')){var r=spRules().filter(function(x){return x.id===g('data-spedit')})[0];if(r)spOpen({id:r.id,team:r.team||'',sport:r.sport||'',g:r.g||'',comp:r.comp||''});return}
+  if(t.hasAttribute('data-spd')){
+    var d=S.spDraft;if(!d)return;var i=$('#sp-team');if(i)d.team=i.value;var c=$('#sp-comp');if(c)d.comp=c.value;
+    var p=g('data-spd').split('|');d[p[0]]=p.slice(1).join('|');
+    if(p[0]==='sport'&&d.comp&&d.sport&&spCompSport(d.comp)&&spCompSport(d.comp)!==d.sport)d.comp='';
+    spSheetPaint();return;
+  }
+  if(t.hasAttribute('data-spsave')){var i2=$('#sp-team'),c2=$('#sp-comp');if(S.spDraft){if(i2)S.spDraft.team=i2.value;if(c2)S.spDraft.comp=c2.value}spSave();return}
+  if(t.hasAttribute('data-spdel')){var dd=S.spDraft;if(dd&&dd.id){spSetRules(spRules().filter(function(x){return x.id!==dd.id}))}spClose();render();window.scrollTo(0,y);return}
+  if(t.hasAttribute('data-spclose')){spClose();return}
 });
-document.addEventListener('submit',function(e){
-  if(e.target.id!=='spform')return;e.preventDefault();
-  var inp=$('#sp-add'),v=(inp&&inp.value||'').trim();if(!v)return;
-  v.split(',').map(function(s){return s.trim()}).filter(Boolean).forEach(function(n){
-    var comp=SPORT_COMPS.filter(function(c){return norm(c.n)===norm(n)})[0];
-    if(comp){if(!spCompOn(comp.n))spToggle('c',comp.n)}else if(!spTeamOn(n))spToggle('t',n);
-  });
-  render();
-});
+document.addEventListener('input',function(e){if(e.target.id==='sp-team'&&S.spDraft){S.spDraft.team=e.target.value;var p=$('#sp-prev');if(p)p.textContent=spPrevText()}});
+document.addEventListener('change',function(e){if(e.target.id==='sp-comp'&&S.spDraft){S.spDraft.comp=e.target.value;var p=$('#sp-prev');if(p)p.textContent=spPrevText()}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&S.spDraft)spClose()});
 document.addEventListener('submit',function(e){if(e.target.id==='omdbform'){e.preventDefault();submitOmdb(e.target)}});
 
 /* ---------- search across all playlists ---------- */
