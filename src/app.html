@@ -137,6 +137,34 @@ body.tv .tvguide .gwrap{margin-top:4px}
 .mv-full{min-height:38px;padding:6px 12px;font-size:.85rem}.mv-full svg{width:18px;height:18px}
 .grow.on .glab{background:var(--accent);color:#fff}
 
+
+/* sources multiples, tri, notes, hub sport */
+.srcbar{display:flex;align-items:center;gap:10px;margin:8px 0 0;min-width:0}
+.srclab{flex:none;font-size:.7rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.srcbar .chips{margin-inline:0;padding-inline:0;flex:1;min-width:0}
+.rtb{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:6px;background:var(--surface2);color:var(--ink);font-weight:700;font-size:.8rem}
+.meta .rtb b,.rtb b{color:var(--gold);font-weight:800;font-size:.7rem;letter-spacing:.03em}
+.spcard{display:flex;gap:12px;padding:12px;margin:0 0 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.spcard.live{border-color:var(--accent)}
+.spcard.mine{background:var(--surface2)}
+.spwhen{flex:none;width:64px;display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.spwhen b{font-size:1rem}.spwhen small{color:var(--muted);font-size:.72rem}
+.spcard.live .spwhen b{color:var(--live);font-size:.82rem;text-transform:uppercase;letter-spacing:.05em}
+.spbody{min-width:0;flex:1;display:flex;flex-direction:column;gap:7px}
+.spteams{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-weight:700}
+.sptm,.spcomp,.spchan,.spfol{border:0;background:none;color:inherit;font:inherit;padding:0}
+.sptm{font-weight:800;font-size:1rem;text-align:left}
+.sptm.on{color:var(--gold)}
+.spvs{color:var(--muted)}.spt{font-weight:700}.spstar{color:var(--gold)}
+.spcomp{align-self:flex-start;font-size:.74rem;font-weight:700;color:var(--muted);padding:2px 9px;border:1px solid var(--line);border-radius:999px}
+.spcomp.on{color:var(--gold);border-color:var(--gold)}
+.spch{display:flex;flex-wrap:wrap;gap:6px}
+.spchan{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;background:var(--surface2);font-size:.8rem;font-weight:700}
+.spchan svg{width:13px;height:13px}
+.spcard.live .spchan{background:var(--accent);color:#fff}
+.spchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.spfol{padding:6px 12px;border-radius:999px;border:1px solid var(--gold);color:var(--gold);font-size:.82rem;font-weight:700}
+.spform{display:flex;gap:8px}.spform input{flex:1;min-width:0}
 </style>
 <style>
 /* Layout: streaming-app look — billboard on top, horizontal rows by category, landscape "resume" cards, full-height detail sheets, bottom tab bar */
@@ -626,7 +654,7 @@ var IC={
 var S={boot:true,liveView:(function(){try{return localStorage.getItem('lview')||(TV?'list':'guide')}catch(e){return 'list'}})(),accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
 var DATA=null;      /* catalogue of the active account */
 var USER={favs:{},prog:{},recent:[],downloads:{}};
-var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:''};  /* per-account personal data */
+var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:'',omdb:'',sports:null};  /* per-account personal data */
 var sheet=null,epgCache={},epgQ=[],epgBusy=0;
 
 /* ---------- helpers ---------- */
@@ -1255,9 +1283,10 @@ function isNew(x){var t=+(x.added||x.last_modified||0);return t&&Date.now()/1000
 function posterHtml(kind,x,opts){
   opts=opts||{};
   var id=x.stream_id||x.series_id,img=imgOf(kind,x),name=cleanName(x.name),r=parseFloat(x.rating);
+  var rr=PREFS.omdb&&opts.rate?rtGet(kind,x):null;if(rr&&rr.i>0)r=rr.i;
   var p=opts.prog,pc=p&&p.dur?Math.min(100,p.pos/p.dur*100):0;
-  return '<button type="button" class="poster'+(opts.labeled?' labeled':'')+(isDts(kind+':'+id)?' dts':'')+'" data-open="'+kind+':'+esc(id)+'" aria-label="'+esc(name)+'"><span class="art"><span class="ph">'+esc(name)+'</span>'+(img?'<img loading="lazy" src="'+esc(img)+'" alt="" onerror="this.remove()">':'')+
-    (r>0&&opts.rate?'<span class="rate">★ '+r.toFixed(1)+'</span>':'')+(isFav(kind,id)?'<span class="fav">'+IC.starOn+'</span>':'')+(opts.fresh&&isNew(x)?'<span class="badge new">Nouveau</span>':'')+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span>'+
+  return '<button type="button" class="poster'+(opts.labeled?' labeled':'')+(!opts.foreign&&isDts(kind+':'+id)?' dts':'')+'" data-open="'+kind+':'+esc(id)+'" aria-label="'+esc(name)+'"><span class="art"><span class="ph">'+esc(name)+'</span>'+(img?'<img loading="lazy" src="'+esc(img)+'" alt="" onerror="this.remove()">':'')+
+    (r>0&&opts.rate?'<span class="rate">★ '+r.toFixed(1)+'</span>':'')+(!opts.foreign&&isFav(kind,id)?'<span class="fav">'+IC.starOn+'</span>':'')+(opts.fresh&&isNew(x)?'<span class="badge new">Nouveau</span>':'')+(pc?'<span class="bar"><i style="width:'+pc.toFixed(0)+'%"></i></span>':'')+'</span>'+
     '<span class="t">'+esc(opts.label||name)+'</span></button>';
 }
 function wideHtml(attr,img,label,pc){
@@ -1292,6 +1321,7 @@ function runFull(){
   }
 }
 function paintFull(id){
+  if(S.liveSports)sportPaint();
   var r=document.querySelector('[data-grow="'+id+'"] .gline');if(r)r.innerHTML=gridLine(id);
   if(sheet&&sheet.kind==='chguide'&&String(sheet.item.stream_id)===String(id)){renderSheet();if((sheet.day||0)===0)setTimeout(scrollNow,30)}
 }
@@ -1810,25 +1840,29 @@ try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListen
   if(e.state==='playing'&&e.detail==='fallback')noteLive(liveExt(),{usedFallback:true});
 })}catch(e){}
 function viewLive(){
+  if(S.liveSports)return viewSports();
+  if(srcIsMerged())return viewLiveMerged();
   var L=filtered('live',S.liveCat),pg=pageOf(L,'live:'+S.liveCat,60);
   var gv=S.liveView==='guide';
-  var h='<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+freshHtml('live')+'<section class="sec" style="margin-top:12px">'+catsHtml('live',S.liveCat,'data-lcat')+'</section>'+
-    (miniOk()?miniHtml():'')+'<div class="tabs" style="margin-top:10px"><button type="button" class="chip" data-lview="list" aria-pressed="'+!gv+'">Chaînes</button><button type="button" class="chip" data-lview="guide" aria-pressed="'+gv+'">'+GICON.replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"')+'Guide TV</button></div>';
+  var h='<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+freshHtml('live')+'<section class="sec" style="margin-top:12px">'+srcBarHtml()+catsHtml('live',S.liveCat,'data-lcat')+'</section>'+
+    (miniOk()?miniHtml():'')+liveToggleHtml();
   if(gv)return h+'<section class="sec" style="margin-top:12px">'+(L.length?viewGuide(L):'<div class="empty"><p>Aucune chaîne dans cette catégorie.</p></div>')+'</section>';
   h+='<section class="sec" style="margin-top:12px"><div class="chlist">';
   pg.items.forEach(function(x){h+=chHtml(x)});
   return h+'</div>'+(pg.more?moreHtml('live:'+S.liveCat):'')+(!L.length?'<div class="empty"><p>'+(S.liveCat==='fav'?'Touche l\'étoile d\'une chaîne pour la retrouver ici.':'Aucune chaîne dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
 function viewGrid(kind){
+  if(srcIsMerged())return viewMerged(kind);
   var catKey=kind==='movie'?'vodCat':'serCat',cats=visCats(kind),all=visList(kind),sec=kind==='movie'?'vod':'series';
   if(S[catKey]==='all'){
-    return billHtml(kind)+'<section class="sec">'+catsHtml(kind,'all',kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section>'+continueRow(kind)+platRows(kind)+
+    return billHtml(kind)+'<section class="sec">'+srcBarHtml()+catsHtml(kind,'all',kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section>'+continueRow(kind)+platRows(kind)+
       rowHtml(kind==='movie'?'Nouveautés':'Mises à jour récentes',newest(kind).map(function(x){return posterHtml(kind,x,{fresh:true})}).join(''))+
       catRows(kind,40)+(!all.length?'<div class="empty"><p>'+(hidCount(kind)?'Tous les groupes sont masqués. Touche « Filtrer » pour en réafficher.':'Rien pour l\'instant dans ce compte.')+'</p></div>':'');
   }
-  var L=filtered(kind,S[catKey]),key=kind+':'+S[catKey],pg=pageOf(L,key,60);
+  var L=sortList(kind,filtered(kind,S[catKey])),key=kind+':'+S[catKey]+':'+S.sort,pg=pageOf(L,key,60);
+  if(S.sort==='rated')enrichRatings(kind,pg.items);
   var bh=S[catKey]!=='fav'?billHtml(kind,S[catKey]):'';
-  var h=(bh||'<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div>')+'<section class="sec" style="margin-top:12px">'+catsHtml(kind,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
+  var h=(bh||'<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div>')+'<section class="sec" style="margin-top:12px">'+srcBarHtml()+catsHtml(kind,S[catKey],kind==='movie'?'data-vcat':'data-scat')+freshHtml(sec)+(S[catKey]!=='fav'?sortBarHtml(kind,false):'')+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
   pg.items.forEach(function(x){h+=posterHtml(kind,x,{rate:true,fresh:true,prog:kind==='movie'?progressOf('movie:'+x.stream_id):null})});
   return h+'</div>'+(pg.more?moreHtml(key):'')+(!L.length?'<div class="empty"><p>'+(S[catKey]==='fav'?'Ajoute des titres à ta liste depuis leur fiche.':'Rien dans cette catégorie.')+'</p></div>':'')+'</section>';
 }
@@ -1898,6 +1932,380 @@ function viewFavs(){
   if(live.length){h+='<section class="sec"><div class="sech"><h2>Chaînes</h2></div><div class="chlist">';live.forEach(function(x){h+=chHtml(x)});h+='</div></section>'}
   return h;
 }
+/* ======================================================================
+   Plusieurs listes en même temps (filtre « Source ») · notes IMDb / Rotten Tomatoes (OMDb) · hub Sport
+   ====================================================================== */
+S.src=(function(){try{return localStorage.getItem('src')||null}catch(e){return null}})();
+S.sort='def';S.liveSports=false;S.spFilter='all';
+
+/* ---------- 1. Source : une liste, ou toutes à la fois ---------- */
+function multiAcc(){return S.accounts.length>1}
+function srcSel(){
+  if(!multiAcc())return S.activeId;
+  var s=S.src;if(s==='all')return 'all';
+  if(s&&S.accounts.some(function(a){return a.id===s}))return s;
+  return S.activeId;
+}
+function srcIsMerged(){return multiAcc()&&srcSel()!==S.activeId}
+function srcBarHtml(){
+  if(!multiAcc())return '';
+  var cur=srcSel(),chip=function(id,label){return '<button type="button" class="chip" data-src="'+esc(id)+'" aria-pressed="'+(cur===id)+'">'+esc(label)+'</button>'};
+  return '<div class="srcbar"><span class="srclab">Source</span><div class="chips">'+chip('all','Toutes')+S.accounts.map(function(a){return chip(a.id,a.name)}).join('')+'</div></div>';
+}
+function tagHtml(g){return multiAcc()?'<small class="accs">'+g.e.map(function(e){return esc(accName(e.acc))}).join(' · ')+'</small>':''}
+function srcSources(kind){
+  var sel=srcSel(),out=[];
+  var add=function(id){
+    if(id===S.activeId){out.push({id:id,list:visList(kind)});return}
+    var xc=XCAT[id];if(xc)out.push({id:id,list:xVisible(xc,kind)});
+  };
+  if(sel==='all'){add(S.activeId);otherAccounts().forEach(function(a){add(a.id)})}else add(sel);
+  return out;
+}
+function srcNeeded(){
+  var sel=srcSel();
+  return sel==='all'?otherAccounts():(sel!==S.activeId?S.accounts.filter(function(a){return a.id===sel}):[]);
+}
+function srcStatusHtml(){
+  loadXCats();
+  var miss=srcNeeded().filter(function(a){return XLOAD[a.id]==='missing'||XLOAD[a.id]==='loading'||XLOAD[a.id]==='cache'});
+  if(!miss.length)return '';
+  return '<div class="offline" style="margin-top:10px">'+miss.map(function(a){
+    return XLOAD[a.id]==='loading'||XLOAD[a.id]==='cache'?'Chargement de « '+esc(a.name)+' »…':'La liste « '+esc(a.name)+' » n\'a jamais été ouverte sur cet appareil. <button type="button" class="btn ghost" data-xload="'+esc(a.id)+'" style="min-height:34px;padding:4px 12px;margin-left:6px">Charger cette liste</button>'}).join('<br>')+'</div>';
+}
+var MG={};
+function srcSig(kind){
+  return [kind,srcSel(),S.sort,S.activeId,DATA&&DATA.upd?[DATA.upd.live,DATA.upd.vod,DATA.upd.series].join(','):'',hidSig(kind),S.sort==='rated'?RTV:0]
+    .concat(S.accounts.map(function(a){var xc=XCAT[a.id];return a.id+':'+(xc?(xc.cat.upd?[xc.cat.upd.live,xc.cat.upd.vod,xc.cat.upd.series].join(','):'x'):'-')})).join('|');
+}
+/* the lists merged: the same title in several lists appears once, with the names of the lists that have it */
+function mergedList(kind){
+  var sig=srcSig(kind),c=MG[kind];if(c&&c.sig===sig)return c.v;
+  var groups={},order=[];
+  srcSources(kind).forEach(function(src){
+    src.list.forEach(function(x){
+      var v=vpOf(x),key=v.key.length>1?v.key+'|'+(kind==='live'?'':year(x.releaseDate||x.name)):'id:'+src.id+'|'+(x.stream_id||x.series_id);
+      var g=groups[key];if(!g){g=groups[key]={e:[]};order.push(g)}
+      if(!g.e.some(function(e){return e.acc===src.id}))g.e.push({acc:src.id,x:x});
+    });
+  });
+  order.forEach(function(g){
+    g.p=g.e.filter(function(e){return e.acc===S.activeId})[0]||g.e[0];
+    g.a=0;g.s=0;g.n=g.p.x._n||(g.p.x._n=norm(g.p.x.name));
+    g.e.forEach(function(e){g.a=Math.max(g.a,added(e.x));g.s=Math.max(g.s,ratingOf(kind,e.x))});
+  });
+  if(kind!=='live'){
+    if(S.sort==='az')order.sort(function(a,b){return a.n<b.n?-1:a.n>b.n?1:0});
+    else if(S.sort==='rated')order.sort(function(a,b){return b.s-a.s||b.a-a.a});
+    else order.sort(function(a,b){return b.a-a.a});
+  }
+  MG[kind]={sig:sig,v:order};return order;
+}
+function sortBarHtml(kind,merged){
+  var cur=S.sort==='def'?(merged?'recent':''):S.sort;
+  var chip=function(k,l){return '<button type="button" class="chip" data-sort="'+k+'" aria-pressed="'+(cur===k)+'">'+l+'</button>'};
+  return '<div class="srcbar"><span class="srclab">Tri</span><div class="chips">'+chip('recent','Récents')+chip('rated','Mieux notés')+chip('az','A–Z')+'</div></div>'+
+    (S.sort==='rated'&&!PREFS.omdb?'<p class="hint" style="margin:6px 0 0">Notes de ton fournisseur. Ajoute une clé OMDb dans les réglages pour trier avec les notes IMDb.</p>':'');
+}
+/* categories / merged: same sort on a plain list */
+function sortList(kind,L){
+  if(S.sort==='def')return L;
+  var c=L.slice();
+  if(S.sort==='az')c.sort(function(a,b){var p=a._n||(a._n=norm(a.name)),q=b._n||(b._n=norm(b.name));return p<q?-1:p>q?1:0});
+  else if(S.sort==='recent')c.sort(function(a,b){return added(b)-added(a)});
+  else{var m=new Map();c.forEach(function(x){m.set(x,ratingOf(kind,x))});c.sort(function(a,b){return m.get(b)-m.get(a)||added(b)-added(a)})}
+  return c;
+}
+function viewMerged(kind){
+  var L=mergedList(kind),key='src:'+kind+':'+srcSel()+':'+S.sort,pg=pageOf(L,key,60);
+  var h='<div class="pagehead"><h1>'+(kind==='movie'?'Films':'Séries')+'</h1></div><section class="sec" style="margin-top:12px">'+srcBarHtml()+sortBarHtml(kind,true)+srcStatusHtml()+'</section><section class="sec" style="margin-top:14px"><div class="grid">';
+  pg.items.forEach(function(g){
+    var e=g.p,t=posterHtml(kind,e.x,{labeled:true,rate:true,fresh:true,foreign:e.acc!==S.activeId});
+    if(e.acc!==S.activeId)t=t.replace('data-open="'+kind+':','data-xopen="'+esc(e.acc)+'|'+kind+':');
+    h+='<div class="xres">'+t+tagHtml(g)+'</div>';
+  });
+  h+='</div>'+(pg.more?moreHtml(key):'')+(!L.length&&!srcStatusHtml()?'<div class="empty"><p>Rien à afficher pour cette source.</p></div>':'')+'</section>';
+  if(S.sort==='rated')enrichRatings(kind,pg.items.map(function(g){return g.p.x}));
+  return h;
+}
+function xchHtml(e,g){
+  var x=e.x;
+  return '<div class="ch"><button type="button" class="logo" data-xplay="'+esc(e.acc)+'|'+esc(x.stream_id)+'">'+(x.stream_icon?'<img loading="lazy" src="'+esc(x.stream_icon)+'" alt="" onerror="this.remove()">':'<span class="ph">'+initials(x.name)+'</span>')+'</button><button type="button" class="n" data-xplay="'+esc(e.acc)+'|'+esc(x.stream_id)+'"><b>'+esc(cleanName(x.name))+tagHtml(g)+'</b></button><span></span></div>';
+}
+function viewLiveMerged(){
+  var L=mergedList('live'),key='src:live:'+srcSel(),pg=pageOf(L,key,60);
+  var h='<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div><section class="sec" style="margin-top:12px">'+srcBarHtml()+srcStatusHtml()+'</section>'+liveToggleHtml(true)+
+    '<section class="sec" style="margin-top:12px"><div class="chlist">';
+  pg.items.forEach(function(g){var e=g.p;h+=e.acc===S.activeId?chHtml(e.x).replace('</b>','</b>'+tagHtml(g)):xchHtml(e,g)});
+  return h+'</div>'+(pg.more?moreHtml(key):'')+(!L.length&&!srcStatusHtml()?'<div class="empty"><p>Aucune chaîne pour cette source.</p></div>':'')+'</section>';
+}
+var TROPHY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"><path d="M8 4h8v5a4 4 0 0 1-8 0V4z"/><path d="M8 6H5a2 2 0 0 0 2 4M16 6h3a2 2 0 0 1-2 4M12 13v4M9 20h6M10 17h4"/></svg>';
+function liveToggleHtml(forceList){
+  var sp=!!S.liveSports,gv=!forceList&&!sp&&S.liveView==='guide';
+  return '<div class="tabs" style="margin-top:10px"><button type="button" class="chip" data-lview="list" aria-pressed="'+(!gv&&!sp)+'">Chaînes</button><button type="button" class="chip" data-lview="guide" aria-pressed="'+gv+'">'+GICON.replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px;margin-right:4px"')+'Guide TV</button><button type="button" class="chip" data-spview aria-pressed="'+sp+'">'+TROPHY+'Sport</button></div>';
+}
+
+/* ---------- 2. Notes IMDb + Rotten Tomatoes (OMDb), en plus de TMDB ---------- */
+var RT={},RTV=0,rtPend={},rtQ=[],rtBusy=0,rtDay={d:'',n:0},rtBad=false;
+kget('omdb').then(function(c){if(c&&c.m){RT=Object.assign(c.m,RT);if(c.q&&c.q.d===new Date().toDateString())rtDay=c.q}});
+function rtKey(kind,x){return (kind==='movie'?'m':'s')+'|'+vpOf(x).key+'|'+(String(x.year||'').slice(0,4)||year(x.releaseDate||x.releasedate||x.name))}
+function rtGet(kind,x){var r=RT[rtKey(kind,x)];return r&&!r.n?r:null}
+function rtSave(){
+  clearTimeout(rtSave.t);
+  rtSave.t=setTimeout(function(){
+    var ks=Object.keys(RT);
+    if(ks.length>4000)ks.sort(function(a,b){return (RT[a].at||0)-(RT[b].at||0)}).slice(0,ks.length-3000).forEach(function(k){delete RT[k]});
+    kset('omdb',{m:RT,q:rtDay});
+  },1500);
+}
+/* the best rating we know for a title: IMDb when fetched, else the provider's */
+function ratingOf(kind,x){var r=PREFS.omdb?rtGet(kind,x):null;return r&&r.i>0?r.i:(rate(x)||0)}
+function plainTitle(name){
+  var n=String(name||'').trim();
+  n=n.replace(/^\s*\[?([A-Za-z0-9]{2,8}(?:[ \-+][A-Za-z0-9]{2,6})?)\]?\s*[★|:•\-–»]+\s*/,'');
+  n=n.replace(/[\[(][^\])]*[\])]/g,' ').replace(/\s[-–]\s*(vostfr|vost|vf|vff|multi|4k|fhd|hd)\s*$/i,'');
+  return n.replace(/\b(19|20)\d{2}\s*$/,'').replace(/\s+/g,' ').trim();
+}
+function omdbReq(q){
+  var k=PREFS.omdb;
+  return withTimeout(fetch('https://www.omdbapi.com/?apikey='+encodeURIComponent(k)+'&'+q,{headers:{Accept:'application/json'}}),15000).then(function(r){
+    if(r.status===401){var e=new Error('clé OMDb refusée');e.code='key';throw e}
+    if(!r.ok)throw new Error('HTTP '+r.status);return r.json();
+  }).then(function(d){
+    if(d&&d.Response==='False'){
+      var m=String(d.Error||'');
+      if(/invalid api key|no api key/i.test(m)){var e=new Error('clé OMDb refusée');e.code='key';throw e}
+      if(/limit/i.test(m)){var e2=new Error('limite quotidienne OMDb atteinte');e2.code='limit';throw e2}
+      return null;
+    }
+    return d;
+  });
+}
+function omdbParse(d){
+  if(!d)return null;
+  var o={},i=parseFloat(d.imdbRating);if(i>0)o.i=i;
+  (d.Ratings||[]).forEach(function(r){
+    if(r.Source==='Rotten Tomatoes'){var p=parseInt(r.Value,10);if(p>=0)o.r=p}
+    if(r.Source==='Metacritic'){var m=parseInt(r.Value,10);if(m>0)o.m=m}
+  });
+  var v=parseInt(String(d.imdbVotes||'').replace(/[^\d]/g,''),10);if(v)o.v=v;
+  return (o.i||o.r!=null)?o:null;
+}
+function resolveRating(j){
+  var kind=j.kind,x=j.x,info=j.info||{},title=plainTitle(info.name||x.name),yr=String(x.year||info.releasedate||info.releaseDate||'').slice(0,4)||year(x.releaseDate||x.name);
+  var imdb=info.imdb_id||x.imdb||x.imdb_id||'',chain;
+  if(/^tt\d+$/.test(imdb))chain=Promise.resolve(imdb);
+  else if(PREFS.tmdb){
+    var tid=x.tmdb||x.tmdb_id||info.tmdb_id||info.tmdb,tk=kind==='movie'?'movie':'tv';
+    chain=(tid?Promise.resolve({id:tid}):tmdbFind(tk,title)).then(function(t){
+      if(!t||!t.id)return null;
+      return tmdbReq('/'+tk+'/'+t.id+'/external_ids').then(function(r){return r&&r.imdb_id||null},function(){return null});
+    },function(){return null});
+  }else chain=Promise.resolve(null);
+  return chain.then(function(id){
+    return id?omdbReq('i='+encodeURIComponent(id)):omdbReq('t='+encodeURIComponent(title)+(yr&&kind==='movie'?'&y='+yr:'')+'&type='+(kind==='movie'?'movie':'series'));
+  }).then(omdbParse);
+}
+function fetchRating(kind,x,info){
+  if(!PREFS.omdb||rtBad)return;
+  var k=rtKey(kind,x),c=RT[k];
+  if(c&&Date.now()-c.at<(c.e?10*60000:c.n?7*86400000:30*86400000))return;
+  if(rtPend[k])return;rtPend[k]=1;rtQ.push({k:k,kind:kind,x:x,info:info||null});runRt();
+}
+function enrichRatings(kind,items){if(!PREFS.omdb||rtBad)return;items.slice(0,120).forEach(function(x){fetchRating(kind,x)})}
+function runRt(){
+  while(rtBusy<2&&rtQ.length){
+    var today=new Date().toDateString();if(rtDay.d!==today)rtDay={d:today,n:0};
+    if(rtDay.n>=800){rtQ.forEach(function(q){delete rtPend[q.k]});rtQ=[];return}
+    var j=rtQ.shift();rtBusy++;rtDay.n++;
+    (function(j){
+      resolveRating(j).then(function(r){RT[j.k]=r?Object.assign({at:Date.now()},r):{n:1,at:Date.now()}},function(e){
+        if(e&&e.code==='key')rtBad=true;
+        else if(e&&e.code==='limit')rtDay.n=99999;
+        RT[j.k]={n:1,e:1,at:Date.now()};
+      }).then(function(){rtBusy--;delete rtPend[j.k];RTV++;rtSave();rtPaint();runRt()});
+    })(j);
+  }
+}
+function rtPaint(){
+  clearTimeout(rtPaint.t);
+  rtPaint.t=setTimeout(function(){
+    if(sheet&&(sheet.kind==='movie'||sheet.kind==='series')){if(!sheet.loading)softSheet();return}
+    if(sheet)return;
+    if(!TV&&S.sort!=='def'&&(S.tab==='movies'||S.tab==='series'))softRender();
+  },700);
+}
+function ratingsHtml(kind,x,info){
+  if(!PREFS.omdb)return '';
+  var r=rtGet(kind,x);
+  if(!r){fetchRating(kind,x,info);return ''}
+  return (r.i?'<span class="rtb"><b>IMDb</b> '+r.i.toFixed(1)+'</span>':'')+(r.r!=null?'<span class="rtb" title="Rotten Tomatoes"><b>RT</b> '+r.r+'%</span>':'')+(r.m?'<span class="rtb"><b>Metacritic</b> '+r.m+'</span>':'');
+}
+function submitOmdb(f){
+  var k=$('#omdb-key').value.trim(),err=$('#omdberr'),ok=$('#omdbok');err.hidden=true;ok.hidden=true;
+  PREFS.omdb=k;rtBad=false;savePrefs();
+  if(!k){ok.textContent='OMDb désactivé : notes de ton fournisseur uniquement.';ok.hidden=false;return}
+  var b=f.querySelector('[type=submit]');b.disabled=true;b.textContent='Test…';
+  omdbReq('t=Inception&y=2010').then(function(d){
+    var r=omdbParse(d);ok.textContent=r?'Clé valide. Exemple : Inception · IMDb '+(r.i||'–')+(r.r!=null?' · Rotten Tomatoes '+r.r+'%':'')+'.':'Clé acceptée.';ok.hidden=false;
+  }).catch(function(e){err.textContent='OMDb : '+errText(e);err.hidden=false}).then(function(){b.disabled=false;b.textContent='Enregistrer et tester'});
+}
+
+/* ---------- 4. Hub Sport : en direct / à venir depuis le guide + équipes et compétitions suivies ---------- */
+var SPORT_COMPS=[
+  ['Ligue 1','ligue 1|ligue1'],['Ligue 2','ligue 2'],['Ligue des champions','ligue des champions|champions league'],['Ligue Europa','ligue europa|europa league'],['Ligue Europa Conférence','conference league'],
+  ['Premier League','premier league'],['LaLiga','laliga|la liga|\\bliga\\b'],['Serie A','serie a\\b'],['Bundesliga','bundesliga'],['Coupe de France','coupe de france'],
+  ['Top 14','top 14'],['Pro D2','pro d2'],['Champions Cup','champions cup'],['Tournoi des 6 Nations','6 nations|six nations'],['Coupe du monde','coupe du monde|world cup'],['Euro','championnat d.europe|\\beuro 20\\d\\d'],['Ligue des nations','ligue des nations'],
+  ['NBA','\\bnba\\b'],['NFL','\\bnfl\\b'],['NHL','\\bnhl\\b'],['Formule 1','formule 1|\\bf1\\b'],['MotoGP','moto ?gp'],['Roland-Garros','roland.garros'],['Tennis ATP / WTA','\\batp\\b|\\bwta\\b|wimbledon|us open|open d.australie|masters 1000'],['Tour de France','tour de france'],['UFC','\\bufc\\b'],['Euroleague','euroleague|betclic elite|liga endesa']
+].map(function(c){return {n:c[0],rx:new RegExp(c[1])}});
+var SP_GENERIC=/^(football|foot|rugby|basket|basketball|tennis|handball|cyclisme|moto|formule 1|golf|boxe|natation|athletisme|volley|volleyball|hockey|sport|direct|live|en direct|match|documentaire|magazine)$/;
+var SP_ALIAS=[['psg','paris sg','paris saint germain'],['om','marseille','olympique de marseille'],['ol','lyon','olympique lyonnais'],['asse','saint etienne','st etienne'],['losc','lille'],['barca','barcelone','fc barcelone','barcelona'],['man city','manchester city'],['man united','manchester united','manchester utd'],['bayern','bayern munich'],['inter','inter milan'],['juve','juventus']];
+var SP_CH=/sport|\bfoot\b|football|bein|dazn|eurosport|\brmc\b|l.equipe|rugby|tennis|\bnba\b|\bnfl\b|\bnhl\b|\bufc\b|golf|\bf1\b|moto ?gp|cyclisme|basket|handball|olymp|automoto|\btnt\b|eleven|infosport|viaplay|premier league|ligue 1|champions/;
+var SP_SKIP=/\(r\)|rediff|replay|differe|resume|magazine|debrief|highlights|best of|zapping|documentaire|reportage/;
+var SP_KEY=/\b(en direct|direct|live|finale|demi-finale|quart de finale|grand prix|qualifications?|essais libres|course|sprint|etape|tournoi|journee|match|rencontre|combat|gala|open|masters)\b/;
+function spNorm(s){return norm(s).replace(/[^a-z0-9+' ]+/g,' ').replace(/\s+/g,' ').trim()}
+function spComp(text){var t=norm(text);for(var i=0;i<SPORT_COMPS.length;i++)if(SPORT_COMPS[i].rx.test(t))return SPORT_COMPS[i].n;return null}
+function spCleanTeam(s){
+  return String(s).replace(/\s*[\(\[].*$/,'').replace(/\s*[-–—]\s*\d+\s*(?:e|ème|eme|er)?\s*journée.*$/i,'').replace(/\s*\d+\s*(?:e|ème|eme)\s*journée.*$/i,'').replace(/[.!?,;:]+$/,'').trim();
+}
+/* "Ligue 1 : Lyon - Marseille", "PSG vs OM", "Rugby - Top 14 : Toulouse / Racing 92" -> ['Lyon','Marseille'] */
+function spTeams(title){
+  var t=String(title||'').replace(/\((?:direct|live|en direct|hd)\)/ig,' ').replace(/\s+/g,' ').trim();
+  var parts=t.split(/\s*:\s+/),seg=parts[parts.length-1];
+  var m=/^(.{2,40}?)\s+(?:vs\.?|v\.?|contre|\/)\s+(.{2,40})$/i.exec(seg),amb=false;
+  if(!m){m=/^(.{2,40}?)\s+[-–—]\s+(.{2,40})$/.exec(seg);amb=true}
+  if(!m)return null;
+  var a=spCleanTeam(m[1]),b=spCleanTeam(m[2]);if(!a||!b||a.length<2||b.length<2)return null;
+  if(amb){
+    var na=spNorm(a),nb=spNorm(b);
+    if(SP_GENERIC.test(na)||SP_GENERIC.test(nb)||spComp(a)||spComp(b))return null;
+    if(!/^[A-ZÀ-ÖØ-Þ0-9]/.test(a)||!/^[A-ZÀ-ÖØ-Þ0-9]/.test(b)||a.split(' ').length>4||b.split(' ').length>4)return null;
+  }
+  return [a,b];
+}
+function spClassify(p){
+  var title=p.t||'',nt=norm(title);
+  if(SP_SKIP.test(nt))return null;
+  var comp=spComp(title+' '+(p.d||'')),teams=spTeams(title);
+  if(teams)return {teams:teams,comp:comp};
+  if(comp||SP_KEY.test(nt))return {teams:null,comp:comp};
+  return null;
+}
+function sportChannels(){
+  return memo('sportch',function(){
+    var cats={},seen={},out=[],L=visList('live');
+    visCats('live').forEach(function(c){if(SP_CH.test(norm(c.category_name)))cats[c.category_id]=1});
+    var pass=function(byName){
+      L.forEach(function(x){
+        if(out.length>=90)return;
+        var nm=norm(x.name),hit=SP_CH.test(nm);
+        if(byName?!hit:(hit||!cats[x.category_id]))return;
+        var k=vpOf(x).key;if(k.length>1&&seen[k])return;seen[k]=1;out.push(x);
+      });
+    };
+    pass(true);pass(false);
+    return out;
+  });
+}
+function spEvents(){
+  var chs=sportChannels(),now=Date.now()/1000,lim=now+3*86400,map={},out=[];
+  chs.forEach(function(x){
+    var c=EPGF[x.stream_id];if(!c||!c.list)return;
+    c.list.forEach(function(p){
+      if(p.e<=now||p.s>=lim||p.e-p.s<1200)return;
+      var cl=spClassify(p);if(!cl)return;
+      var base=cl.teams?spNorm(cl.teams[0])+'|'+spNorm(cl.teams[1]):spNorm(p.t),k=base+'|'+Math.round(p.s/900),ev=map[k];
+      if(!ev){ev=map[k]={k:k,s:p.s,e:p.e,t:p.t,d:p.d,teams:cl.teams,comp:cl.comp,ch:[]};out.push(ev)}
+      if(!ev.ch.some(function(y){return String(y.stream_id)===String(x.stream_id)}))ev.ch.push(x);
+      if(!ev.comp&&cl.comp)ev.comp=cl.comp;
+    });
+  });
+  return out.sort(function(a,b){return a.s-b.s||(a.t<b.t?-1:1)});
+}
+function spFollows(){var s=PREFS.sports||{};return {teams:s.teams||[],comps:s.comps||[]}}
+function spNames(name){var n=spNorm(name);for(var i=0;i<SP_ALIAS.length;i++)if(SP_ALIAS[i].indexOf(n)>=0)return SP_ALIAS[i];return [n]}
+function spHas(text,name){
+  var t=' '+spNorm(text)+' ';
+  return spNames(name).some(function(n){return n&&t.indexOf(' '+n+' ')>=0});
+}
+function spTeamOn(name){return spFollows().teams.some(function(t){return spNames(t).indexOf(spNorm(name))>=0||spNorm(t)===spNorm(name)})}
+function spCompOn(name){return spFollows().comps.some(function(c){return norm(c)===norm(name)})}
+function spIsMine(ev){
+  var f=spFollows();
+  if(ev.comp&&f.comps.some(function(c){return norm(c)===norm(ev.comp)}))return true;
+  return f.teams.some(function(t){return spHas(ev.t,t)});
+}
+function spToggle(kind,name){
+  var s=PREFS.sports=PREFS.sports||{teams:[],comps:[]};s.teams=s.teams||[];s.comps=s.comps||[];
+  var L=kind==='c'?s.comps:s.teams,n=norm(name),i=L.findIndex(function(v){return norm(v)===n});
+  if(i<0&&kind==='t'){var al=spNames(name);i=L.findIndex(function(v){return al.indexOf(spNorm(v))>=0})}
+  if(i>=0)L.splice(i,1);else L.push(name);
+  savePrefs();
+}
+function spCardHtml(ev,now){
+  var live=ev.s<=now,mine=spIsMine(ev);
+  var teams=ev.teams?ev.teams.map(function(t){return '<button type="button" class="sptm'+(spTeamOn(t)?' on':'')+'" data-sp="t|'+esc(t)+'" aria-label="Suivre '+esc(t)+'">'+esc(t)+'</button>'}).join('<span class="spvs">–</span>'):'<span class="spt">'+esc(ev.t)+'</span>';
+  return '<div class="spcard'+(live?' live':'')+(mine?' mine':'')+'"><div class="spwhen"><b>'+(live?'En direct':hhmm(ev.s))+'</b><small>'+(live?'jusqu\'à '+hhmm(ev.e):'→ '+hhmm(ev.e))+'</small></div><div class="spbody"><div class="spteams">'+teams+(mine?'<span class="spstar" aria-label="Dans mes équipes">★</span>':'')+'</div>'+
+    (ev.comp?'<button type="button" class="spcomp'+(spCompOn(ev.comp)?' on':'')+'" data-sp="c|'+esc(ev.comp)+'">'+esc(ev.comp)+'</button>':'')+
+    '<div class="spch">'+ev.ch.slice(0,4).map(function(x){return '<button type="button" class="spchan" '+(live?'data-play="live:'+esc(x.stream_id)+'"':'data-chguide="'+esc(x.stream_id)+'"')+'>'+(live?IC.play:'')+esc(cleanName(x.name))+'</button>'}).join('')+'</div></div></div>';
+}
+function spEventsHtml(){
+  var chs=sportChannels(),done=chs.filter(function(x){var c=EPGF[x.stream_id];return c&&!c.loading}).length;
+  var all=spEvents(),sel=S.spFilter||'all',now=Date.now()/1000,comps={};
+  all.forEach(function(ev){if(ev.comp)comps[ev.comp]=(comps[ev.comp]||0)+1});
+  var mine=all.filter(spIsMine);
+  if(sel!=='all'&&sel!=='mine'&&!comps[sel.slice(2)])sel=S.spFilter='all';
+  var chip=function(k,l,n){return '<button type="button" class="chip" data-spf="'+esc(k)+'" aria-pressed="'+(sel===k)+'">'+esc(l)+(n!=null?'<b>'+n+'</b>':'')+'</button>'};
+  var h='<div class="chips" style="margin-top:12px">'+chip('all','Tout',all.length)+chip('mine','Mes équipes',mine.length)+Object.keys(comps).sort(function(a,b){return comps[b]-comps[a]}).slice(0,10).map(function(c){return chip('c:'+c,c,comps[c])}).join('')+'</div>';
+  if(!chs.length)return h+'<div class="empty"><p>Aucune chaîne de sport repérée dans cette liste (je cherche « sport », « foot », « bein », « eurosport », « rmc »…).</p></div>';
+  if(done<chs.length)h+='<p class="hint" style="margin:10px 0 0">Analyse du guide : '+done+' / '+chs.length+' chaînes…</p>';
+  var L=sel==='all'?all:sel==='mine'?mine:all.filter(function(ev){return ev.comp===sel.slice(2)});
+  if(!L.length)return h+'<div class="empty"><p>'+(done<chs.length?'Un instant, le guide se charge…':sel==='mine'?(spFollows().teams.length||spFollows().comps.length?'Aucun match de tes équipes dans les 3 prochains jours.':'Suis des équipes ou des compétitions (touche un nom dans la liste, ou ajoute-les en bas) pour les retrouver ici.'):'Aucun match repéré dans les 3 prochains jours. Le guide de ton fournisseur ne couvre peut-être pas ces chaînes.')+'</p></div>';
+  var d0=dayStart(0),nowL=L.filter(function(ev){return ev.s<=now}),byDay={},days=[];
+  if(nowL.length)h+='<section class="sec"><div class="sech"><h2>En ce moment</h2></div>'+nowL.map(function(ev){return spCardHtml(ev,now)}).join('')+'</section>';
+  L.filter(function(ev){return ev.s>now}).forEach(function(ev){var o=Math.round((new Date(ev.s*1000).setHours(0,0,0,0)/1000-d0)/86400);if(!byDay[o]){byDay[o]=[];days.push(o)}byDay[o].push(ev)});
+  days.forEach(function(o){h+='<section class="sec"><div class="sech"><h2>'+esc(dayLabel(o))+'</h2></div>'+byDay[o].map(function(ev){return spCardHtml(ev,now)}).join('')+'</section>'});
+  return h;
+}
+function spFollowHtml(){
+  var f=spFollows(),chips=f.teams.map(function(t){return '<button type="button" class="spfol" data-sp="t|'+esc(t)+'">'+esc(t)+' <span aria-hidden="true">✕</span></button>'}).concat(f.comps.map(function(c){return '<button type="button" class="spfol" data-sp="c|'+esc(c)+'">'+esc(c)+' <span aria-hidden="true">✕</span></button>'})).join('');
+  return '<section class="sec spfollow"><div class="sech"><h2>Mes équipes et compétitions</h2></div>'+(chips?'<div class="spchips">'+chips+'</div>':'<p class="hint" style="margin:0 0 8px">Rien de suivi pour l\'instant. Touche le nom d\'une équipe ou d\'une compétition dans la liste, ou ajoute-la ici.</p>')+
+    '<form id="spform" class="spform"><input id="sp-add" autocapitalize="words" autocorrect="off" spellcheck="false" placeholder="Équipe ou compétition (ex. PSG, Toulouse, Top 14)"><button type="submit" class="btn ghost">Suivre</button></form></section>';
+}
+function viewSports(){
+  sportChannels().forEach(function(x){wantFull(x.stream_id)});
+  return '<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+liveToggleHtml()+'<div id="spev">'+spEventsHtml()+'</div>'+spFollowHtml();
+}
+function sportPaint(){
+  clearTimeout(sportPaint.t);
+  sportPaint.t=setTimeout(function(){if(S.tab!=='live'||!S.liveSports||sheet)return;var e=$('#spev');if(e)e.innerHTML=spEventsHtml()},400);
+}
+
+/* ---------- events of the new controls (own listeners, the main handler is left untouched) ---------- */
+document.addEventListener('click',function(e){
+  var t=e.target.closest&&e.target.closest('[data-src],[data-sort],[data-spview],[data-spf],[data-sp]');if(!t)return;
+  var y=window.scrollY;
+  if(t.hasAttribute('data-src')){
+    S.src=t.getAttribute('data-src');try{localStorage.setItem('src',S.src)}catch(x){}
+    loadXCats();
+    render();window.scrollTo(0,0);return;
+  }
+  if(t.hasAttribute('data-sort')){var s=t.getAttribute('data-sort');S.sort=S.sort===s?'def':s;render();window.scrollTo(0,y);return}
+  if(t.hasAttribute('data-spview')){S.liveSports=true;MINI.on&&miniStop();render();window.scrollTo(0,0);return}
+  if(t.hasAttribute('data-spf')){S.spFilter=t.getAttribute('data-spf');var ev=$('#spev');if(ev)ev.innerHTML=spEventsHtml();return}
+  if(t.hasAttribute('data-sp')){var p=t.getAttribute('data-sp').split('|');spToggle(p[0],p.slice(1).join('|'));render();window.scrollTo(0,y);return}
+});
+document.addEventListener('submit',function(e){
+  if(e.target.id!=='spform')return;e.preventDefault();
+  var inp=$('#sp-add'),v=(inp&&inp.value||'').trim();if(!v)return;
+  v.split(',').map(function(s){return s.trim()}).filter(Boolean).forEach(function(n){
+    var comp=SPORT_COMPS.filter(function(c){return norm(c.n)===norm(n)})[0];
+    if(comp){if(!spCompOn(comp.n))spToggle('c',comp.n)}else if(!spTeamOn(n))spToggle('t',n);
+  });
+  render();
+});
+document.addEventListener('submit',function(e){if(e.target.id==='omdbform'){e.preventDefault();submitOmdb(e.target)}});
+
 /* ---------- search across all playlists ---------- */
 var XCAT={},XLOAD={};
 /* catalogues of the other accounts (cached ones load instantly, never-opened ones on request) */
@@ -1909,7 +2317,7 @@ function loadXCats(){
       var c=r[0],u=r[1]||{};
       XLOAD[a.id]=c?'':'missing';
       if(c){XCAT[a.id]={cat:c,hidden:u.hidden||{},hiddenCats:u.hiddenCats||{}}}
-      if(S.tab==='search')softRender();
+      if(S.tab==='search'||srcIsMerged())softRender();
       if(sheet&&(sheet.kind==='movie'||sheet.kind==='series')&&!sheet.loading)softSheet();
     });
   });
@@ -2334,6 +2742,9 @@ function renderSheetInner(){
       '<div class="fld"><label for="tmdb-key">Clé API TMDB</label><input id="tmdb-key" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(PREFS.tmdb||'')+'" placeholder="Clé API ou jeton de lecture"></div>'+
       '<p class="err" id="tmdberr" hidden></p><p class="okmsg" id="tmdbok"'+(PREFS.tmdb&&TREND?'':' hidden')+'>'+(TREND?esc('Tendances et Top Netflix, Prime Video, Disney+ chargés.'):'')+'</p>'+
       '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
+    h+=secOpen('omdb','Notes IMDb et Rotten Tomatoes (OMDb)',PREFS.omdb?'Activé · notes sur les fiches et tri « Mieux notés »':'Non configuré')+'<form class="form" id="omdbform"><p class="hint" style="margin:0">Pour afficher les notes IMDb et Rotten Tomatoes sur les fiches et trier par « Mieux notés », l\'appli utilise OMDb : clé gratuite (1 000 requêtes par jour) sur omdbapi.com. Elle reste sur ton appareil et suit tes autres réglages dans la synchro chiffrée.</p>'+
+      '<div class="fld"><label for="omdb-key">Clé API OMDb</label><input id="omdb-key" autocapitalize="off" autocorrect="off" spellcheck="false" value="'+esc(PREFS.omdb||'')+'" placeholder="ex. 1a2b3c4d"></div>'+
+      '<p class="err" id="omdberr" hidden></p><p class="okmsg" id="omdbok" hidden></p><div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
     h+=secOpen('subs','Sous-titres',{auto:'Si la vidéo n\'est pas en français',always:'Toujours',never:'Jamais'}[curSubMode()]+' · réglage du profil')+
       '<div class="fld"><label for="subMode">Afficher les sous-titres français</label><select id="subMode"><option value="auto"'+(curSubMode()==='auto'?' selected':'')+'>Seulement si la vidéo n\'est pas en français</option><option value="always"'+(curSubMode()==='always'?' selected':'')+'>Toujours</option><option value="never"'+(curSubMode()==='never'?' selected':'')+'>Jamais (activables avec CC)</option></select></div>'+
       '<p class="hint" style="margin:0">Pendant la lecture, le bouton « OpenSub » du lecteur permet de les décaler s\'ils sont en avance ou en retard.</p>'+
@@ -2387,7 +2798,7 @@ function renderSheetInner(){
     var x=sheet.item,info=sheet.info||{},p=progressOf('movie:'+x.stream_id),bg=info.backdrop_path&&info.backdrop_path[0]||info.movie_image||info.cover_big||x.stream_icon;
     var r=parseFloat(info.rating||x.rating),yr=year(info.releasedate||info.release_date||x.name);
     h+='<div class="hero'+(bg?'':' noimg')+(info.backdrop_path&&info.backdrop_path[0]?' isbd':'')+'" style="background-image:url(\''+esc(bg||'')+'\')"><button type="button" class="iconbtn x" data-close aria-label="Fermer">'+IC.x+'</button></div><div class="in gut"><h2>'+esc(cleanName(info.name||x.name))+'</h2>'+
-      '<div class="meta">'+(r>0?'<b>★ '+r.toFixed(1)+'</b>':'')+(yr?'<span>'+yr+'</span>':'')+(info.duration?'<span>'+esc(info.duration)+'</span>':'')+(info.genre?'<span>'+esc(info.genre)+'</span>':'')+subAvailHtml('movie:'+x.stream_id)+(isDts('movie:'+x.stream_id)?'<span class="dtsb">Son DTS · non compatible Samsung</span>':'')+'</div>'+
+      '<div class="meta">'+(r>0?'<b>★ '+r.toFixed(1)+'</b>':'')+(yr?'<span>'+yr+'</span>':'')+(info.duration?'<span>'+esc(info.duration)+'</span>':'')+(info.genre?'<span>'+esc(info.genre)+'</span>':'')+subAvailHtml('movie:'+x.stream_id)+(isDts('movie:'+x.stream_id)?'<span class="dtsb">Son DTS · non compatible Samsung</span>':'')+ratingsHtml('movie',x,info)+'</div>'+
       (sheet.loading?'<p class="hint">Chargement de la fiche…</p>':'')+((info.plot||info.description)?'<p class="plot">'+esc(info.plot||info.description)+'</p>':'')+
       ((info.director||info.cast||info.actors)?'<p class="hint">'+(info.director?'Réalisation : '+esc(info.director)+'<br>':'')+((info.cast||info.actors)?'Avec : '+esc(info.cast||info.actors):'')+'</p>':'')+
       '<div class="acts">'+(p&&!p.done?'<button type="button" class="btn" data-playmovie="'+esc(x.stream_id)+'">'+IC.play+'Reprendre à '+dur(p.pos)+'</button><button type="button" class="btn ghost" data-playmovie="'+esc(x.stream_id)+'" data-start="1">Depuis le début</button>':'<button type="button" class="btn" data-playmovie="'+esc(x.stream_id)+'">'+IC.play+'Lecture</button>')+
@@ -2401,7 +2812,7 @@ function renderSheetInner(){
     var bgs=(inf.backdrop_path&&inf.backdrop_path[0])||(s.backdrop_path&&s.backdrop_path[0])||inf.cover||s.cover;
     var rs=parseFloat(inf.rating||s.rating);
     h+='<div class="hero'+(bgs?'':' noimg')+(((inf.backdrop_path&&inf.backdrop_path[0])||(s.backdrop_path&&s.backdrop_path[0]))?' isbd':'')+'" style="background-image:url(\''+esc(bgs||'')+'\')"><button type="button" class="iconbtn x" data-close aria-label="Fermer">'+IC.x+'</button></div><div class="in gut"><h2>'+esc(cleanName(inf.name||s.name))+'</h2>'+
-      '<div class="meta">'+(rs>0?'<b>★ '+rs.toFixed(1)+'</b>':'')+(year(inf.releaseDate||s.releaseDate)?'<span>'+year(inf.releaseDate||s.releaseDate)+'</span>':'')+(seasons.length?'<span>'+seasons.length+' saison'+(seasons.length>1?'s':'')+'</span>':'')+((inf.genre||s.genre)?'<span>'+esc(inf.genre||s.genre)+'</span>':'')+subAvailHtml('series:'+s.series_id)+'</div>'+
+      '<div class="meta">'+(rs>0?'<b>★ '+rs.toFixed(1)+'</b>':'')+(year(inf.releaseDate||s.releaseDate)?'<span>'+year(inf.releaseDate||s.releaseDate)+'</span>':'')+(seasons.length?'<span>'+seasons.length+' saison'+(seasons.length>1?'s':'')+'</span>':'')+((inf.genre||s.genre)?'<span>'+esc(inf.genre||s.genre)+'</span>':'')+subAvailHtml('series:'+s.series_id)+ratingsHtml('series',s,inf)+'</div>'+
       ((inf.plot||s.plot)?'<p class="plot">'+esc(inf.plot||s.plot)+'</p>':'')+
       '<div class="acts">'+(nextEp?'<button type="button" class="btn" data-playep="'+esc(nextEp.ep.id)+'">'+IC.play+(nextEp.resume?'Reprendre ':'Regarder ')+esc(nextEp.label)+'</button>':(TV&&seasons.length&&(eps[seasons[0]]||[])[0]?'<button type="button" class="btn" data-playep="'+esc(eps[seasons[0]][0].id)+'">'+IC.play+'Regarder S'+esc(seasons[0])+' · É'+esc(eps[seasons[0]][0].episode_num)+'</button>':''))+
       '<button type="button" class="btn ghost" data-fav="series:'+esc(s.series_id)+'">'+(isFav('series',s.series_id)?IC.starOn+'Dans mes favoris':IC.star+'Ajouter aux favoris')+'</button></div>'+versionsHtml('series',s)+elsewhereHtml('series',s);
@@ -2569,7 +2980,7 @@ document.addEventListener('click',function(e){
   if(d.seasonno!==undefined){sheet.seasonAsk=null;renderSheet();return}
   if(d.chguide!==undefined){var cg=byId('live',d.chguide);if(cg)openChGuide(cg);return}
   if(d.gday!==undefined){sheet.day=+d.gday;renderSheet();setTimeout(sheet.day===0?scrollNow:function(){chipIntoView('#sheet [data-gday][aria-pressed=true]')},30);return}
-  if(d.lview){S.liveView=d.lview;try{localStorage.setItem('lview',d.lview)}catch(x){}render();return}
+  if(d.lview){S.liveView=d.lview;S.liveSports=false;try{localStorage.setItem('lview',d.lview)}catch(x){}render();return}
   if(d.gridday!==undefined){S.gDay=+d.gridday;S.gScroll=null;var y=window.scrollY;render();window.scrollTo(0,y);return}
   if(d.replay){var rp=d.replay.split('|'),rx=byId('live',rp[0]),pr=rx&&progOf(rp[0],rp[1]);if(pr)playReplay(rx,pr);return}
   if(d.gprog){
@@ -2721,7 +3132,7 @@ function localState(){
   return Promise.all(keys.map(function(k){return k[0]===S.profileId&&k[1]===S.activeId?Promise.resolve(USER):kget(ukey(k[1],k[0]))})).then(function(us){
     var users={};keys.forEach(function(k,i){users[k[0]+':'+k[1]]=userPart(us[i])});
     return {v:2,profiles:S.profiles.map(function(pp){return {id:pp.id,name:pp.name,color:pp.color,subMode:pp.subMode||'auto',at:pp.at||0}}),profDel:S.profDel||{},accounts:S.accounts.map(function(a){return {id:a.id,name:a.name,server:a.server,username:a.username,password:a.password,format:a.format,info:a.info,maxConn:a.maxConn,at:a.at||0}}),
-      accDel:S.accDel||{},users:users,prefs:{subMode:PREFS.subMode||'auto',tmdb:PREFS.tmdb||'',os:PREFS.os?{key:PREFS.os.key,user:PREFS.os.user,pass:PREFS.os.pass}:null,at:PREFS.at||0}};
+      accDel:S.accDel||{},users:users,prefs:{subMode:PREFS.subMode||'auto',tmdb:PREFS.tmdb||'',omdb:PREFS.omdb||'',sports:PREFS.sports||null,os:PREFS.os?{key:PREFS.os.key,user:PREFS.os.user,pass:PREFS.os.pass}:null,at:PREFS.at||0}};
   });
 }
 function newer(x,y){return ((x&&x.at)||0)>=((y&&y.at)||0)?x:y}
@@ -2770,7 +3181,7 @@ function applyState(M){
   });
   if(profGone||!S.profileId){S.profileId=S.profiles.length===1?S.profiles[0].id:null;S.pickProfile=!S.profileId;if(S.profileId)kset('profileActive',S.profileId)}
   var pr=M.prefs||{};
-  if(pr.at>(PREFS.at||0)){PREFS.subMode=pr.subMode;PREFS.tmdb=pr.tmdb;var tok=PREFS.os&&PREFS.os.user===(pr.os&&pr.os.user)?PREFS.os:{};PREFS.os=pr.os?Object.assign({},tok,pr.os):null;PREFS.at=pr.at;jobs.push(kset('prefs',PREFS))}
+  if(pr.at>(PREFS.at||0)){PREFS.subMode=pr.subMode;PREFS.tmdb=pr.tmdb;PREFS.omdb=pr.omdb||'';if(pr.sports)PREFS.sports=pr.sports;var tok=PREFS.os&&PREFS.os.user===(pr.os&&pr.os.user)?PREFS.os:{};PREFS.os=pr.os?Object.assign({},tok,pr.os):null;PREFS.at=pr.at;jobs.push(kset('prefs',PREFS))}
   if(activeGone||!S.activeId)S.activeId=S.accounts[0]?S.accounts[0].id:null;
   jobs.push(kset('accounts',{list:S.accounts,active:S.activeId,del:S.accDel}));
   return Promise.all(jobs).then(function(){
