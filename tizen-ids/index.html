@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=1920">
+<title>ID des applis</title>
+<style>
+  html,body{margin:0;background:#0b1220;color:#e8eefc;font-family:Arial,Helvetica,sans-serif}
+  body{padding:40px 64px;font-size:30px}
+  h1{margin:0 0 6px;font-size:46px;color:#34d0d0}
+  .sub{color:#8fa0bf;font-size:26px;margin-bottom:24px}
+  .big{background:#12301f;border:3px solid #35c759;border-radius:20px;padding:20px 28px;margin-bottom:26px}
+  .big .n{font-size:34px;color:#9ff0b4}.big .i{font-size:64px;font-weight:bold;letter-spacing:2px;margin-top:6px;word-break:break-all}
+  .none{background:#2a2230;border:2px solid #6b5a85;border-radius:20px;padding:18px 26px;margin-bottom:26px;color:#d9c8f5}
+  .row{display:flex;justify-content:space-between;gap:30px;padding:12px 18px;border-bottom:1px solid #1f2b44}
+  .row.hl{background:#14283f}
+  .row .n{flex:1 1 40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .i{flex:1 1 60%;text-align:right;font-family:monospace;color:#9fd8ff;word-break:break-all}
+  .err{background:#3a1620;border:2px solid #ff5a5f;border-radius:20px;padding:24px;font-size:30px}
+  .hint{position:fixed;right:40px;bottom:20px;color:#6f819f;font-size:22px}
+</style></head><body>
+<h1>ID des applications</h1>
+<div class="sub" id="sub">Lecture de la liste des applications installées…</div>
+<div id="top"></div><div id="list"></div>
+<div class="hint">▲ ▼ pour faire défiler · RETOUR pour quitter</div>
+<script>
+(function(){
+  var FREE=/free|oqee|qqee/i;
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function show(list){
+    list=list.filter(function(a){return a&&a.id}).sort(function(a,b){return (FREE.test(b.name||"")-FREE.test(a.name||""))||String(a.name||"").localeCompare(String(b.name||""))});
+    document.getElementById("sub").textContent=list.length+" applications trouvées. Note l'ID de TV by Free (en vert) et saisis-le dans TV Chap Simple.";
+    var f=list.filter(function(a){return FREE.test(a.name||"")}),t="";
+    if(f.length)t=f.map(function(a){return '<div class="big"><div class="n">'+esc(a.name)+'</div><div class="i">'+esc(a.id)+'</div></div>'}).join("");
+    else t='<div class="none">Aucune appli dont le nom contient « Free » ou « Oqee ». Regarde la liste ci-dessous : l\'appli peut porter un autre nom.</div>';
+    document.getElementById("top").innerHTML=t;
+    document.getElementById("list").innerHTML=list.map(function(a){return '<div class="row'+(FREE.test(a.name||"")?' hl':'')+'"><span class="n">'+esc(a.name||"(sans nom)")+'</span><span class="i">'+esc(a.id)+'</span></div>'}).join("");
+  }
+  function fail(msg){document.getElementById("sub").textContent="";document.getElementById("top").innerHTML='<div class="err">'+esc(msg)+'</div>';}
+  try{
+    if(typeof tizen==="undefined"||!tizen.application||!tizen.application.getAppsInfo){fail("L'API Tizen « application » n'est pas disponible sur cette TV (ou l'appli n'est pas signée avec les bons droits).");}
+    else tizen.application.getAppsInfo(function(infos){show(infos.map(function(i){return {id:i.id,name:i.name}}));},function(e){fail("Lecture impossible : "+(e&&e.message||e&&e.name||"erreur inconnue")+". Vérifie que l'appli est signée avec ton certificat Samsung.");});
+  }catch(e){fail("Erreur : "+(e&&e.message||e));}
+  document.addEventListener("keydown",function(e){
+    if(e.keyCode===40)window.scrollBy(0,160);else if(e.keyCode===38)window.scrollBy(0,-160);
+    else if(e.keyCode===10009){try{tizen.application.getCurrentApplication().exit();}catch(x){}}
+  });
+})();
+</script></body></html>

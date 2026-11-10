@@ -15,3 +15,12 @@ with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
     z.writestr('index.html', html)
     z.write(os.path.join(root, 'tizen', 'icon.png'), 'icon.png')
 print(out, os.path.getsize(out))
+
+# Petit outil à installer une fois sur la TV : affiche l'ID de chaque application installée
+ids = os.path.join(root, 'tizen-ids')
+out2 = os.path.join(root, 'dist', 'ids-apps.wgt')
+with zipfile.ZipFile(out2, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.writestr('config.xml', open(os.path.join(ids, 'config.xml'), encoding='utf-8').read().replace('@@VERSION@@', version))
+    z.write(os.path.join(ids, 'index.html'), 'index.html')
+    z.write(os.path.join(ids, 'icon.png'), 'icon.png')
+print(out2, os.path.getsize(out2))
