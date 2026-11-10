@@ -1835,7 +1835,7 @@ function miniBarInner(x){
 }
 function paintMiniBar(){var b=$('#mvbar'),x=MINI.id&&byId('live',MINI.id);if(b&&x)b.innerHTML=miniBarInner(x)}
 function miniRectNow(){
-  var el=$('#mvbox');if(!el)return null;var r=el.getBoundingClientRect(),vis=!sheet&&r.bottom>0&&r.top<innerHeight&&$('#webplayer').hidden;
+  var el=$('#mvbox');if(!el)return null;var r=el.getBoundingClientRect(),vis=!sheet&&!document.getElementById('spsheet')&&r.bottom>0&&r.top<innerHeight&&$('#webplayer').hidden;
   return {x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height),visible:vis};
 }
 function miniSync(){
@@ -2378,18 +2378,47 @@ function bgGet(kind,name,sport,q){
   if(BGQ.every(function(x){return x.k!==k})&&BGQ.length<60)BGQ.push({k:k,kind:kind,name:name,sport:sport,q:q||name});
   bgRun();return v||'';
 }
-function bgRun(){
-  if(BGBUSY||!BGQ.length||!navigator.onLine)return;
-  var j=BGQ.shift();BGBUSY=true;
+var WIKI={
+ 'team:PSG:football':'Paris Saint-Germain Football Club','team:OM:football':'Olympique de Marseille','team:Lyon:football':'Olympique lyonnais','team:Monaco:football':'AS Monaco','team:Lille:football':'LOSC Lille','team:Lens:football':'RC Lens','team:Nice:football':'OGC Nice','team:Rennes:football':'Stade rennais FC','team:France:football':'Équipe de France de football',
+ 'team:Real Madrid:football':'Real Madrid Club de Fútbol','team:Barcelone:football':'FC Barcelone','team:Atletico Madrid:football':'Atlético de Madrid','team:Manchester City:football':'Manchester City Football Club','team:Manchester United:football':'Manchester United Football Club','team:Liverpool:football':'Liverpool Football Club','team:Arsenal:football':'Arsenal Football Club','team:Chelsea:football':'Chelsea Football Club','team:Bayern Munich:football':'Bayern Munich','team:Dortmund:football':'Borussia Dortmund','team:Juventus:football':'Juventus FC','team:Inter Milan:football':'Inter Milan','team:AC Milan:football':'Milan AC','team:Naples:football':'SSC Naples',
+ 'team:Toulouse:rugby':'Stade toulousain','team:Racing 92:rugby':'Racing 92','team:Toulon:rugby':'Rugby club toulonnais','team:La Rochelle:rugby':'Stade rochelais','team:Stade Francais:rugby':'Stade français Paris rugby','team:Bordeaux-Begles:rugby':'Union Bordeaux Bègles','team:Clermont:rugby':'ASM Clermont Auvergne','team:France:rugby':'Équipe de France de rugby à XV','team:Irlande:rugby':'Équipe d\'Irlande de rugby à XV','team:Angleterre:rugby':'Équipe d\'Angleterre de rugby à XV','team:Afrique du Sud:rugby':'Équipe d\'Afrique du Sud de rugby à XV','team:Nouvelle-Zelande:rugby':'Équipe de Nouvelle-Zélande de rugby à XV',
+ 'team:Monaco:basket':'AS Monaco Basket','team:ASVEL:basket':'LDLC ASVEL','team:Lakers:basket':'Lakers de Los Angeles','team:Celtics:basket':'Celtics de Boston','team:Warriors:basket':'Warriors de Golden State','team:France:basket':'Équipe de France de basket-ball',
+ 'team:France:handball':'Équipe de France masculine de handball','team:PSG:handball':'Paris Saint-Germain Handball','team:Montpellier:handball':'Montpellier Handball','team:Nantes:handball':'HBC Nantes','team:France:volley':'Équipe de France de volley-ball','team:Tours:volley':'Tours Volley-Ball',
+ 'team:Alcaraz:tennis':'Carlos Alcaraz','team:Sinner:tennis':'Jannik Sinner','team:Djokovic:tennis':'Novak Djokovic','team:Swiatek:tennis':'Iga Świątek',
+ 'team:Chiefs:nfl':'Chiefs de Kansas City','team:Cowboys:nfl':'Cowboys de Dallas','team:Eagles:nfl':'Eagles de Philadelphie','team:49ers:nfl':'49ers de San Francisco',
+ 'comp:Ligue 1:football':'Championnat de France de football','comp:Ligue 2:football':'Championnat de France de football de Ligue 2','comp:Ligue des champions:football':'Ligue des champions de l\'UEFA','comp:Ligue Europa:football':'Ligue Europa de l\'UEFA','comp:Ligue Europa Conférence:football':'Ligue Europa Conférence de l\'UEFA',
+ 'comp:Premier League:football':'Championnat d\'Angleterre de football','comp:LaLiga:football':'Championnat d\'Espagne de football','comp:Serie A:football':'Championnat d\'Italie de football','comp:Bundesliga:football':'Championnat d\'Allemagne de football','comp:Coupe de France:football':'Coupe de France de football',
+ 'comp:Top 14:rugby':'Championnat de France de rugby à XV','comp:Pro D2:rugby':'Championnat de France de rugby à XV de deuxième division','comp:Champions Cup:rugby':'Coupe d\'Europe de rugby à XV','comp:Tournoi des 6 Nations:rugby':'Tournoi des Six Nations',
+ 'comp:Coupe du monde:':'Coupe du monde de football','comp:Euro:':'Championnat d\'Europe de football','comp:Ligue des nations:':'Ligue des nations de l\'UEFA',
+ 'comp:NBA:basket':'National Basketball Association','comp:NFL:nfl':'National Football League','comp:NHL:hockey':'Ligue nationale de hockey','comp:Formule 1:auto':'Championnat du monde de Formule 1','comp:MotoGP:auto':'Championnat du monde de vitesse moto','comp:Roland-Garros:tennis':'Internationaux de France de tennis','comp:Tennis ATP / WTA:tennis':'Association des joueurs de tennis professionnels','comp:Tour de France:cyclisme':'Tour de France','comp:UFC:combat':'Ultimate Fighting Championship','comp:Euroleague:basket':'Euroligue'
+};
+var BGLAST='';
+function wikiThumb(q){
+  var base='https://fr.wikipedia.org/w/api.php?action=query&format=json&origin=*&prop=pageimages&piprop=thumbnail&pithumbsize=200&redirects=1';
+  var pick=function(d){var P=d&&d.query&&d.query.pages;if(!P)return '';for(var k in P){var t=P[k].thumbnail;if(t&&t.source)return t.source}return ''};
+  return fetch(base+'&titles='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(d){
+    var u=pick(d);if(u)return u;
+    return fetch(base+'&generator=search&gsrlimit=1&gsrsearch='+encodeURIComponent(q)).then(function(r){return r.ok?r.json():null}).then(pick);
+  });
+}
+function sdbThumb(j){
   var url=j.kind==='comp'?(SDB_LEAGUE[j.name]?'https://www.thesportsdb.com/api/v1/json/3/lookupleague.php?id='+SDB_LEAGUE[j.name]:null):'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t='+encodeURIComponent(j.q);
-  var done=function(u,keep){if(!keep){BG.u[j.k]=u||'';BG.t[j.k]=Date.now();clearTimeout(BGSAVE);BGSAVE=setTimeout(function(){kset('badges',BG)},1500)}bgApply();setTimeout(function(){BGBUSY=false;bgRun()},2200)};
-  if(!url){done('');return}
-  fetch(url).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
-    var u='';
-    if(j.kind==='comp'){var l=d&&d.leagues&&d.leagues[0];u=l&&(l.strBadge||l.strLogo)||''}
-    else{var L=(d&&d.teams)||[],w=SDB_SPORT[j.sport],t=L.filter(function(x){return !w||x.strSport===w})[0]||null;u=t&&t.strBadge||''}
-    done(u);
-  }).catch(function(){done('',true)});
+  if(!url)return Promise.resolve('');
+  return fetch(url).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(function(d){
+    if(j.kind==='comp'){var l=d&&d.leagues&&d.leagues[0];return l&&(l.strBadge||l.strLogo)||''}
+    var L=(d&&d.teams)||[],w=SDB_SPORT[j.sport],t=L.filter(function(x){return !w||x.strSport===w})[0]||null;return t&&t.strBadge||'';
+  });
+}
+function bgRun(){
+  if(BGBUSY||!BGQ.length)return;
+  var j=BGQ.shift();BGBUSY=true;
+  var done=function(u,keep){if(!keep){BG.u[j.k]=u||'';BG.t[j.k]=Date.now();clearTimeout(BGSAVE);BGSAVE=setTimeout(function(){kset('badges',BG)},1500)}bgApply();setTimeout(function(){BGBUSY=false;bgRun()},350)};
+  var wq=WIKI[j.kind+':'+j.name+':'+(j.sport||'')]||j.name;
+  var fail=0;
+  wikiThumb(wq).catch(function(e){fail++;BGLAST='wiki '+(e&&e.message);return ''}).then(function(u){
+    if(u)return u;
+    return sdbThumb(j).catch(function(e){fail++;BGLAST+=' sdb '+(e&&e.message);return ''});
+  }).then(function(u){done(u,!u&&fail>=2)});
 }
 function bgApply(){
   [].forEach.call(document.querySelectorAll('[data-bgk]:not([data-bgd])'),function(el){
@@ -2426,7 +2455,7 @@ function spTilesComp(d){
   return spCatComps(d).map(function(c){return spTile('data-spj="'+esc(JSON.stringify({k:'comp',v:c.n,s:c.s}))+'"',d.comp===c.n,bgHtml('comp',c.n,c.s),c.n)}).join('')||'<p class="hint">Aucune compétition ne correspond.</p>';
 }
 function spOpen(d){S.spDraft=Object.assign({team:'',sport:'',g:'',comp:'',qs:'',qt:'',qc:''},d||{});S.spQuick=null;spSheetPaint()}
-function spClose(){S.spDraft=null;S.spQuick=null;var el=document.getElementById('spsheet');if(el)el.remove()}
+function spClose(){S.spDraft=null;S.spQuick=null;var el=document.getElementById('spsheet');if(el)el.remove();setTimeout(miniSync,60)}
 function spDraftValid(d){return !!((d.team||'').trim()||d.comp||d.sport)}
 function spPrevText(){
   var d=S.spDraft;if(!d)return '';
@@ -2449,8 +2478,8 @@ function spSheetPaint(){
   var el=document.getElementById('spsheet');
   if(!S.spDraft){if(el)el.remove();return}
   var keep=el&&el.querySelector('.spfull');var sy=keep?keep.scrollTop:0;
-  if(!el){el=document.createElement('div');el.id='spsheet';document.body.appendChild(el)}
-  el.innerHTML=spSheetHtml();var f=el.querySelector('.spfull');if(f)f.scrollTop=sy;
+  if(!el){el=document.createElement('div');el.id='spsheet';document.body.appendChild(el);setTimeout(miniSync,30)}
+  el.innerHTML=spSheetHtml();bgApply();var f=el.querySelector('.spfull');if(f)f.scrollTop=sy;
 }
 function spTilesRefresh(){
   var d=S.spDraft;if(!d)return;
@@ -2488,7 +2517,7 @@ function spQuickPaint(){
   var el=document.getElementById('spsheet');
   var ev=S.spQuick&&spEvents().filter(function(e){return e.k===S.spQuick})[0];
   if(!ev){if(el)el.remove();return}
-  if(!el){el=document.createElement('div');el.id='spsheet';document.body.appendChild(el)}
+  if(!el){el=document.createElement('div');el.id='spsheet';document.body.appendChild(el);setTimeout(miniSync,30)}
   el.innerHTML=spQuickHtml(ev);
 }
 
