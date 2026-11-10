@@ -16,12 +16,20 @@ const get = async u => { const r = await fetch(u, { headers: { 'User-Agent': 'Mo
 (async () => {
   const from = new Date(), to = new Date(Date.now() + 21 * 864e5), report = {}, events = [], raw = {};
   for (const [sp, lg, label, sport] of LEAGUES) {
-    const u = `https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard?dates=${ymd(from)}-${ymd(to)}&limit=300`;
     try {
-      const d = await get(u);
-      const ev = d.events || [];
+      let ev = [];
+      const base = `https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard`;
+      try { ev = (await get(`${base}?dates=${ymd(from)}-${ymd(to)}&limit=300`)).events || []; }
+      catch (e1) { // certains championnats refusent les plages : on interroge jour par jour
+        const seen = new Set(); let lastErr = e1;
+        for (let i = 0; i <= 21; i++) {
+          try { const d = await get(`${base}?dates=${ymd(new Date(Date.now() + i * 864e5))}`); for (const x of d.events || []) if (!seen.has(x.id)) { seen.add(x.id); ev.push(x); } lastErr = null; } catch (e2) { lastErr = e2; }
+          await new Promise(r => setTimeout(r, 150));
+        }
+        if (!ev.length && lastErr) throw lastErr;
+      }
       report[label] = { ok: true, n: ev.length, keys: ev[0] ? Object.keys(ev[0]) : [] };
-      raw[label] = ev.slice(0, 2);
+      raw[label] = ev.slice(0, 1).map(x => { const c = (x.competitions || [])[0] || {}; return { name: x.name, date: x.date, season: x.season, notes: c.notes, type: c.type, competitor0: (c.competitors || [])[0] && { team: Object.keys(c.competitors[0].team || {}), curatedRank: c.competitors[0].curatedRank, records: c.competitors[0].records } }; });
       for (const e of ev) {
         const c = (e.competitions || [])[0] || {};
         const teams = (c.competitors || []).map(t => ({ n: (t.team && (t.team.displayName || t.team.name)) || (t.athlete && t.athlete.displayName) || null, logo: (t.team && t.team.logo) || (t.athlete && t.athlete.flag && t.athlete.flag.href) || null, rec: t.records && t.records[0] && t.records[0].summary || null, rank: t.curatedRank && t.curatedRank.current || null }));
@@ -42,6 +50,6 @@ const get = async u => { const r = await fetch(u, { headers: { 'User-Agent': 'Mo
   }
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'events.json'), JSON.stringify({ generatedAt: new Date().toISOString(), source: 'ESPN (API publique)', events, rank }));
-  fs.writeFileSync(path.join(OUT, 'events-report.json'), JSON.stringify({ report, sample: raw }, null, 1).slice(0, 400000));
+  fs.writeFileSync(path.join(OUT, 'events-report.json'), JSON.stringify({ report, sample: raw }, null, 1));
   console.log(JSON.stringify(report));
 })();
