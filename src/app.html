@@ -187,7 +187,7 @@ body.tv .tvguide .gwrap{margin-top:4px}
 .spposters{gap:12px}.spposter{flex:none;width:44vw;max-width:190px;scroll-snap-align:start}
 .spart{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;aspect-ratio:3/4;border:0;border-radius:16px;padding:12px 8px;color:#fff;text-align:center;overflow:hidden;background:linear-gradient(160deg,#2b3550,#141826);font:inherit}
 .spart.s-football{background:linear-gradient(160deg,#1f7a46,#0d2a1b)}.spart.s-rugby{background:linear-gradient(160deg,#7a3b1f,#2a140b)}.spart.s-basket{background:linear-gradient(160deg,#b4561f,#3a1a08)}.spart.s-tennis{background:linear-gradient(160deg,#6b8a1f,#243008)}.spart.s-combat{background:linear-gradient(160deg,#9b1c25,#2c0709)}.spart.s-auto{background:linear-gradient(160deg,#a31f1f,#1b0a0a)}.spart.s-cyclisme{background:linear-gradient(160deg,#b89b1a,#33290a)}.spart.s-nfl{background:linear-gradient(160deg,#243b7a,#0a1330)}
-.spcrests{display:flex;align-items:center;gap:6px}.spcrests i{font-style:normal;font-weight:800;font-size:.7rem;opacity:.8}.spcrests.solo .bgb{width:64px;height:64px}.spemo.big{font-size:3rem;line-height:1}
+.spart.nochan{cursor:default;opacity:.92}.spcrests{display:flex;align-items:center;gap:6px}.spcrests i{font-style:normal;font-weight:800;font-size:.7rem;opacity:.8}.spcrests.solo .bgb{width:64px;height:64px}.spemo.big{font-size:3rem;line-height:1}
 .spptitle{font-size:.85rem;line-height:1.2}
 .spdot{position:absolute;left:8px;bottom:8px;background:#e5484d;color:#fff;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:999px}
 .spbigtag.sm{position:absolute;left:8px;top:8px;font-size:.65rem;padding:2px 7px}
@@ -2216,7 +2216,7 @@ var SP_SPORT_RX=[
 ];
 var SP_GENDER_SPORTS=['football','rugby','basket','handball','volley','tennis','hockey'];
 var SP_GENERIC=/^(football|foot|rugby|basket|basketball|tennis|handball|cyclisme|moto|formule 1|golf|boxe|natation|athletisme|volley|volleyball|hockey|sport|direct|live|en direct|match|documentaire|magazine)$/;
-var SP_ALIAS=[['psg','paris sg','paris saint germain'],['om','marseille','olympique de marseille'],['ol','lyon','olympique lyonnais'],['asse','saint etienne','st etienne'],['losc','lille'],['barca','barcelone','fc barcelone','barcelona'],['man city','manchester city'],['man united','manchester united','manchester utd'],['bayern','bayern munich'],['inter milan','internazionale'],['juve','juventus']];
+var SP_ALIAS=[['psg','paris sg','paris saint germain'],['om','marseille','olympique de marseille'],['ol','lyon','olympique lyonnais'],['asse','saint etienne','st etienne'],['losc','lille'],['barca','barcelone','fc barcelone','barcelona'],['man city','manchester city'],['man united','manchester united','manchester utd'],['bayern','bayern munich'],['inter milan','internazionale'],['juve','juventus'],['italie','italy'],['allemagne','germany'],['angleterre','england'],['espagne','spain'],['bresil','brazil'],['pays bas','netherlands','hollande'],['belgique','belgium'],['argentine','argentina'],['irlande','ireland'],['ecosse','scotland'],['pays de galles','wales'],['nouvelle zelande','new zealand'],['afrique du sud','south africa'],['australie','australia'],['etats unis','usa','united states'],['croatie','croatia'],['suisse','switzerland'],['pologne','poland'],['danemark','denmark'],['dortmund','borussia dortmund'],['naples','napoli'],['atletico madrid','atletico de madrid'],['athletic club','athletic bilbao'],['sporting cp','sporting lisbonne'],['bayer leverkusen','leverkusen']];
 var SP_CH=/sport|\bfoot\b|football|bein|dazn|eurosport|\brmc\b|l.equipe|rugby|tennis|\bnba\b|\bnfl\b|\bnhl\b|\bufc\b|golf|\bf1\b|moto ?gp|cyclisme|basket|handball|olymp|automoto|\btnt\b|eleven|infosport|viaplay|premier league|ligue 1|champions/;
 var SP_SKIP=/\(r\)|rediff|replay|differe|resume|magazine|debrief|highlights|best of|zapping|documentaire|reportage/;
 var SP_KEY=/\b(en direct|direct|live|finale|demi-finale|quart de finale|grand prix|qualifications?|essais libres|course|sprint|etape|tournoi|journee|match|rencontre|combat|gala|open|masters)\b/;
@@ -2298,6 +2298,74 @@ function spBig(ev){
   if(ev.sport==='cyclisme'&&/tourmalet|alpe d.huez|ventoux|galibier|etape reine/.test(text))add(2,'Étape clé');
   return {n:sc,why:why};
 }
+/* ---- calendrier sportif (ESPN, collecté chaque nuit par GitHub Actions) : sert à choisir les vraies grosses affiches ---- */
+var CAL_URL='https://raw.githubusercontent.com/Nagromc86/TV-Streamy/main/data/events.json',CAL=null;
+var SP_DERBY=[['psg','marseille'],['lyon','marseille'],['lyon','saint etienne'],['lyon','paris saint germain'],['real madrid','barcelone'],['real madrid','atletico madrid'],['manchester united','manchester city'],['manchester united','liverpool'],['liverpool','everton'],['arsenal','tottenham'],['inter milan','ac milan'],['inter milan','juventus'],['ac milan','juventus'],['napoli','juventus'],['as roma','lazio'],['bayern munich','borussia dortmund']];
+function calSame(a,b){return spHas(a,b)||spHas(b,a)}
+function calRec(r){if(!r)return null;var n=String(r).split('-').map(Number);if(n.some(isNaN))return null;var g=n.reduce(function(x,y){return x+y},0);return g?{g:g,p:n[0]/g}:null}
+function calScore(e,rank){
+  var sc=0,why='',set=function(n,w){if(n>sc){sc=n;why=w}},note=norm(e.note||''),t=e.teams||[],a=t[0]&&t[0].n,b=t[1]&&t[1].n;
+  if(/super bowl/.test(note))set(3,'Super Bowl');
+  else if(/\bfinal\b/.test(note)&&!/semi|quarter|round of|group/.test(note))set(3,'Finale');
+  else if(/semi/.test(note))set(2,'Demi-finale');else if(/quarter/.test(note))set(2,'Quart de finale');
+  if(e.sport==='football'&&a&&b){
+    var R=rank[e.comp];
+    if(R){
+      var ra=0,rb=0;R.forEach(function(x){if(calSame(x.n,a))ra=x.rank;if(calSame(x.n,b))rb=x.rank});
+      if(ra&&rb){if(ra<=4&&rb<=4)set(3,'Choc du haut de tableau ('+Math.min(ra,rb)+'e / '+Math.max(ra,rb)+'e)');else if(Math.min(ra,rb)<=3&&Math.max(ra,rb)<=8)set(2,'Haut de tableau ('+Math.min(ra,rb)+'e / '+Math.max(ra,rb)+'e)')}
+    }else{
+      var ba=spBigTeam(a),bb=spBigTeam(b);
+      if(ba&&bb)set(2,'Ténors face à face');else if(/champions|europa/i.test(e.comp)&&(ba||bb))set(1,e.comp);
+      if(/nations/i.test(e.comp)&&(/^france$/i.test(a)||/^france$/i.test(b)))set(2,'Les Bleus');
+    }
+    SP_DERBY.forEach(function(d){if((spHas(a,d[0])&&spHas(b,d[1]))||(spHas(a,d[1])&&spHas(b,d[0])))set(2,'Classique / derby')});
+  }
+  if((e.sport==='basket'||e.sport==='nfl'||e.sport==='hockey')&&t.length===2){
+    var x=calRec(t[0].rec),y=calRec(t[1].rec),th=e.sport==='basket'?.62:.66;
+    if(x&&y&&x.g>=8&&y.g>=8&&x.p>=th&&y.p>=th)set(2,'Duel de leaders');
+  }
+  if(e.sport==='combat'&&/\bufc ?\d{3}\b/i.test(e.name))set(3,'UFC numéroté');
+  else if(e.sport==='combat')set(1,'Fight Night');
+  if(e.sport==='tennis'){if(e.major)set(3,'Grand Chelem');else if(/masters|finals/i.test(e.name))set(2,'Masters')}
+  if(e.sport==='auto'&&/grand prix/i.test(e.name))set(2,'Grand Prix');
+  if(e.sport==='rugby'&&a&&b&&spBigTeam(a)&&spBigTeam(b))set(2,'Ténors face à face');
+  return {n:sc,why:why};
+}
+function calPrep(d){
+  var rank=d.rank||{},out=[];
+  (d.events||[]).forEach(function(e){
+    if(e.status&&!/SCHEDULED|IN_PROGRESS|DELAYED/.test(e.status))return;
+    var s=Date.parse(e.start)/1000;if(!s)return;
+    var tm=(e.sport==='combat'||e.sport==='tennis'||e.sport==='auto')?null:(e.teams||[]).filter(function(t){return t.n});
+    var sc=calScore(e,rank),dur=e.sport==='tennis'?7*86400:e.sport==='combat'?5*3600:e.sport==='auto'?3*3600:3*3600;
+    out.push({k:'cal'+e.id,s:s,e:s+dur,t:tm&&tm.length===2?tm[0].n+' – '+tm[1].n:e.name,teams:tm&&tm.length===2?[tm[0].n,tm[1].n]:null,logos:tm&&tm.length===2?[tm[0].logo,tm[1].logo]:null,comp:e.comp,sport:e.sport,g:'m',y:false,score:sc.n,why:sc.why?[sc.why]:[],big:sc.n>=2,ch:[],cal:true,name:e.name});
+  });
+  return out.sort(function(a,b){return a.s-b.s});
+}
+function calLoad(){
+  if(calLoad.p)return;calLoad.p=1;
+  var done=function(){if(typeof sportPaint==='function')sportPaint()};
+  kget('cal').then(function(c){
+    if(c&&c.data){try{CAL=calPrep(c.data)}catch(e){}}
+    if(c&&Date.now()-c.at<6*36e5){done();return}
+    return fetch(CAL_URL+'?h='+Math.floor(Date.now()/36e5)).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){CAL=calPrep(d);kset('cal',{at:Date.now(),data:d});done()});
+  }).catch(function(){calLoad.p=0;setTimeout(calLoad,600000)});
+}
+/* rapproche un programme du guide d'un match du calendrier (mêmes équipes à ±2 h, ou même grand prix / combat) */
+function calMatch(ev){
+  if(!CAL)return null;var txt=ev.t+' '+(ev.d||''),best=null;
+  for(var i=0;i<CAL.length;i++){
+    var c=CAL[i];if(Math.abs(c.s-ev.s)>(c.sport==='tennis'?7*86400:c.sport==='combat'?16*3600:c.sport==='auto'?3*86400:7200))continue;
+    if(c.sport!==ev.sport&&!(c.sport==='football'&&!ev.sport))continue;
+    var ok=false;
+    if(c.teams){ok=c.teams.every(function(n){return spHas(txt,n)||(ev.teams||[]).some(function(m){return calSame(m,n)})})}
+    else if(c.sport==='combat'){var nm=/\bufc ?(\d{3})\b/i.exec(c.name);ok=/ufc/i.test(norm(txt))&&(!nm||txt.indexOf(nm[1])>=0||(c.name.split(/[:]/)[1]||'').split(/\s+vs\.?\s+/i).some(function(w){return w&&spHas(txt,w.trim().split(' ').pop())}))}
+    else if(c.sport==='auto'){var w=norm(c.name).replace(/grand prix|formula 1|formule 1/g,' ').split(' ').filter(function(x){return x.length>4});ok=/grand prix/.test(norm(txt))&&(!w.length||w.some(function(x){return norm(txt).indexOf(x)>=0}))}
+    else if(c.sport==='tennis'){var al={'australian open':'australie','french open':'roland','us open':'us open','wimbledon':'wimbledon'},k=norm(c.name);ok=Object.keys(al).some(function(a){return k.indexOf(a)>=0&&norm(txt).indexOf(al[a])>=0})||k.split(' ').filter(function(x){return x.length>5&&x!=='tournament'}).some(function(x){return norm(txt).indexOf(x)>=0})}
+    if(ok){best=c;break}
+  }
+  return best;
+}
 function spEvents(){
   var chs=sportChannels(),now=Date.now()/1000,lim=now+14*86400,map={},out=[];
   chs.forEach(function(x){
@@ -2309,7 +2377,7 @@ function spEvents(){
       if(!ev){
         ev=map[k]={k:k,s:p.s,e:p.e,t:p.t,d:p.d,teams:cl.teams,comp:cl.comp,ch:[]};
         ev.sport=spSport(p.t,p.d,cl.comp);ev.g=spGender(p.t+' '+(p.d||''));ev.y=SP_YOUTH.test(norm(p.t));
-        var b=spBig(ev);ev.big=b.n>=2;ev.why=b.why.slice(0,2);
+        var cm=CAL?calMatch(ev):null;if(cm){ev.cal=cm;ev.big=cm.big;ev.why=cm.why}else if(CAL){ev.big=false;ev.why=[]}else{var b=spBig(ev);ev.big=b.n>=2;ev.why=b.why.slice(0,2)}
         out.push(ev);
       }
       if(!ev.ch.some(function(y){return String(y.stream_id)===String(x.stream_id)}))ev.ch.push(x);
@@ -2541,12 +2609,24 @@ function spCardHtml(ev,now){
     '<div class="spch">'+ev.ch.slice(0,3).map(function(x){return '<button type="button" class="spchan" '+(live?'data-play="live:'+esc(x.stream_id)+'"':'data-chguide="'+esc(x.stream_id)+'"')+'>'+(live?IC.play:'')+esc(cleanName(x.name))+'</button>'}).join('')+'</div></div>'+
     '<button type="button" class="spstar" data-spq="'+esc(ev.k)+'" aria-label="Suivre…" aria-pressed="'+mine+'">'+(mine?'★':'☆')+'</button></div>';
 }
+function calCrest(logo,name,sport){
+  if(!logo)return bgHtml('team',name,sport);
+  return '<span class="bgb has" style="--h:'+bgHue(name)+'"><img alt="" loading="lazy" src="'+esc(logo)+'" onerror="this.remove();this.parentNode&&this.parentNode.classList.remove(\'has\')"><b>'+esc(bgInit(name))+'</b></span>';
+}
 function spPosterHtml(ev,now){
   var live=ev.s<=now,x=ev.ch[0],act=x?(live?'data-play="live:'+esc(x.stream_id)+'"':'data-chguide="'+esc(x.stream_id)+'"'):'';
-  var art=ev.teams?'<div class="spcrests">'+bgHtml('team',ev.teams[0],ev.sport)+'<i>VS</i>'+bgHtml('team',ev.teams[1],ev.sport)+'</div><b class="spptitle">'+esc(ev.teams[0])+' – '+esc(ev.teams[1])+'</b>'
+  var art=ev.teams?'<div class="spcrests">'+calCrest(ev.logos&&ev.logos[0],ev.teams[0],ev.sport)+'<i>VS</i>'+calCrest(ev.logos&&ev.logos[1],ev.teams[1],ev.sport)+'</div><b class="spptitle">'+esc(ev.teams[0])+' – '+esc(ev.teams[1])+'</b>'
     :'<div class="spcrests solo">'+(ev.comp?bgHtml('comp',ev.comp,ev.sport):'<span class="spemo big">'+(SP_EMO[ev.sport]||'🏅')+'</span>')+'</div><b class="spptitle">'+esc(ev.t)+'</b>';
-  return '<div class="spposter"><button type="button" class="spart s-'+esc(ev.sport||'x')+(live?' live':'')+'" '+act+' aria-label="'+esc(ev.t)+'">'+(ev.big?'<span class="spbigtag sm">'+FLAME+esc(ev.why[0]||'Affiche')+'</span>':'')+art+(live?'<span class="spdot">EN DIRECT</span>':'')+'</button>'+
-    '<div class="spposter-meta"><span>'+esc(ev.sport?spSportName(ev.sport):'Sport')+(ev.comp?' · '+esc(ev.comp):'')+'</span><span>'+esc(spWhenText(ev,now))+'</span><span>'+(x?esc(cleanName(x.name)):'')+'</span></div></div>';
+  return '<div class="spposter"><button type="button" class="spart s-'+esc(ev.sport||'x')+(live?' live':'')+(x?'':' nochan')+'" '+act+' aria-label="'+esc(ev.t)+'">'+(ev.why&&ev.why[0]?'<span class="spbigtag sm">'+FLAME+esc(ev.why[0])+'</span>':'')+art+(live?'<span class="spdot">EN DIRECT</span>':'')+'</button>'+
+    '<div class="spposter-meta"><span>'+esc(ev.sport?spSportName(ev.sport):'Sport')+(ev.comp?' · '+esc(ev.comp):'')+'</span><span>'+esc(spWhenText(ev,now))+'</span><span>'+(x?esc(cleanName(x.name)):'Pas dans ton guide')+'</span></div></div>';
+}
+/* affiches = matchs forts du calendrier (classement, phase finale, UFC numéroté…) ; la chaîne vient de ton guide quand on la trouve */
+function spPosters(all,R,now){
+  var bycal={};all.forEach(function(ev){if(ev.cal&&!bycal[ev.cal.k])bycal[ev.cal.k]=ev});
+  var L=(CAL||[]).filter(function(c){return c.score>=2&&c.e>now&&c.s<now+14*86400&&(!R.length||R.some(function(r){return spRuleMatch(r,c)}))});
+  L.sort(function(a,b){return b.score-a.score||a.s-b.s});
+  L=L.slice(0,8).sort(function(a,b){return a.s-b.s});
+  return L.map(function(c){var e=bycal[c.k],o={};for(var k in c)o[k]=c[k];if(e){o.ch=e.ch;if(e.teams&&o.teams)o.teams=o.teams.map(function(n){return e.teams.filter(function(m){return calSame(m,n)})[0]||n})}return o});
 }
 function spEventsHtml(){
   var chs=sportChannels(),done=chs.filter(function(x){var c=EPGF[x.stream_id];return c&&!c.loading}).length;
@@ -2559,10 +2639,9 @@ function spEventsHtml(){
   else h+='<button type="button" class="spcta" data-spedit><b>Choisis ce que tu veux suivre</b><span>Sport, équipe, compétition : on te montre où et quand les regarder.</span></button>';
   if(done<chs.length)h+='<p class="hint" style="margin:10px 0 0">Analyse du guide : '+done+' / '+chs.length+' chaînes…</p>';
   /* affiches */
-  var pool=R.length?mine:all,upc=pool.filter(function(ev){return ev.e>now}),seen={},posters=[];
-  upc.filter(function(ev){return ev.big}).concat(upc.filter(function(ev){return !ev.big})).forEach(function(ev){if(posters.length<8&&!seen[ev.k]){seen[ev.k]=1;posters.push(ev)}});
-  posters.sort(function(a,b){return (b.big?1:0)-(a.big?1:0)||a.s-b.s});
-  h+='<section class="sec"><div class="sech"><h2>Les affiches à ne pas manquer</h2></div>'+(posters.length?'<div class="row spposters">'+posters.map(function(ev){return spPosterHtml(ev,now)}).join('')+'</div>':'<p class="hint" style="margin:0">'+(done<chs.length?'Un instant, le guide se charge…':'Rien à signaler pour l\'instant dans le guide de ton fournisseur.')+'</p>')+'</section>';
+  var posters=CAL?spPosters(all,R,now):[];
+  if(!CAL){var pool=R.length?mine:all,seen={};pool.filter(function(ev){return ev.big&&ev.e>now}).forEach(function(ev){if(posters.length<8&&!seen[ev.k]){seen[ev.k]=1;posters.push(ev)}})}
+  h+='<section class="sec"><div class="sech"><h2>Les affiches à ne pas manquer</h2></div>'+(posters.length?'<div class="row spposters">'+posters.map(function(ev){return spPosterHtml(ev,now)}).join('')+'</div>':'<p class="hint" style="margin:0">'+(!CAL?'Calendrier en cours de chargement…':R.length?'Pas de gros match dans tes sélections ces prochains jours.':'Pas de gros match annoncé ces prochains jours.')+'</p>')+'</section>';
   /* liste */
   var base=showAll?all:mine,sc={};base.forEach(function(ev){if(ev.sport)sc[ev.sport]=(sc[ev.sport]||0)+1});
   if(S.spSport!=='all'&&!sc[S.spSport])S.spSport='all';
@@ -2584,7 +2663,7 @@ function spEventsHtml(){
 }
 function viewSports(){
   if(!S.spInit){S.spInit=1;S.spAll=false;S.spSport='all'}
-  sportChannels().forEach(function(x){wantFull(x.stream_id)});
+  sportChannels().forEach(function(x){wantFull(x.stream_id)});calLoad();
   return '<div class="pagehead"><h1>TV en direct</h1><span class="livetag">Direct</span></div>'+(miniOk()?miniHtml():'')+liveToggleHtml()+'<div id="spev">'+spEventsHtml()+'</div>';
 }
 function sportPaint(){
