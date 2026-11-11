@@ -246,6 +246,43 @@ public class PlayerPlugin extends Plugin {
         }
     }
 
+    /** Poids réel d'une vidéo (sans la télécharger) : on demande juste le premier octet. */
+    @PluginMethod
+    public void probe(PluginCall call) {
+        final String url = call.getString("url");
+        if (url == null) { call.reject("adresse manquante"); return; }
+        new Thread(() -> {
+            java.net.HttpURLConnection c = null;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setInstanceFollowRedirects(true);
+                c.setConnectTimeout(12000);
+                c.setReadTimeout(12000);
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) LecteurIPTV/1.0");
+                c.setRequestProperty("Accept-Encoding", "identity");
+                c.setRequestProperty("Range", "bytes=0-0");
+                int code = c.getResponseCode();
+                long size = -1;
+                String cr = c.getHeaderField("Content-Range");
+                if (cr != null) {
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("/(\\d+)").matcher(cr);
+                    if (m.find()) size = Long.parseLong(m.group(1));
+                }
+                if (size < 0 && code == 200) {
+                    try { size = Long.parseLong(c.getHeaderField("Content-Length")); } catch (Exception e) { size = -1; }
+                }
+                JSObject r = new JSObject();
+                r.put("code", code);
+                r.put("size", size);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("indisponible");
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }).start();
+    }
+
     @PluginMethod
     public void pauseDownload(PluginCall call) {
         DownloadEngine.get(getContext()).pause(call.getString("id", ""));

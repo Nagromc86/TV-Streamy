@@ -408,6 +408,12 @@ main{padding-bottom:calc(var(--navh) + 28px + env(safe-area-inset-bottom,0px));m
 .dlbar{display:block;height:3px;background:var(--line);border-radius:2px;margin-top:5px;overflow:hidden}
 .dlbar i{display:block;height:100%;background:var(--accent)}
 .dlacts{display:flex;gap:6px}
+.dlpick{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
+.dlpbox{background:var(--surface,#1c1c22);width:100%;max-width:560px;max-height:85vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.dlpbox h3{margin:0 0 4px;font-size:1.1rem}
+.dlprow{display:grid;grid-template-columns:auto 1fr;grid-template-areas:'q l' 'q s';gap:2px 12px;width:100%;text-align:left;border:1px solid #3a3a46;background:transparent;color:inherit;border-radius:12px;padding:10px 12px;margin:0 0 8px;font:inherit}
+.dlprow.best{border-color:var(--ink)}.dlprow:disabled{opacity:.45}
+.dlpq{grid-area:q;align-self:center;font-weight:700;min-width:58px;font-size:1.05rem}.dlpl{grid-area:l;font-size:.9rem}.dlpl i{opacity:.7;font-style:normal}.dlps{grid-area:s;font-size:.82rem;opacity:.8;display:flex;gap:8px;align-items:center}.dlps b{color:var(--ink);font-weight:600}
 .offline{background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:.86rem;margin-top:8px}
 .chk{display:flex;align-items:flex-start;gap:10px;font-weight:600}
 .chk input{width:22px;height:22px;accent-color:var(--accent);margin:0;flex:none}
@@ -695,7 +701,7 @@ var IC={
 var S={boot:true,liveView:(function(){try{return localStorage.getItem('lview')||(TV?'list':'guide')}catch(e){return 'list'}})(),accounts:[],activeId:null,cat:null,tab:'home',liveCat:'all',vodCat:'all',serCat:'all',q:'',limit:{},loading:'',msg:''};
 var DATA=null;      /* catalogue of the active account */
 var USER={favs:{},prog:{},recent:[],downloads:{}};
-var PREFS={allowMobile:false,subMode:'auto',os:null,tmdb:'',omdb:'',sports:null};  /* per-account personal data */
+var PREFS={allowMobile:false,dlQual:'ask',subMode:'auto',os:null,tmdb:'',omdb:'',sports:null};  /* per-account personal data */
 var sheet=null,epgCache={},epgQ=[],epgBusy=0;
 
 /* ---------- helpers ---------- */
@@ -903,6 +909,88 @@ function saveProgress(k,res,meta){
 
 /* ---------- offline downloads ---------- */
 function nat(m,o){return window.Capacitor.nativePromise('IptvPlayer',m,o||{})}
+
+/* ---------- choix de la version à télécharger (qualité / poids) ----------
+   Le fournisseur limite souvent le débit par connexion : le seul vrai levier est de prendre un fichier plus léger
+   (une version 720p au lieu de la 4K), quand il en propose plusieurs. */
+var QRX=[[/\b(4k|uhd|2160p?)\b/i,2160,'4K'],[/\b(fhd|1080p?|full ?hd)\b/i,1080,'1080p'],[/\b(hd|720p?)\b/i,720,'720p'],[/\b(sd|480p?|576p?)\b/i,480,'SD']];
+var LANGRX=/\b(vostfr|vost|vff|vfq|vfi|vf|french|fr|multi|en|eng|vo)\b/i;
+function qualOf(kind,y,inf){
+  var v=inf&&inf.video,h=v&&(+v.height||0),w=v&&(+v.width||0);
+  if(h){var r=Math.max(h,w*9/16);return {h:r,l:r>=1800?'4K':r>=1000?'1080p':r>=700?'720p':Math.round(h)+'p'}}
+  var t=verLabel(kind,y)+' '+(y.name||'');for(var i=0;i<QRX.length;i++)if(QRX[i][0].test(t))return {h:QRX[i][1],l:QRX[i][2]};
+  return {h:0,l:''};
+}
+function langOf(kind,y){var m=LANGRX.exec(verLabel(kind,y)+' '+(y.name||''));if(!m)return '';var l=m[1].toUpperCase();return /^(VOSTFR|VOST)$/.test(l)?'VOSTFR':/^(VFF|VFQ|VFI|VF|FRENCH|FR)$/.test(l)?'VF':l==='MULTI'?'MULTI':/^(EN|ENG|VO)$/.test(l)?'VO':''}
+function infoP(kind,id){
+  return kget('info:'+S.activeId+':'+kind+':'+id).then(function(c){if(c)return c;return api(acc(),kind==='movie'?'action=get_vod_info&vod_id='+id:'action=get_series_info&series_id='+id).then(function(r){kset('info:'+S.activeId+':'+kind+':'+id,r);return r})});
+}
+var DLP=null;
+function dlPick(kind,item,ep,info){
+  if(!NATIVE){toast('Le téléchargement fonctionne dans l\'appli Android.');return}
+  var others=versionsOf(kind,item).slice(0,7);
+  var cur={y:item,cur:true,ep:ep,info:kind==='movie'?(info&&(info.info||info)):(ep&&ep.info),st:'load'};
+  var C=[cur].concat(others.map(function(y){return {y:y,st:'load'}}));
+  DLP={kind:kind,item:item,ep:ep,C:C,lang:langOf(kind,item),tok:{}};
+  /* une seule version : on télécharge directement */
+  if(C.length===1){dlGo(cur);DLP=null;return}
+  if(PREFS.dlQual==='best'){dlGo(cur);DLP=null;return}
+  if(PREFS.dlQual!=='light')dlpPaint();else toast('Recherche de la version la plus légère…');
+  var tok=DLP.tok,jobs=C.map(function(c){return function(){return dlpResolve(c).then(function(){if(DLP&&DLP.tok===tok&&PREFS.dlQual!=='light')dlpPaint()})}});
+  /* une demande à la fois : les fournisseurs n'aiment pas les connexions en parallèle */
+  jobs.reduce(function(p,j){return p.then(j,j)},Promise.resolve()).then(function(){
+    if(!DLP||DLP.tok!==tok)return;
+    if(PREFS.dlQual==='light'){var b=dlpLightest();DLP=null;if(b){toast('Version la plus légère : '+dlpDesc(b));dlGo(b)}else dlGo(cur)}
+  });
+}
+function dlpResolve(c){
+  var k=DLP.kind,y=c.y,id=y.stream_id||y.series_id;
+  var p=(c.cur&&(k!=='movie'||(c.info&&c.info.video)))?Promise.resolve():infoP(k,id).then(function(r){
+    if(k==='movie'){c.info=r&&r.info;if(c.cur)return}
+    else{var e=(r&&r.episodes&&r.episodes[DLP.ep.season])||[],m=e.filter(function(x){return +x.episode_num===+DLP.ep.episode_num})[0];
+      if(!m){c.st='none';return}m.season=DLP.ep.season;c.ep=m;c.info=m.info}
+  });
+  return p.then(function(){
+    if(c.st==='none')return;
+    c.q=qualOf(k,y,c.info);c.lang=langOf(k,y);
+    c.url=k==='movie'?streamUrl('movie',y):streamUrl('episode',c.ep);c.ext=k==='movie'?y.container_extension:c.ep.container_extension;
+    var br=c.info&&(+c.info.bitrate||0),du=c.info&&(+c.info.duration_secs||0);if(br&&du)c.est=br*1000/8*du;
+    return nat('probe',{url:c.url}).then(function(r){if(r&&r.size>0)c.size=r.size;c.st='ok'},function(){c.st='ok'});
+  },function(){c.st='err'});
+}
+function dlpWeight(c){return c.size||c.est||(c.q&&c.q.h?c.q.h*1e6:5e9)}
+function dlpLightest(){var L=DLP.C.filter(function(c){return c.st==='ok'&&c.url&&(!DLP.lang||!c.lang||c.lang===DLP.lang||c.lang==='MULTI')});L.sort(function(a,b){return dlpWeight(a)-dlpWeight(b)});return L[0]||null}
+function dlpDesc(c){return [c.q&&c.q.l,c.lang,c.size?size(c.size):c.est?'≈ '+size(c.est):''].filter(Boolean).join(' · ')||verLabel(DLP.kind,c.y)}
+function dlpPaint(){
+  var el=document.getElementById('dlpick');
+  if(!DLP){if(el)el.remove();return}
+  if(!el){el=document.createElement('div');el.id='dlpick';el.className='dlpick';document.body.appendChild(el)}
+  var light=dlpLightest(),t=DLP.kind==='movie'?cleanName(DLP.item.name):cleanName(DLP.item.name)+' · S'+String(DLP.ep.season).padStart(2,'0')+'E'+String(DLP.ep.episode_num).padStart(2,'0');
+  el.innerHTML='<div class="dlpbox" role="dialog" aria-label="Choisir la version à télécharger"><h3>Quelle version télécharger ?</h3><p class="hint" style="margin:0 0 10px">'+esc(t)+'</p>'+
+    DLP.C.map(function(c,i){
+      var lab=verLabel(DLP.kind,c.y),q=c.q&&c.q.l,sz=c.size?size(c.size):c.est?'≈ '+size(c.est):'',dis=c.st==='none'||c.st==='err';
+      return '<button type="button" class="dlprow'+(c===light?' best':'')+'" data-dlpi="'+i+'"'+(dis?' disabled':'')+'><span class="dlpq">'+esc(q||'Qualité ?')+'</span><span class="dlpl">'+esc(lab)+(c.cur?' <i>(celle que tu regardes)</i>':'')+'</span><span class="dlps">'+
+        (c.st==='load'?'…':c.st==='none'?'épisode absent':c.st==='err'?'indisponible':esc(sz||'taille ?'))+(c===light?'<b>la plus légère</b>':'')+'</span></button>';
+    }).join('')+
+    '<p class="hint" style="margin:10px 0 6px">Sur un téléphone, une version 720p suffit : le fichier est souvent 3 à 5 fois plus léger qu\'une 4K, donc d\'autant plus rapide à télécharger.</p>'+
+    '<div class="tabs" style="flex-wrap:wrap"><button type="button" class="chip" data-dlqual="light">Toujours la plus légère</button><button type="button" class="chip" data-dlpclose>Annuler</button></div></div>';
+}
+function dlGo(c){
+  /* la clé et les infos restent celles du titre affiché (coche, reprise, liste) ; seule l'adresse change si on prend une autre version */
+  var k=DLP?DLP.kind:(c.ep?'series':'movie'),y=c.y,X=DLP?DLP.item:y;
+  if(k==='movie'){startDownload('movie:'+X.stream_id,c.url||streamUrl('movie',y),y.container_extension,{kind:'movie',id:X.stream_id,title:cleanName(X.name),icon:X.stream_icon||y.stream_icon,quality:c.q&&c.q.l,srcId:y.stream_id,subMeta:subMeta('movie',X,sheet&&sheet.item===X?sheet.info:null)});return}
+  var de=c.ep,E=DLP&&DLP.ep?DLP.ep:de,lb='S'+String(E.season).padStart(2,'0')+'E'+String(E.episode_num).padStart(2,'0');
+  startDownload('ep:'+E.id,c.url||streamUrl('episode',de),de.container_extension,{kind:'ep',id:E.id,title:cleanName(X.name)+' · '+lb,icon:X.cover,quality:c.q&&c.q.l,srcId:de.id,
+    ep:{id:E.id,season:E.season,episode_num:E.episode_num,title:E.title,container_extension:de.container_extension},series:{series_id:X.series_id,name:X.name,cover:X.cover},subMeta:subMeta('series',X,sheet&&sheet.info?sheet.info.info:null,E)});
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest&&e.target.closest('#dlpick [data-dlpi],#dlpick [data-dlpclose],#dlpick [data-dlqual]');
+  if(!b){if(DLP&&e.target.id==='dlpick'){DLP=null;dlpPaint()}return}
+  e.preventDefault();e.stopPropagation();
+  if(b.hasAttribute('data-dlpclose')){DLP=null;dlpPaint();return}
+  if(b.hasAttribute('data-dlqual')){PREFS.dlQual='light';savePrefs();var L=dlpLightest();if(L){var c=L;dlGo(c);DLP=null;dlpPaint();toast('Retenu : la version la plus légère sera prise automatiquement (modifiable dans le compte).')}return}
+  var c=DLP&&DLP.C[+b.getAttribute('data-dlpi')];if(!c||!c.url)return;dlGo(c);DLP=null;dlpPaint();
+},true);
 function dlOf(k){return (USER.downloads||{})[k]||null}
 function dlReady(k){var d=dlOf(k);return d&&d.status==='done'&&d.localUri?d:null}
 function safeFile(s){return String(s||'video').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9._ -]+/g,' ').replace(/\s+/g,' ').trim().slice(0,60)||'video'}
@@ -3129,7 +3217,7 @@ function renderSheetInner(){
       });
       h+=secClose;
     }
-    if(NATIVE){var mc=maxConn();h+=secOpen('dl','Téléchargements',PREFS.allowMobile?'Wi-Fi et données mobiles':'Wi-Fi uniquement');h+='<p class="hint" style="margin:0">Téléchargements : un à la fois, reprise automatique après une coupure'+(mc>1?', jusqu\'à '+Math.min(4,mc)+' connexions en parallèle':'')+'. Ton abonnement autorise '+mc+' écran'+(mc>1?'s':'')+'. La file se met en pause pendant une vidéo en ligne (pas pendant une vidéo déjà téléchargée).</p>'}
+    if(NATIVE){var mc=maxConn();h+=secOpen('dl','Téléchargements',PREFS.allowMobile?'Wi-Fi et données mobiles':'Wi-Fi uniquement');h+='<p class="hint" style="margin:0">Téléchargements : un à la fois, reprise automatique après une coupure'+(mc>1?', jusqu\'à '+Math.min(4,mc)+' connexions en parallèle':'')+'. Ton abonnement autorise '+mc+' écran'+(mc>1?'s':'')+'. La file se met en pause pendant une vidéo en ligne (pas pendant une vidéo déjà téléchargée).</p>'+'<p class="hint" style="margin:8px 0 4px">Quand ton fournisseur propose plusieurs versions (4K, 1080p, 720p…) :</p><div class="tabs" style="flex-wrap:wrap">'+[['ask','Me demander'],['light','La plus légère'],['best','Celle que je regarde']].map(function(o){return '<button type="button" class="chip" data-dlqual="'+o[0]+'" aria-pressed="'+((PREFS.dlQual||'ask')===o[0])+'">'+o[1]+'</button>'}).join('')+'</div>'}
     if(NATIVE&&S.stor&&S.stor.volumes&&S.stor.volumes.length>1){h+='<p class="hint" style="margin:6px 0 0">Où enregistrer les nouveaux téléchargements :</p><div class="tabs">'+S.stor.volumes.map(function(v){return '<button type="button" class="chip" data-stor="'+esc(v.id)+'" aria-pressed="'+(S.stor.current===v.id)+'">'+esc(v.label)+' · '+size(v.free)+' libres</button>'}).join('')+'</div>'}
     else if(NATIVE&&S.stor&&S.stor.volumes&&S.stor.volumes[0])h+='<p class="hint" style="margin:6px 0 0">Place libre sur le téléphone : '+size(S.stor.volumes[0].free)+'. Une carte SD sera proposée ici si le téléphone en a une.</p>';
     if(NATIVE)h+='<label class="chk"><input type="checkbox" id="allowMobile"'+(PREFS.allowMobile?' checked':'')+'><span>Télécharger aussi en données mobiles (4G/5G)<br><span class="hint" style="font-weight:400">Sinon, les téléchargements attendent le Wi-Fi.</span></span></label>';
@@ -3308,17 +3396,15 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-contrm],[data-tvq],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-contrm],[data-tvq],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlqual],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.contrm){var cr=USER.prog[d.contrm];if(cr){USER.prog[d.contrm]=Object.assign({},cr,{hidden:true,at:Date.now()});saveUser()}closeSheet();toast('Retiré de « Reprendre la lecture ».');render();return}
   if(d.tvq!=null){S.q=d.tvq;var tq=document.getElementById('tvq');if(tq)tq.innerHTML=esc(S.q);var tr=document.getElementById('tvres');if(tr){tr.innerHTML=tvSearchRes();observe()}return}
   if(TV&&tvTab()==='search'&&(d.open||d.play||d.playmovie))tvKeepQ();
-  if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)startDownload('movie:'+dm.stream_id,streamUrl('movie',dm),dm.container_extension,{kind:'movie',id:dm.stream_id,title:cleanName(dm.name),icon:dm.stream_icon,subMeta:subMeta('movie',dm,sheet&&sheet.item===dm?sheet.info:null)});return}
+  if(d.dlmovie){var dm=byId('movie',d.dlmovie);if(dm)dlPick('movie',dm,null,sheet&&sheet.item===dm?sheet.info:null);return}
   if(d.dlep){var de=allEpisodes().filter(function(x){return String(x.id)===String(d.dlep)})[0],ds=sheet&&sheet.item;
-    if(de&&ds){var lb='S'+String(de.season).padStart(2,'0')+'E'+String(de.episode_num).padStart(2,'0');
-      startDownload('ep:'+de.id,streamUrl('episode',de),de.container_extension,{kind:'ep',id:de.id,title:cleanName(ds.name)+' · '+lb,icon:ds.cover,
-        ep:{id:de.id,season:de.season,episode_num:de.episode_num,title:de.title,container_extension:de.container_extension},series:{series_id:ds.series_id,name:ds.name,cover:ds.cover},subMeta:subMeta('series',ds,sheet.info&&sheet.info.info,de)})}
+    if(de&&ds)dlPick('series',ds,de,sheet.info);
     return}
   if(d.profuse){useProfile(d.profuse);return}
   if(t.hasAttribute('data-profswitch')){closeSheet();S.pickProfile=true;S.profEdit=false;render();window.scrollTo(0,0);return}
@@ -3374,6 +3460,7 @@ document.addEventListener('click',function(e){
   if(t.hasAttribute('data-exitapp')){closeSheet();exitApp();return}
   if(d.kb!==undefined){kbPress(d.kb);return}
   if(d.tvsort){S.tvSort=S.tvSort||{};var so=['recent','rating','az'],ci=so.indexOf(S.tvSort[d.tvsort]||'recent');S.tvSort[d.tvsort]=so[(ci+1)%3];render();return}
+  if(d.dlqual&&!e.target.closest('#dlpick')){PREFS.dlQual=d.dlqual;savePrefs();render();return}
   if(d.stor){nat('setStorage',{id:d.stor}).then(loadStorage);toast(d.stor==='sd'?'Les prochains téléchargements iront sur la carte SD.':'Les prochains téléchargements iront dans le téléphone.');return}
   if(d.seasonno!==undefined){sheet.seasonAsk=null;renderSheet();return}
   if(d.chguide!==undefined){var cg=byId('live',d.chguide);if(cg)openChGuide(cg);return}
