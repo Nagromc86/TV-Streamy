@@ -24,3 +24,10 @@ with zipfile.ZipFile(out2, 'w', zipfile.ZIP_DEFLATED) as z:
     z.write(os.path.join(ids, 'index.html'), 'index.html')
     z.write(os.path.join(ids, 'icon.png'), 'icon.png')
 print(out2, os.path.getsize(out2))
+
+out3 = os.path.join(root, 'dist', 'ids-apps-lite.wgt')
+with zipfile.ZipFile(out3, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.writestr('config.xml', open(os.path.join(ids, 'config-lite.xml'), encoding='utf-8').read().replace('@@VERSION@@', version))
+    z.write(os.path.join(ids, 'index.html'), 'index.html')
+    z.write(os.path.join(ids, 'icon.png'), 'icon.png')
+print(out3, os.path.getsize(out3))

@@ -34,10 +34,18 @@
     document.getElementById("list").innerHTML=list.map(function(a){return '<div class="row'+(FREE.test(a.name||"")?' hl':'')+'"><span class="n">'+esc(a.name||"(sans nom)")+'</span><span class="i">'+esc(a.id)+'</span></div>'}).join("");
   }
   function fail(msg){document.getElementById("sub").textContent="";document.getElementById("top").innerHTML='<div class="err">'+esc(msg)+'</div>';}
+  function running(why){
+    /* repli sans droit spécial : applis actuellement ouvertes (lance TV by Free sur la TV, puis reviens ici avec la touche Accueil) */
+    try{tizen.application.getAppsContext(function(ctx){
+      var L=[];ctx.forEach(function(c){try{L.push({id:c.appId,name:(tizen.application.getAppInfo(c.appId)||{}).name||""})}catch(e){L.push({id:c.appId,name:""})}});
+      if(L.length){show(L);document.getElementById("sub").textContent="Liste complète refusée par la TV ("+why+"). Voici les applis actuellement ouvertes : lance TV by Free, reviens ici avec Accueil, puis relance « ID des applis ».";}
+      else fail("Liste refusée par la TV : "+why);
+    },function(e){fail("Liste refusée par la TV : "+why+" / "+(e&&e.message||e))});}catch(e){fail("Liste refusée par la TV : "+why+" / "+(e&&e.message||e))}
+  }
   try{
-    if(typeof tizen==="undefined"||!tizen.application||!tizen.application.getAppsInfo){fail("L'API Tizen « application » n'est pas disponible sur cette TV (ou l'appli n'est pas signée avec les bons droits).");}
-    else tizen.application.getAppsInfo(function(infos){show(infos.map(function(i){return {id:i.id,name:i.name}}));},function(e){fail("Lecture impossible : "+(e&&e.message||e&&e.name||"erreur inconnue")+". Vérifie que l'appli est signée avec ton certificat Samsung.");});
-  }catch(e){fail("Erreur : "+(e&&e.message||e));}
+    if(typeof tizen==="undefined"||!tizen.application||!tizen.application.getAppsInfo){fail("L'API Tizen « application » n'est pas disponible sur cette TV.");}
+    else tizen.application.getAppsInfo(function(infos){show(infos.map(function(i){return {id:i.id,name:i.name}}));},function(e){running(e&&e.message||e&&e.name||"erreur");});
+  }catch(e){running(e&&e.message||e&&e.name||"erreur")}
   document.addEventListener("keydown",function(e){
     if(e.keyCode===40)window.scrollBy(0,160);else if(e.keyCode===38)window.scrollBy(0,-160);
     else if(e.keyCode===10009){try{tizen.application.getCurrentApplication().exit();}catch(x){}}

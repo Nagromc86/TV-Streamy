@@ -124,7 +124,8 @@ jobs:
           python3 tools/build_tizen.py "1.0.${{ github.run_number }}"
           cp dist/tv-streamy.wgt tv-streamy.wgt
           cp dist/ids-apps.wgt ids-apps.wgt
-          gh release create "v1.${{ github.run_number }}" tv-streamy.apk tv-streamy.wgt ids-apps.wgt \
+          cp dist/ids-apps-lite.wgt ids-apps-lite.wgt
+          gh release create "v1.${{ github.run_number }}" tv-streamy.apk tv-streamy.wgt ids-apps.wgt ids-apps-lite.wgt \
             --title "TV Streamy 1.${{ github.run_number }} ($APP_VERSION)" \
-            --notes "Version du $APP_VERSION. tv-streamy.apk : téléphone, tablette et Android TV (ouvre-le pour installer ou mettre à jour). tv-streamy.wgt : TV Samsung (Tizen), à installer avec un outil comme Apps2Samsung ou Tizen Studio. ids-apps.wgt : petit outil Samsung qui affiche l'ID des applications installées." \
+            --notes "Version du $APP_VERSION. tv-streamy.apk : téléphone, tablette et Android TV (ouvre-le pour installer ou mettre à jour). tv-streamy.wgt : TV Samsung (Tizen), à installer avec un outil comme Apps2Samsung ou Tizen Studio. ids-apps.wgt : petit outil Samsung qui affiche l'ID des applications installées (certificat partenaire requis) ; ids-apps-lite.wgt : même outil sans droit spécial, installable partout, liste réduite aux applis ouvertes." \
             --latest
