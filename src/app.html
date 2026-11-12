@@ -3158,11 +3158,15 @@ function renderInner(){
     S.tvKeep=tvTab()+(S.vodCat||'')+(S.serCat||'')+(S.liveCat||'');
     observe();if(S.liveView==='guide'&&S.tab==='live')guideScroll();return;
   }
+  /* une liste qu'on fait glisser ne doit pas être remise au début par un rafraîchissement : on attend la fin du geste, puis on garde la position */
+  if(Date.now()-ROWBUSY<450){clearTimeout(render.defer);render.defer=setTimeout(render,480);return}
+  var rsk=S.tab,rsc={};[].forEach.call(document.querySelectorAll('main .row'),function(r,i){if(r.scrollLeft>0)rsc[rowKey(r,i)]=r.scrollLeft});
   BILL=false;var v=S.tab==='live'?viewLive():S.tab==='movies'?viewGrid('movie'):S.tab==='series'?viewGrid('series'):S.tab==='favs'?viewFavs():S.tab==='search'?viewSearch():viewHome();
   var hadFocus=document.activeElement&&document.activeElement.id==='q',sel=hadFocus?document.activeElement.selectionStart:0;
   var lead=BILL?'':'<div style="height:6px"></div>';
   app.innerHTML=topHtml()+'<main class="gut">'+lead+(navigator.onLine===false?'<p class="offline">Hors connexion : les films et épisodes téléchargés restent lisibles (Ma liste).</p>':'')+(S.msg?'<p class="err" style="margin-top:8px">'+esc(S.msg)+'</p>':'')+v+'</main>';
   nav.innerHTML=navHtml();nav.hidden=false;
+  if(rsk===ROWTAB)[].forEach.call(document.querySelectorAll('main .row'),function(r,i){var k=rowKey(r,i);if(rsc[k])r.scrollLeft=rsc[k]});ROWTAB=S.tab;
   if(hadFocus){var q=$('#q');if(q){q.focus();try{q.setSelectionRange(sel,sel)}catch(e){}}}
   onScroll();observe();billSync();if(S.tab==='live'&&S.liveView==='guide')guideScroll();var tb=$('#topbar');if(tb)document.documentElement.style.setProperty('--toph',tb.offsetHeight+'px');setTimeout(miniSync,0);
 }
@@ -3367,6 +3371,10 @@ function openItem(kind,id){
   p.then(function(r){kset(ck,r);show(r)},function(e){if(!live()||shown)return;kget(ck).then(function(c){if(c){show(c);return}sheet.loading=false;sheet.info={};renderSheet();if(navigator.onLine!==false)toast('Fiche indisponible : '+errText(e))})});
 }
 
+var ROWBUSY=0,ROWTAB=null;
+function rowKey(r,i){var sec=r.closest('section'),h=sec&&sec.querySelector('h2,h3');return (h?h.textContent:'')+'#'+i}
+document.addEventListener('scroll',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('row'))ROWBUSY=Date.now()},true);
+document.addEventListener('touchmove',function(e){if(e.target.closest&&e.target.closest('.row'))ROWBUSY=Date.now()},{passive:true,capture:true});
 /* ---------- account save ---------- */
 function submitAccount(form){
   var g=function(n){return (form.elements[n].value||'').trim()};
