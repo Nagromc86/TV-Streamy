@@ -5,7 +5,17 @@ import csv, io, json, sys, urllib.request
 
 URL = 'https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv'
 req = urllib.request.Request(URL, headers={'User-Agent': 'Mozilla/5.0 (TV Streamy top10 job)'})
-raw = urllib.request.urlopen(req, timeout=120).read().decode('utf-8', 'replace')
+import time
+raw = None
+for attempt in range(4):  # le téléchargement (~33 Mo) est parfois coupé en route : on réessaie
+    try:
+        raw = urllib.request.urlopen(req, timeout=120).read().decode('utf-8', 'replace')
+        break
+    except Exception as e:
+        print('Essai %d échoué : %s' % (attempt + 1, e))
+        if attempt == 3:
+            raise
+        time.sleep(20 * (attempt + 1))
 rows = [r for r in csv.DictReader(io.StringIO(raw), delimiter='\t') if (r.get('country_iso2') or '').upper() == 'FR']
 if not rows:
     sys.exit('no France rows: columns are %s' % raw.split('\n', 1)[0])
