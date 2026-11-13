@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 18,
+   "n": 19,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 20,
+   "n": 21,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 18,
+   "n": 19,
    "keys": [
     "id",
     "uid",
@@ -114,7 +114,7 @@
   },
   "Coupe de France": {
    "ok": true,
-   "n": 89,
+   "n": 88,
    "keys": [
     "id",
     "uid",
@@ -135,7 +135,7 @@
   },
   "Ligue des nations": {
    "ok": true,
-   "n": 52,
+   "n": 44,
    "keys": [
     "id",
     "uid",
@@ -151,7 +151,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 155,
+   "n": 153,
    "keys": [
     "id",
     "uid",
@@ -166,7 +166,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 44,
+   "n": 43,
    "keys": [
     "id",
     "uid",
@@ -177,13 +177,12 @@
     "week",
     "competitions",
     "links",
-    "weather",
     "status"
    ]
   },
   "NHL": {
    "ok": true,
-   "n": 161,
+   "n": 154,
    "keys": [
     "id",
     "uid",
@@ -577,8 +576,8 @@
   ],
   "Coupe de France": [
    {
-    "name": "Grenoble at Chambéry Savoie",
-    "date": "2026-11-12T18:00Z",
+    "name": "Orléans at Dijon FCO",
+    "date": "2026-11-13T19:00Z",
     "season": {
      "year": 2026,
      "type": 14639,
@@ -598,7 +597,8 @@
       "alternateColor",
       "isActive",
       "logo",
-      "links"
+      "links",
+      "venue"
      ]
     }
    }
@@ -606,8 +606,8 @@
   "Coupe du monde": [],
   "Ligue des nations": [
    {
-    "name": "Cyprus at Armenia",
-    "date": "2026-11-12T17:00Z",
+    "name": "Kazakhstan at Moldova",
+    "date": "2026-11-13T17:00Z",
     "season": {
      "year": 2026,
      "type": 14105,
@@ -643,14 +643,19 @@
   ],
   "NBA": [
    {
-    "name": "Toronto Raptors at Philadelphia 76ers",
-    "date": "2026-11-13T00:00Z",
+    "name": "New York Knicks at Indiana Pacers",
+    "date": "2026-11-14T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [],
+    "notes": [
+     {
+      "type": "event",
+      "headline": "NBA Cup - Group Play"
+     }
+    ],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -677,17 +682,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "9-3"
+       "summary": "4-8"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "4-2"
+       "summary": "1-4"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "5-1"
+       "summary": "3-3"
       }
      ]
     }
@@ -695,72 +700,17 @@
   ],
   "NFL": [
    {
-    "name": "Washington Commanders at New York Giants",
-    "date": "2026-11-13T01:15Z",
+    "name": "New England Patriots at Detroit Lions",
+    "date": "2026-11-15T14:30Z",
     "season": {
      "year": 2026,
-     "type": 2,
-     "slug": "regular-season"
-    },
-    "notes": [],
-    "type": {
-     "id": "1",
-     "abbreviation": "STD"
-    },
-    "competitor0": {
-     "team": [
-      "id",
-      "uid",
-      "location",
-      "name",
-      "abbreviation",
-      "displayName",
-      "shortDisplayName",
-      "color",
-      "alternateColor",
-      "isActive",
-      "venue",
-      "links",
-      "logo",
-      "logoDark"
-     ],
-     "curatedRank": {
-      "current": 99
-     },
-     "records": [
-      {
-       "name": "overall",
-       "abbreviation": "Any",
-       "type": "total",
-       "summary": "5-2-1"
-      },
-      {
-       "name": "Home",
-       "type": "home",
-       "summary": "3-1"
-      },
-      {
-       "name": "Road",
-       "type": "road",
-       "summary": "2-1-1"
-      }
-     ]
-    }
-   }
-  ],
-  "NHL": [
-   {
-    "name": "Carolina Hurricanes at Seattle Kraken",
-    "date": "2026-11-12T17:00Z",
-    "season": {
-     "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
     "notes": [
      {
       "type": "event",
-      "headline": "NHL Global Series"
+      "headline": "NFL Munich Game"
      }
     ],
     "type": {
@@ -790,21 +740,76 @@
      "records": [
       {
        "name": "overall",
+       "abbreviation": "Any",
+       "type": "total",
+       "summary": "6-2"
+      },
+      {
+       "name": "Home",
+       "type": "home",
+       "summary": "4-0"
+      },
+      {
+       "name": "Road",
+       "type": "road",
+       "summary": "2-2"
+      }
+     ]
+    }
+   }
+  ],
+  "NHL": [
+   {
+    "name": "New York Rangers at Vancouver Canucks",
+    "date": "2026-11-14T02:00Z",
+    "season": {
+     "year": 2027,
+     "type": 2,
+     "slug": "regular-season"
+    },
+    "notes": [],
+    "type": {
+     "id": "1",
+     "abbreviation": "STD"
+    },
+    "competitor0": {
+     "team": [
+      "id",
+      "uid",
+      "location",
+      "name",
+      "abbreviation",
+      "displayName",
+      "shortDisplayName",
+      "color",
+      "alternateColor",
+      "isActive",
+      "venue",
+      "links",
+      "logo",
+      "logoDark"
+     ],
+     "curatedRank": {
+      "current": 99
+     },
+     "records": [
+      {
+       "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "9-6-1"
+       "summary": "3-16-1"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "5-3-0"
+       "summary": "1-8-0"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "4-3-1"
+       "summary": "2-8-1"
       }
      ]
     }
