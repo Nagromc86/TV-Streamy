@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 19,
+   "n": 24,
    "keys": [
     "id",
     "uid",
@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 30,
+   "n": 37,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 21,
+   "n": 24,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 19,
+   "n": 25,
    "keys": [
     "id",
     "uid",
@@ -114,7 +114,7 @@
   },
   "Coupe de France": {
    "ok": true,
-   "n": 88,
+   "n": 85,
    "keys": [
     "id",
     "uid",
@@ -135,7 +135,7 @@
   },
   "Ligue des nations": {
    "ok": true,
-   "n": 44,
+   "n": 34,
    "keys": [
     "id",
     "uid",
@@ -151,7 +151,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 153,
+   "n": 146,
    "keys": [
     "id",
     "uid",
@@ -182,7 +182,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 154,
+   "n": 164,
    "keys": [
     "id",
     "uid",
@@ -197,7 +197,7 @@
   },
   "UFC": {
    "ok": true,
-   "n": 2,
+   "n": 3,
    "keys": [
     "id",
     "uid",
@@ -253,7 +253,7 @@
   },
   "Formule 1": {
    "ok": true,
-   "n": 2,
+   "n": 3,
    "keys": [
     "id",
     "uid",
@@ -270,7 +270,7 @@
   },
   "Top 14": {
    "ok": true,
-   "n": 7,
+   "n": 13,
    "keys": [
     "id",
     "uid",
@@ -576,8 +576,8 @@
   ],
   "Coupe de France": [
    {
-    "name": "Orléans at Dijon FCO",
-    "date": "2026-11-13T19:00Z",
+    "name": "Montpellier at Balagne",
+    "date": "2026-11-14T13:00Z",
     "season": {
      "year": 2026,
      "type": 14639,
@@ -597,8 +597,7 @@
       "alternateColor",
       "isActive",
       "logo",
-      "links",
-      "venue"
+      "links"
      ]
     }
    }
@@ -606,8 +605,8 @@
   "Coupe du monde": [],
   "Ligue des nations": [
    {
-    "name": "Kazakhstan at Moldova",
-    "date": "2026-11-13T17:00Z",
+    "name": "Israel at Kosovo",
+    "date": "2026-11-14T14:00Z",
     "season": {
      "year": 2026,
      "type": 14105,
@@ -634,7 +633,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "1-1-2",
+       "summary": "1-2-1",
        "abbreviation": "Total"
       }
      ]
@@ -643,19 +642,14 @@
   ],
   "NBA": [
    {
-    "name": "New York Knicks at Indiana Pacers",
-    "date": "2026-11-14T00:00Z",
+    "name": "Denver Nuggets at New Orleans Pelicans",
+    "date": "2026-11-15T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [
-     {
-      "type": "event",
-      "headline": "NBA Cup - Group Play"
-     }
-    ],
+    "notes": [],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -682,17 +676,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "4-8"
+       "summary": "4-9"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "1-4"
+       "summary": "3-5"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "3-3"
+       "summary": "1-4"
       }
      ]
     }
@@ -760,14 +754,19 @@
   ],
   "NHL": [
    {
-    "name": "New York Rangers at Vancouver Canucks",
-    "date": "2026-11-14T02:00Z",
+    "name": "Seattle Kraken at Carolina Hurricanes",
+    "date": "2026-11-14T18:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [],
+    "notes": [
+     {
+      "type": "event",
+      "headline": "NHL Global Series"
+     }
+    ],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -797,19 +796,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "3-16-1"
+       "summary": "15-3-2"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "1-8-0"
+       "summary": "6-1-1"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "2-8-1"
+       "summary": "9-2-1"
       }
      ]
     }
