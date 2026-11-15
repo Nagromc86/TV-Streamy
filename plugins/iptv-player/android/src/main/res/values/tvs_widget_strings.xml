@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tvs_resume_widget_label">Reprendre la lecture</string>
+    <string name="tvs_resume_widget_desc">Reprend la dernière vidéo là où tu t\'es arrêté</string>
+</resources>

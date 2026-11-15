@@ -37,6 +37,50 @@ public class PlayerPlugin extends Plugin {
         instance = this;
     }
 
+    /* ---------- reprise : positions écrites par le lecteur + widget « Reprendre la lecture » ---------- */
+
+    @PluginMethod
+    public void takeProgress(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("items", ResumeStore.takePending(getContext()));
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void setResume(PluginCall call) {
+        ResumeStore.setWidget(getContext(), call.getString("title", ""), call.getString("subtitle", ""), call.getString("image", ""),
+                call.getInt("pct", 0), call.getString("key", ""));
+        call.resolve();
+    }
+
+    /** True once if the app was opened from the widget. */
+    @PluginMethod
+    public void takeLaunch(PluginCall call) {
+        JSObject r = new JSObject();
+        boolean resume = false;
+        if (getActivity() != null) {
+            Intent i = getActivity().getIntent();
+            if (i != null && i.getBooleanExtra(ResumeWidget.EXTRA_RESUME, false)) {
+                resume = true;
+                i.removeExtra(ResumeWidget.EXTRA_RESUME);
+            }
+        }
+        r.put("resume", resume);
+        call.resolve(r);
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        super.handleOnNewIntent(intent);
+        if (intent != null && intent.getBooleanExtra(ResumeWidget.EXTRA_RESUME, false)) {
+            intent.removeExtra(ResumeWidget.EXTRA_RESUME);
+            if (getActivity() != null) {
+                getActivity().setIntent(intent);
+            }
+            notifyListeners("resumeRequest", new JSObject());
+        }
+    }
+
     /** The player asks the app (which holds the OpenSubtitles account) to fetch French subtitles. */
     static void requestOpenSub(boolean byUser) {
         PlayerPlugin p = instance;
@@ -153,6 +197,9 @@ public class PlayerPlugin extends Plugin {
         intent.putExtra(PlayerActivity.EXTRA_TITLE, call.getString("title", ""));
         intent.putExtra(PlayerActivity.EXTRA_SUBTITLE, call.getString("subtitle", ""));
         intent.putExtra(PlayerActivity.EXTRA_START_MS, call.getData().optLong("startMs", 0L));
+        intent.putExtra(PlayerActivity.EXTRA_PROG_KEY, call.getString("progKey", ""));
+        intent.putExtra(PlayerActivity.EXTRA_PROG_META, call.getString("progMeta", ""));
+        intent.putExtra(PlayerActivity.EXTRA_IMAGE, call.getString("image", ""));
         intent.putExtra(PlayerActivity.EXTRA_LIVE, call.getBoolean("live", false));
         intent.putExtra(PlayerActivity.EXTRA_USER_AGENT, call.getString("userAgent", ""));
         intent.putExtra(PlayerActivity.EXTRA_SUB_MODE, call.getString("subMode", "auto"));

@@ -77,6 +77,35 @@ public class PlayerActivity extends Activity {
     static final String EXTRA_WATCH_KEY = "watchKey";
     static final String EXTRA_WATCH_DEV = "watchDev";
     static final String EXTRA_WATCH_SINCE = "watchSince";
+    static final String EXTRA_PROG_KEY = "progKey";
+    static final String EXTRA_PROG_META = "progMeta";
+    static final String EXTRA_IMAGE = "image";
+    /* position written every few seconds, so a resume survives Android closing the app */
+    private String progKey, progMeta;
+    private final android.os.Handler progHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable progTick = new Runnable() {
+        @Override
+        public void run() {
+            saveProgress(false);
+            progHandler.postDelayed(this, 10000);
+        }
+    };
+
+    private void saveProgress(boolean closing) {
+        if (live || TextUtils.isEmpty(progKey) || player == null) {
+            return;
+        }
+        long pos = Math.max(0L, player.getCurrentPosition());
+        long d = player.getDuration();
+        long dur = d == C.TIME_UNSET ? 0L : d;
+        if (pos < 5000 && !ended && !closing) {
+            return;
+        }
+        ResumeStore.savePosition(getApplicationContext(), progKey, progMeta, pos, dur, ended);
+        int pct = dur > 0 ? (int) Math.min(100, pos * 100 / dur) : 0;
+        Intent in = getIntent();
+        ResumeStore.setWidgetProgress(getApplicationContext(), progKey, in.getStringExtra(EXTRA_TITLE), in.getStringExtra(EXTRA_SUBTITLE), in.getStringExtra(EXTRA_IMAGE), ended ? 100 : pct);
+    }
     /* one screen at a time between synced devices: see watchTick */
     private String watchUrl, watchToken, watchRefresh, watchKey, watchDev;
     private long watchSince;
@@ -171,6 +200,8 @@ public class PlayerActivity extends Activity {
         fallbackUrl = in.getStringExtra(EXTRA_FALLBACK_URL);
         live = in.getBooleanExtra(EXTRA_LIVE, false);
         long startMs = in.getLongExtra(EXTRA_START_MS, 0L);
+        progKey = in.getStringExtra(EXTRA_PROG_KEY);
+        progMeta = in.getStringExtra(EXTRA_PROG_META);
         subMode = in.getStringExtra(EXTRA_SUB_MODE);
         if (subMode == null) {
             subMode = "auto";
@@ -504,6 +535,9 @@ public class PlayerActivity extends Activity {
         }
         player.prepare();
         player.setPlayWhenReady(true);
+        if (!live && !TextUtils.isEmpty(progKey)) {
+            progHandler.postDelayed(progTick, 10000);
+        }
     }
 
     /* ---------- floating window (picture-in-picture) ---------- */
@@ -1454,6 +1488,8 @@ public class PlayerActivity extends Activity {
             return;
         }
         finishing = true;
+        saveProgress(true);
+        progHandler.removeCallbacksAndMessages(null);
         Intent data = new Intent();
         if (player != null) {
             long duration = player.getDuration();
@@ -1507,6 +1543,7 @@ public class PlayerActivity extends Activity {
                 return;
             }
         }
+        saveProgress(false);
         if (player != null && !isFinishing()) {
             // in the background: free the provider's screen (a paused stream still holds it), resume on return
             backgroundPos = player.getCurrentPosition();
@@ -1534,6 +1571,7 @@ public class PlayerActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        progHandler.removeCallbacksAndMessages(null);
         subHandler.removeCallbacksAndMessages(null);
         retryHandler.removeCallbacksAndMessages(null);
         watchHandler.removeCallbacksAndMessages(null);

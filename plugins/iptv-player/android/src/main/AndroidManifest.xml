@@ -47,5 +47,16 @@
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode"
             android:screenOrientation="sensorLandscape"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+        <receiver
+            android:name="fr.nagromc86.iptvplayer.ResumeWidget"
+            android:exported="true"
+            android:label="@string/tvs_resume_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tvs_resume_widget_info" />
+        </receiver>
     </application>
 </manifest>
