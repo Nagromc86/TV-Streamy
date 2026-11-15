@@ -53,6 +53,13 @@ public class PlayerPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Playlists and their expiry dates for the 2 x 1 widget. */
+    @PluginMethod
+    public void setAccounts(PluginCall call) {
+        AccountsWidget.setAccounts(getContext(), call.getString("list", "[]"));
+        call.resolve();
+    }
+
     /** Big games for the 2 x 2 posters widget. */
     @PluginMethod
     public void setPosters(PluginCall call) {

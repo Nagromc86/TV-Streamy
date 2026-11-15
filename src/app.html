@@ -764,7 +764,7 @@ function migrateProfiles(){
     else{S.profileId=null;S.pickProfile=true}
   });
 }
-function saveAccounts(){syncSoon();return kset('accounts',{list:S.accounts,active:S.activeId,del:S.accDel||{}})}
+function saveAccounts(){syncSoon();pushAccounts();return kset('accounts',{list:S.accounts,active:S.activeId,del:S.accDel||{}})}
 
 /* ---------- Xtream API ---------- */
 function acc(){return S.accounts.filter(function(a){return a.id===S.activeId})[0]||null}
@@ -857,7 +857,7 @@ function loadCatalog(){
 }
 function refreshAccountInfo(a){
   if(!a||navigator.onLine===false)return;
-  api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){a.maxConn=+ui.max_connections||1;var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');saveAccounts()}},function(){});
+  api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){a.maxConn=+ui.max_connections||1;var exp=+ui.exp_date;a.exp=exp||0;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');saveAccounts()}},function(){});
 }
 function switchAccount(id){
   flushUser();
@@ -1424,6 +1424,21 @@ function postersAtStart(){
 }
 function openSportsHub(){S.tab='live';S.liveSports=true;if(sheet)closeSheet();render();window.scrollTo(0,0)}
 try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','sportsRequest',function(){openSportsHub()})}catch(e){}
+/* playlists + date d'expiration -> widget 2×1 (en rouge 10 jours avant) */
+function accExp(a){if(a.exp)return a.exp;var m=/Expire le (\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(a.info||'');return m?Math.floor(new Date(+m[3],+m[2]-1,+m[1],23,59).getTime()/1000):0}
+function pushAccounts(){
+  if(!NATIVE||TV)return;
+  var j=JSON.stringify((S.accounts||[]).map(function(a){return {name:a.name||a.username||'Playlist',exp:accExp(a)}}));
+  if(j===pushAccounts.last)return;pushAccounts.last=j;nat('setAccounts',{list:j}).catch(function(){});
+}
+/* une fois par jour : relire la date d'expiration de chaque playlist Xtream */
+function refreshAllExpiry(){
+  if(!NATIVE||navigator.onLine===false)return;
+  var last=0;try{last=+localStorage.getItem('expChk')||0}catch(e){}
+  if(Date.now()-last<20*3600e3){pushAccounts();return}
+  try{localStorage.setItem('expChk',String(Date.now()))}catch(e){}
+  (S.accounts||[]).filter(function(a){return a.type!=='m3u'&&a.server}).reduce(function(p,a){return p.then(function(){return api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){var exp=+ui.exp_date;a.exp=exp||0;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'')}},function(){})})},Promise.resolve()).then(function(){saveAccounts();pushAccounts()});
+}
 function fmtPos(ms){var m=Math.floor((ms||0)/60000),h=Math.floor(m/60);return h?h+' h '+String(m%60).padStart(2,'0'):m+' min'}
 /* ouverture depuis le widget : relance directement la dernière vidéo, à sa position */
 function resumeFromWidget(){
@@ -1434,7 +1449,7 @@ function resumeFromWidget(){
   if(e&&e.container_extension){playEpisode(s,e,false);return}
   openItem('series',p.id);
 }
-function checkLaunch(){if(!NATIVE)return;postersAtStart();nat('takeLaunch').then(function(r){if(r&&r.resume)setTimeout(resumeFromWidget,300);else if(r&&r.sports)setTimeout(openSportsHub,300)},function(){})}
+function checkLaunch(){if(!NATIVE)return;postersAtStart();refreshAllExpiry();nat('takeLaunch').then(function(r){if(r&&r.resume)setTimeout(resumeFromWidget,300);else if(r&&r.sports)setTimeout(openSportsHub,300)},function(){})}
 try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','resumeRequest',function(){pullNativeProgress().then(resumeFromWidget)})}catch(e){}
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')pullNativeProgress()});
 function playEpisode(series,ep,fromStart){
@@ -3475,7 +3490,7 @@ function submitAccount(form){
     if(!ui||String(ui.auth)!=='1')throw new Error('identifiant ou mot de passe refusé par le serveur.');
     if(ui.status&&ui.status!=='Active')throw new Error('abonnement « '+ui.status+' ».');
     a.maxConn=+ui.max_connections||1;
-    var exp=+ui.exp_date;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');
+    var exp=+ui.exp_date;a.exp=exp||0;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'');
     var i=S.accounts.findIndex(function(x){return x.id===a.id});
     var changed=i<0||S.accounts[i].server!==a.server||S.accounts[i].username!==a.username||S.accounts[i].password!==a.password;
     a.at=Date.now();

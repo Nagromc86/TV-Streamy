@@ -6,4 +6,6 @@
     <string name="tvs_channel_widget_desc">Lance directement une de tes chaînes favorites</string>
     <string name="tvs_posters_widget_label">Affiches à ne pas manquer</string>
     <string name="tvs_posters_widget_desc">Les gros matchs à venir, en carrousel</string>
+    <string name="tvs_accounts_widget_label">Mes playlists</string>
+    <string name="tvs_accounts_widget_desc">Date d’expiration de chaque playlist, en rouge 10 jours avant</string>
 </resources>
