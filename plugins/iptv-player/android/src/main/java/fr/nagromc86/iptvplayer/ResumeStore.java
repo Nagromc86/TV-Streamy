@@ -33,8 +33,56 @@ final class ResumeStore {
             o.put("at", System.currentTimeMillis());
             o.put("meta", meta == null ? "" : meta);
             all.put(key, o);
-            p.edit().putString("pending", all.toString()).apply();
+            p.edit().putString("pending", all.toString()).putLong("p_" + key, ended ? 0L : Math.max(0L, pos)).apply();
         } catch (Exception ignored) {
+        }
+    }
+
+    /** Last known position of a video (kept, unlike "pending"). */
+    static long positionOf(Context c, String key) {
+        return prefs(c).getLong("p_" + key, 0L);
+    }
+
+    /** The video's player launch (url, title, subtitles mode…), to start it again from the widget. */
+    static synchronized void saveLaunch(Context c, String key, android.os.Bundle extras) {
+        if (key == null || key.isEmpty() || extras == null) {
+            return;
+        }
+        try {
+            JSONObject o = new JSONObject();
+            for (String k : extras.keySet()) {
+                if (k.startsWith("watch") || k.equals(PlayerActivity.EXTRA_START_MS)) {
+                    continue;
+                }
+                Object v = extras.get(k);
+                if (v instanceof String || v instanceof Boolean || v instanceof Long || v instanceof Integer) {
+                    o.put(k, v);
+                }
+            }
+            SharedPreferences p = prefs(c);
+            JSONObject all = new JSONObject(p.getString("launch", "{}"));
+            all.put(key, o);
+            // keep only the last 30 videos
+            if (all.length() > 30) {
+                java.util.Iterator<String> it = all.keys();
+                if (it.hasNext()) {
+                    String first = it.next();
+                    if (!first.equals(key)) {
+                        all.remove(first);
+                    }
+                }
+            }
+            p.edit().putString("launch", all.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    static JSONObject launchOf(Context c, String key) {
+        try {
+            JSONObject all = new JSONObject(prefs(c).getString("launch", "{}"));
+            return all.optJSONObject(key);
+        } catch (Exception e) {
+            return null;
         }
     }
 

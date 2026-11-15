@@ -202,6 +202,9 @@ public class PlayerActivity extends Activity {
         long startMs = in.getLongExtra(EXTRA_START_MS, 0L);
         progKey = in.getStringExtra(EXTRA_PROG_KEY);
         progMeta = in.getStringExtra(EXTRA_PROG_META);
+        if (!live && !TextUtils.isEmpty(progKey)) {
+            ResumeStore.saveLaunch(getApplicationContext(), progKey, in.getExtras());
+        }
         subMode = in.getStringExtra(EXTRA_SUB_MODE);
         if (subMode == null) {
             subMode = "auto";

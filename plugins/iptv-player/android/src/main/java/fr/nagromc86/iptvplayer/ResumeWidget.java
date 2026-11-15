@@ -133,13 +133,17 @@ public class ResumeWidget extends AppWidgetProvider {
         } else {
             v.setViewVisibility(R.id.tvs_w_img, View.GONE);
         }
-        Intent open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
-        if (open == null) {
-            open = new Intent();
-        }
-        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        Intent open;
         if (has) {
-            open.putExtra(EXTRA_RESUME, true);
+            // straight to the player, at the saved position (no app screen in between)
+            open = new Intent(c, ResumeLaunchActivity.class);
+            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        } else {
+            open = c.getPackageManager().getLaunchIntentForPackage(c.getPackageName());
+            if (open == null) {
+                open = new Intent();
+            }
+            open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
         PendingIntent pi = PendingIntent.getActivity(c, has ? 7101 : 7100, open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
