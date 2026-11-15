@@ -2,4 +2,8 @@
 <resources>
     <string name="tvs_resume_widget_label">Reprendre la lecture</string>
     <string name="tvs_resume_widget_desc">Reprend la dernière vidéo là où tu t\'es arrêté</string>
+    <string name="tvs_channel_widget_label">Chaîne favorite</string>
+    <string name="tvs_channel_widget_desc">Lance directement une de tes chaînes favorites</string>
+    <string name="tvs_posters_widget_label">Affiches à ne pas manquer</string>
+    <string name="tvs_posters_widget_desc">Les gros matchs à venir, en carrousel</string>
 </resources>

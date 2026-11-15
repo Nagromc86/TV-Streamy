@@ -53,6 +53,20 @@ public class PlayerPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Big games for the 2 x 2 posters widget. */
+    @PluginMethod
+    public void setPosters(PluginCall call) {
+        PostersWidget.setPosters(getContext(), call.getString("list", "[]"));
+        call.resolve();
+    }
+
+    /** Favourite channels for the 1 x 1 channel widgets. */
+    @PluginMethod
+    public void setChannels(PluginCall call) {
+        ChannelWidget.setChannels(getContext(), call.getString("list", "[]"));
+        call.resolve();
+    }
+
     /** True once if the app was opened from the widget. */
     @PluginMethod
     public void takeLaunch(PluginCall call) {
@@ -65,7 +79,16 @@ public class PlayerPlugin extends Plugin {
                 i.removeExtra(ResumeWidget.EXTRA_RESUME);
             }
         }
+        boolean sports = false;
+        if (getActivity() != null) {
+            Intent i = getActivity().getIntent();
+            if (i != null && i.getBooleanExtra(PostersWidget.EXTRA_SPORTS, false)) {
+                sports = true;
+                i.removeExtra(PostersWidget.EXTRA_SPORTS);
+            }
+        }
         r.put("resume", resume);
+        r.put("sports", sports);
         call.resolve(r);
     }
 
@@ -78,6 +101,10 @@ public class PlayerPlugin extends Plugin {
                 getActivity().setIntent(intent);
             }
             notifyListeners("resumeRequest", new JSObject());
+        }
+        if (intent != null && intent.getBooleanExtra(PostersWidget.EXTRA_SPORTS, false)) {
+            intent.removeExtra(PostersWidget.EXTRA_SPORTS);
+            notifyListeners("sportsRequest", new JSObject());
         }
     }
 

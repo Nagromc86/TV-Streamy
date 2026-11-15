@@ -876,7 +876,7 @@ function toggleFav(kind,item){
   var k=fkey(kind,item.stream_id||item.series_id);
   USER.favDel=USER.favDel||{};
   if(USER.favs[k]){delete USER.favs[k];USER.favDel[k]=Date.now()}else USER.favs[k]={kind:kind,id:item.stream_id||item.series_id,name:item.name,icon:item.stream_icon||item.cover||'',at:Date.now()};
-  saveUser();
+  saveUser();if(kind==='live')syncChannels();
 }
 /* after each catalogue load: favourites whose number changed at the provider are found again by their name */
 function repairFavs(){
@@ -1386,6 +1386,7 @@ function contList(){
 }
 function updateWidget(){
   if(!NATIVE||TV)return;
+  syncChannels();
   var p=contList()[0];
   if(!p){nat('setResume',{}).catch(function(){});return}
   var x=byId(p.kind,p.id),pct=p.dur?Math.round(p.pos/p.dur*100):0;
@@ -1393,6 +1394,36 @@ function updateWidget(){
     :{title:cleanName((x&&x.name)||p.name||''),subtitle:(p.label||'')+(p.ep&&p.ep.title?' · '+p.ep.title:'')+' · '+fmtPos(p.pos),image:(x&&x.cover)||p.icon||'',key:'ep:'+p.last};
   o.pct=pct;nat('setResume',o).catch(function(){});
 }
+/* chaînes favorites -> raccourcis 1×1 de l'écran d'accueil (un widget = une chaîne, lancée directement) */
+function syncChannels(){
+  if(!NATIVE||TV||!S.activeId)return;
+  var ex=liveExt();
+  var L=Object.keys(USER.favs||{}).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind==='live'}).sort(function(a,b){return (a.name||'').localeCompare(b.name||'')}).map(function(f){
+    var x=(DATA&&byId('live',f.id))||{stream_id:f.id,name:f.name,stream_icon:f.icon};
+    return {id:S.activeId+':'+x.stream_id,name:cleanName(x.name||f.name||''),logo:x.stream_icon||f.icon||'',url:streamUrl('live',x,ex[0]),fallbackUrl:streamUrl('live',x,ex[1]),subMode:curSubMode()};
+  });
+  var j=JSON.stringify(L);if(j===syncChannels.last)return;syncChannels.last=j;
+  nat('setChannels',{list:j}).catch(function(){});
+}
+/* affiches à ne pas manquer -> widget 2×2 en carrousel (rafraîchi à chaque passage dans le hub Sport et à l'ouverture) */
+function pushPosters(posters){
+  if(!NATIVE||TV)return;
+  var ex=liveExt();
+  var L=(posters||[]).slice(0,8).map(function(ev){
+    var x=ev.ch&&ev.ch[0];
+    return {id:ev.k,s:ev.s,e:ev.e,title:ev.t,teams:ev.teams||null,logoA:ev.logos&&ev.logos[0]||'',logoB:ev.logos&&ev.logos[1]||'',comp:ev.comp||'',why:(ev.why&&ev.why[0])||'',
+      chName:x?cleanName(x.name):'',url:x?streamUrl('live',x,ex[0]):'',fallbackUrl:x?streamUrl('live',x,ex[1]):''};
+  });
+  var j=JSON.stringify(L);if(j===pushPosters.last)return;pushPosters.last=j;
+  nat('setPosters',{list:j}).catch(function(){});
+}
+function postersAtStart(){
+  if(!NATIVE||TV)return;
+  calLoad();
+  var tries=0;(function wait(){if(CAL){try{pushPosters(spPosters(spEvents(),spRules(),Date.now()/1000))}catch(e){}return}if(++tries<20)setTimeout(wait,1500)})();
+}
+function openSportsHub(){S.tab='live';S.liveSports=true;if(sheet)closeSheet();render();window.scrollTo(0,0)}
+try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','sportsRequest',function(){openSportsHub()})}catch(e){}
 function fmtPos(ms){var m=Math.floor((ms||0)/60000),h=Math.floor(m/60);return h?h+' h '+String(m%60).padStart(2,'0'):m+' min'}
 /* ouverture depuis le widget : relance directement la dernière vidéo, à sa position */
 function resumeFromWidget(){
@@ -1403,7 +1434,7 @@ function resumeFromWidget(){
   if(e&&e.container_extension){playEpisode(s,e,false);return}
   openItem('series',p.id);
 }
-function checkLaunch(){if(!NATIVE)return;nat('takeLaunch').then(function(r){if(r&&r.resume)setTimeout(resumeFromWidget,300)},function(){})}
+function checkLaunch(){if(!NATIVE)return;postersAtStart();nat('takeLaunch').then(function(r){if(r&&r.resume)setTimeout(resumeFromWidget,300);else if(r&&r.sports)setTimeout(openSportsHub,300)},function(){})}
 try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','resumeRequest',function(){pullNativeProgress().then(resumeFromWidget)})}catch(e){}
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')pullNativeProgress()});
 function playEpisode(series,ep,fromStart){
@@ -2779,7 +2810,7 @@ function spEventsHtml(){
   else h+='<button type="button" class="spcta" data-spedit><b>Choisis ce que tu veux suivre</b><span>Sport, équipe, compétition : on te montre où et quand les regarder.</span></button>';
   if(done<chs.length)h+='<p class="hint" style="margin:10px 0 0">Analyse du guide : '+done+' / '+chs.length+' chaînes…</p>';
   /* affiches */
-  var posters=CAL?spPosters(all,R,now):[];
+  var posters=CAL?spPosters(all,R,now):[];if(CAL)pushPosters(posters);
   if(!CAL){var pool=R.length?mine:all,seen={};pool.filter(function(ev){return ev.big&&ev.e>now}).forEach(function(ev){if(posters.length<8&&!seen[ev.k]){seen[ev.k]=1;posters.push(ev)}})}
   h+='<section class="sec"><div class="sech"><h2>Les affiches à ne pas manquer</h2></div>'+(posters.length?'<div class="row spposters">'+posters.map(function(ev){return spPosterHtml(ev,now)}).join('')+'</div>':'<p class="hint" style="margin:0">'+(!CAL?'Calendrier en cours de chargement…':R.length?'Pas de gros match dans tes sélections ces prochains jours.':'Pas de gros match annoncé ces prochains jours.')+'</p>')+'</section>';
   /* liste */
@@ -3212,6 +3243,7 @@ function renderInner(){
   }
   /* une liste qu'on fait glisser ne doit pas être remise au début par un rafraîchissement : on attend la fin du geste, puis on garde la position */
   if(Date.now()-ROWBUSY<450){clearTimeout(render.defer);render.defer=setTimeout(render,480);return}
+  if(NATIVE&&DATA&&syncChannels.data!==DATA){syncChannels.data=DATA;try{syncChannels()}catch(e){}}
   var rsk=S.tab,rsc={};[].forEach.call(document.querySelectorAll('main .row'),function(r,i){if(r.scrollLeft>0)rsc[rowKey(r,i)]=r.scrollLeft});
   BILL=false;var v=S.tab==='live'?viewLive():S.tab==='movies'?viewGrid('movie'):S.tab==='series'?viewGrid('series'):S.tab==='favs'?viewFavs():S.tab==='search'?viewSearch():viewHome();
   var hadFocus=document.activeElement&&document.activeElement.id==='q',sel=hadFocus?document.activeElement.selectionStart:0;
