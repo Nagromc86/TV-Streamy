@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 24,
+   "n": 27,
    "keys": [
     "id",
     "uid",
@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 37,
+   "n": 40,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 22,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 24,
+   "n": 28,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 25,
+   "n": 27,
    "keys": [
     "id",
     "uid",
@@ -114,7 +114,7 @@
   },
   "Coupe de France": {
    "ok": true,
-   "n": 85,
+   "n": 33,
    "keys": [
     "id",
     "uid",
@@ -135,7 +135,7 @@
   },
   "Ligue des nations": {
    "ok": true,
-   "n": 34,
+   "n": 26,
    "keys": [
     "id",
     "uid",
@@ -151,7 +151,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 146,
+   "n": 141,
    "keys": [
     "id",
     "uid",
@@ -166,7 +166,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 43,
+   "n": 55,
    "keys": [
     "id",
     "uid",
@@ -182,7 +182,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 164,
+   "n": 156,
    "keys": [
     "id",
     "uid",
@@ -197,7 +197,7 @@
   },
   "UFC": {
    "ok": true,
-   "n": 3,
+   "n": 2,
    "keys": [
     "id",
     "uid",
@@ -213,7 +213,7 @@
   },
   "Tennis ATP": {
    "ok": true,
-   "n": 2,
+   "n": 1,
    "keys": [
     "id",
     "uid",
@@ -233,7 +233,7 @@
   },
   "Tennis WTA": {
    "ok": true,
-   "n": 7,
+   "n": 6,
    "keys": [
     "id",
     "uid",
@@ -270,7 +270,7 @@
   },
   "Top 14": {
    "ok": true,
-   "n": 13,
+   "n": 14,
    "keys": [
     "id",
     "uid",
@@ -560,8 +560,7 @@
       "alternateColor",
       "isActive",
       "logo",
-      "links",
-      "venue"
+      "links"
      ],
      "records": [
       {
@@ -576,8 +575,8 @@
   ],
   "Coupe de France": [
    {
-    "name": "Montpellier at Balagne",
-    "date": "2026-11-14T13:00Z",
+    "name": "Les Ulis at Chatou",
+    "date": "2026-11-15T13:00Z",
     "season": {
      "year": 2026,
      "type": 14639,
@@ -605,8 +604,8 @@
   "Coupe du monde": [],
   "Ligue des nations": [
    {
-    "name": "Israel at Kosovo",
-    "date": "2026-11-14T14:00Z",
+    "name": "Montenegro at Cyprus",
+    "date": "2026-11-15T14:00Z",
     "season": {
      "year": 2026,
      "type": 14105,
@@ -633,7 +632,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "1-2-1",
+       "summary": "2-2-1",
        "abbreviation": "Total"
       }
      ]
@@ -642,8 +641,8 @@
   ],
   "NBA": [
    {
-    "name": "Denver Nuggets at New Orleans Pelicans",
-    "date": "2026-11-15T00:00Z",
+    "name": "Indiana Pacers at Philadelphia 76ers",
+    "date": "2026-11-15T18:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -676,17 +675,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "4-9"
+       "summary": "10-3"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "3-5"
+       "summary": "5-2"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "1-4"
+       "summary": "5-1"
       }
      ]
     }
@@ -754,19 +753,14 @@
   ],
   "NHL": [
    {
-    "name": "Seattle Kraken at Carolina Hurricanes",
-    "date": "2026-11-14T18:00Z",
+    "name": "Edmonton Oilers at Philadelphia Flyers",
+    "date": "2026-11-16T00:30Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [
-     {
-      "type": "event",
-      "headline": "NHL Global Series"
-     }
-    ],
+    "notes": [],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -796,19 +790,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "15-3-2"
+       "summary": "6-10-6"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "6-1-1"
+       "summary": "3-4-3"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "9-2-1"
+       "summary": "3-6-3"
       }
      ]
     }
@@ -816,16 +810,16 @@
   ],
   "UFC": [
    {
-    "name": "UFC 334: Gane vs. Hokit",
-    "date": "2026-11-14T22:00Z",
+    "name": "UFC Fight Night: Procházka vs. Stirling",
+    "date": "2026-11-21T15:00Z",
     "season": {
      "year": 2026,
      "type": 2,
      "slug": "regular-season"
     },
     "type": {
-     "id": "986",
-     "abbreviation": "Lightweight"
+     "id": "990",
+     "abbreviation": "Light Heavyweight"
     },
     "competitor0": {
      "team": [],
@@ -834,7 +828,7 @@
        "name": "overall",
        "abbreviation": "TOT",
        "type": "total",
-       "summary": "10-2-0"
+       "summary": "12-2-0"
       }
      ]
     }
@@ -842,8 +836,8 @@
   ],
   "Tennis ATP": [
    {
-    "name": "Bybit Stockholm Open",
-    "date": "2026-11-07T05:00Z",
+    "name": "Nitto ATP Finals",
+    "date": "2026-11-15T05:00Z",
     "season": {
      "year": 2026,
      "type": 2
