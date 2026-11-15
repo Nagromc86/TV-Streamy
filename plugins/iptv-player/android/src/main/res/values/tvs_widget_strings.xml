@@ -8,4 +8,12 @@
     <string name="tvs_posters_widget_desc">Les gros matchs à venir, en carrousel</string>
     <string name="tvs_accounts_widget_label">Mes playlists</string>
     <string name="tvs_accounts_widget_desc">Date d’expiration de chaque playlist, en rouge 10 jours avant</string>
+    <string name="tvs_tonight_label">Ce soir à la télé</string>
+    <string name="tvs_tonight_desc">Ce qui passe maintenant et ce soir sur tes chaînes favorites</string>
+    <string name="tvs_neweps_label">Nouveaux épisodes</string>
+    <string name="tvs_neweps_desc">Les séries de Ma liste qui ont un nouvel épisode</string>
+    <string name="tvs_mylist_label">Ma liste</string>
+    <string name="tvs_mylist_desc">Tes films et séries à regarder, en carrousel</string>
+    <string name="tvs_downloads_label">Téléchargements</string>
+    <string name="tvs_downloads_desc">Progression des téléchargements et vidéos prêtes hors ligne</string>
 </resources>

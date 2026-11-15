@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tvs_n_root" android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:gravity="center_vertical" android:orientation="horizontal" android:paddingTop="5dp" android:paddingBottom="5dp" android:paddingStart="4dp" android:paddingEnd="4dp">
+    <ImageView android:id="@+id/tvs_n_img" android:layout_width="34dp" android:layout_height="50dp" android:scaleType="centerCrop" android:contentDescription="@null" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:orientation="vertical">
+        <TextView android:id="@+id/tvs_n_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+            android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
+        <TextView android:id="@+id/tvs_n_sub" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+            android:textColor="#FF6B6B" android:textSize="11sp" />
+    </LinearLayout>
+    <ImageView android:layout_width="30dp" android:layout_height="30dp" android:background="@drawable/tvs_widget_playbg" android:padding="7dp"
+        android:src="@drawable/tvs_widget_play" android:contentDescription="@null" />
+</LinearLayout>

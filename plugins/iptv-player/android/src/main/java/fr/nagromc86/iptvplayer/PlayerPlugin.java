@@ -60,6 +60,19 @@ public class PlayerPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Data of the list widgets: kind = tonight | neweps | mylist. */
+    @PluginMethod
+    public void setListWidget(PluginCall call) {
+        ListWidgets.set(getContext(), call.getString("kind", "mylist"), call.getString("list", "[]"));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void refreshDownloadsWidget(PluginCall call) {
+        DownloadsWidget.refresh(getContext(), true);
+        call.resolve();
+    }
+
     /** Big games for the 2 x 2 posters widget. */
     @PluginMethod
     public void setPosters(PluginCall call) {
@@ -94,8 +107,17 @@ public class PlayerPlugin extends Plugin {
                 i.removeExtra(PostersWidget.EXTRA_SPORTS);
             }
         }
+        String open = null;
+        if (getActivity() != null) {
+            Intent i = getActivity().getIntent();
+            if (i != null && i.getStringExtra(OpenItemActivity.EXTRA_OPEN) != null) {
+                open = i.getStringExtra(OpenItemActivity.EXTRA_OPEN);
+                i.removeExtra(OpenItemActivity.EXTRA_OPEN);
+            }
+        }
         r.put("resume", resume);
         r.put("sports", sports);
+        r.put("open", open == null ? "" : open);
         call.resolve(r);
     }
 
@@ -112,6 +134,12 @@ public class PlayerPlugin extends Plugin {
         if (intent != null && intent.getBooleanExtra(PostersWidget.EXTRA_SPORTS, false)) {
             intent.removeExtra(PostersWidget.EXTRA_SPORTS);
             notifyListeners("sportsRequest", new JSObject());
+        }
+        if (intent != null && intent.getStringExtra(OpenItemActivity.EXTRA_OPEN) != null) {
+            JSObject d = new JSObject();
+            d.put("open", intent.getStringExtra(OpenItemActivity.EXTRA_OPEN));
+            intent.removeExtra(OpenItemActivity.EXTRA_OPEN);
+            notifyListeners("openRequest", d);
         }
     }
 

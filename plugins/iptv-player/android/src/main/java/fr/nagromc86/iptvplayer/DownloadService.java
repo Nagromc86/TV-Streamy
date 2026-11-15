@@ -63,10 +63,12 @@ public class DownloadService extends Service {
                     stopForeground(true);
                 }
                 stopSelf();
+                DownloadsWidget.refresh(DownloadService.this, true);
                 return;
             }
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             nm.notify(ID, build());
+            DownloadsWidget.refresh(DownloadService.this, false);
             handler.postDelayed(this, 1000);
         }
     };

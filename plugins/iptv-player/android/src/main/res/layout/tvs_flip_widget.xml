@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/tvs_widget_bg">
+    <AdapterViewFlipper android:id="@+id/tvs_l_list" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:autoStart="true" android:flipInterval="5000" android:loopViews="true"
+        android:inAnimation="@android:animator/fade_in" android:outAnimation="@android:animator/fade_out" />
+    <TextView android:id="@+id/tvs_l_empty" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:gravity="center" android:padding="12dp" android:textColor="#B3FFFFFF" android:textSize="12sp" />
+</FrameLayout>

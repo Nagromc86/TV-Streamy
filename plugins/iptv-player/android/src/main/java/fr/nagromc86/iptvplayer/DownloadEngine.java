@@ -354,6 +354,37 @@ class DownloadEngine {
         return new Object[] {"Téléchargements", why + (waiting > 0 ? " · " + waiting + " vidéo" + (waiting > 1 ? "s" : "") : ""), -1, waiting};
     }
 
+    /** For the widget: [active, title, text, percent]. */
+    synchronized Object[] widgetInfo() {
+        int done = 0, waiting = 0;
+        String lastDone = "";
+        long lastAt = 0;
+        for (Task t : tasks.values()) {
+            if ("done".equals(t.status)) {
+                done++;
+                if (t.added >= lastAt) {
+                    lastAt = t.added;
+                    lastDone = t.title;
+                }
+            } else if ("queued".equals(t.status) || "running".equals(t.status)) {
+                waiting++;
+            }
+        }
+        Task c = current;
+        if (c != null) {
+            Object[] s = summary();
+            return new Object[] {true, c.title, (String) s[1], (Integer) s[2]};
+        }
+        if (waiting > 0) {
+            Object[] s = summary();
+            return new Object[] {true, (String) s[0], (String) s[1], -1};
+        }
+        if (done == 0) {
+            return new Object[] {false, "Téléchargements", "Aucune vidéo hors ligne", 0};
+        }
+        return new Object[] {false, done + " vidéo" + (done > 1 ? "s" : "") + " prête" + (done > 1 ? "s" : "") + " hors ligne", "Dernière : " + lastDone, 100};
+    }
+
     static String mb(long b) {
         if (b >= 1073741824L) {
             return String.format(java.util.Locale.FRANCE, "%.1f Go", b / 1073741824.0);

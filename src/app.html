@@ -876,7 +876,7 @@ function toggleFav(kind,item){
   var k=fkey(kind,item.stream_id||item.series_id);
   USER.favDel=USER.favDel||{};
   if(USER.favs[k]){delete USER.favs[k];USER.favDel[k]=Date.now()}else USER.favs[k]={kind:kind,id:item.stream_id||item.series_id,name:item.name,icon:item.stream_icon||item.cover||'',at:Date.now()};
-  saveUser();if(kind==='live')syncChannels();
+  saveUser();if(kind==='live')syncChannels();setTimeout(pushListWidgets,50);
 }
 /* after each catalogue load: favourites whose number changed at the provider are found again by their name */
 function repairFavs(){
@@ -1439,6 +1439,55 @@ function refreshAllExpiry(){
   try{localStorage.setItem('expChk',String(Date.now()))}catch(e){}
   (S.accounts||[]).filter(function(a){return a.type!=='m3u'&&a.server}).reduce(function(p,a){return p.then(function(){return api(a,'').then(function(r){var ui=r&&r.user_info;if(ui&&String(ui.auth)==='1'){var exp=+ui.exp_date;a.exp=exp||0;a.info=(exp?'Expire le '+new Date(exp*1000).toLocaleDateString('fr-FR'):'Sans date d\'expiration')+(ui.max_connections?' · '+ui.max_connections+' écran'+(ui.max_connections>1?'s':''):'')}},function(){})})},Promise.resolve()).then(function(){saveAccounts();pushAccounts()});
 }
+/* ---------- widgets Android : Ce soir à la télé, Nouveaux épisodes, Ma liste ---------- */
+function favOf(kind){return Object.keys(USER.favs||{}).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind===kind})}
+function listWidget(kind,L){var j=JSON.stringify(L);listWidget.last=listWidget.last||{};if(listWidget.last[kind]===j)return;listWidget.last[kind]=j;nat('setListWidget',{kind:kind,list:j}).catch(function(){})}
+function pushTonight(){
+  if(!NATIVE||TV||!S.activeId)return;
+  var now=Date.now()/1000;
+  var L=favOf('live').sort(function(a,b){return (a.name||'').localeCompare(b.name||'')}).slice(0,12).map(function(f){
+    var x=(DATA&&byId('live',f.id))||{stream_id:f.id,name:f.name,stream_icon:f.icon},c=EPGF[x.stream_id];
+    if(!c||(!c.list&&!c.loading))wantFull(x.stream_id);
+    var pr=((c&&c.list)||[]).filter(function(p){return p.e>now&&p.s<now+30*3600}).slice(0,14).map(function(p){return {t:p.t,s:p.s,e:p.e}});
+    return {id:S.activeId+':'+x.stream_id,name:cleanName(x.name||f.name||''),logo:x.stream_icon||f.icon||'',progs:pr};
+  });
+  listWidget('tonight',L);
+}
+function pushNewEps(){
+  if(!NATIVE||TV||!DATA)return;
+  var seen=USER.seenSer||{},now=Date.now()/1000;
+  var L=favOf('series').map(function(f){
+    var x=byId('series',f.id);if(!x)return null;
+    var lm=+x.last_modified||0,base=seen[f.id]||Math.round((f.at||0)/1000),p=USER.prog['series:'+f.id];
+    if(p&&p.at)base=Math.max(base,Math.round(p.at/1000));
+    if(!lm||lm<=base||lm<now-45*86400)return null;
+    return {id:x.series_id,name:cleanName(x.name),image:x.cover||'',lm:lm,label:'Nouvel épisode'};
+  }).filter(Boolean).sort(function(a,b){return b.lm-a.lm}).slice(0,15);
+  listWidget('neweps',L);
+}
+function pushMyList(){
+  if(!NATIVE||TV)return;
+  var F=Object.keys(USER.favs||{}).map(function(k){return USER.favs[k]}).filter(function(f){return f.kind==='movie'||f.kind==='series'}).sort(function(a,b){return b.at-a.at}).slice(0,24);
+  listWidget('mylist',F.map(function(f){var x=DATA&&byId(f.kind,f.id);return {key:f.kind+':'+f.id,name:cleanName((x&&x.name)||f.name||''),image:(x&&(x.stream_icon||x.cover))||f.icon||'',sub:f.kind==='movie'?'Film':'Série'}}).sort(function(a,b){return (b.image?1:0)-(a.image?1:0)}));
+}
+function pushListWidgets(){try{pushTonight();pushNewEps();pushMyList()}catch(e){}}
+/* ouverture depuis un widget : film, série (et son nouvel épisode), téléchargements, onglet… */
+function openFromWidget(w){
+  if(!w)return;var p=w.split(':'),k=p[0],id=p.slice(1).join(':');
+  if(k==='movie'||k==='series'){S.tab=k==='movie'?'movies':'series';render();openItem(k,id);return}
+  if(k==='newep'){
+    S.tab='series';render();openItem('series',id);var n=0;
+    (function wait(){if(sheet&&sheet.kind==='series'&&String(sheet.item.series_id)===String(id)&&sheet.info&&sheet.info.episodes){
+      var E=sheet.info.episodes,ss=Object.keys(E).sort(function(a,b){return a-b}),last=ss.length&&E[ss[ss.length-1]],ep=last&&last[last.length-1];
+      if(ep){ep.season=ep.season||ss[ss.length-1];playEpisode(sheet.item,ep,false)}return}
+      if(++n<40)setTimeout(wait,300)})();
+    return;
+  }
+  if(k==='downloads'){if(sheet)closeSheet();S.tab='favs';S.favCat='dl';render();window.scrollTo(0,0);return}
+  if(k==='mylist'){if(sheet)closeSheet();S.tab='favs';S.favCat='all';render();window.scrollTo(0,0);return}
+  if(k==='live'||k==='series'||k==='movies'){if(sheet)closeSheet();S.tab=k;render();window.scrollTo(0,0)}
+}
+try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','openRequest',function(d){openFromWidget(d&&d.open)})}catch(e){}
 function fmtPos(ms){var m=Math.floor((ms||0)/60000),h=Math.floor(m/60);return h?h+' h '+String(m%60).padStart(2,'0'):m+' min'}
 /* ouverture depuis le widget : relance directement la dernière vidéo, à sa position */
 function resumeFromWidget(){
@@ -1449,9 +1498,9 @@ function resumeFromWidget(){
   if(e&&e.container_extension){playEpisode(s,e,false);return}
   openItem('series',p.id);
 }
-function checkLaunch(){if(!NATIVE)return;postersAtStart();refreshAllExpiry();nat('takeLaunch').then(function(r){if(r&&r.resume)setTimeout(resumeFromWidget,300);else if(r&&r.sports)setTimeout(openSportsHub,300)},function(){})}
+function checkLaunch(){if(!NATIVE)return;postersAtStart();refreshAllExpiry();nat('refreshDownloadsWidget').catch(function(){});nat('takeLaunch').then(function(r){if(r&&r.resume)setTimeout(resumeFromWidget,300);else if(r&&r.sports)setTimeout(openSportsHub,300);else if(r&&r.open)setTimeout(function(){openFromWidget(r.open)},400)},function(){})}
 try{if(window.Capacitor&&window.Capacitor.addListener)window.Capacitor.addListener('IptvPlayer','resumeRequest',function(){pullNativeProgress().then(resumeFromWidget)})}catch(e){}
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')pullNativeProgress()});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){pullNativeProgress();setTimeout(pushTonight,500)}});
 function playEpisode(series,ep,fromStart){
   var k='ep:'+ep.id,p=progressOf(k),start=!fromStart&&p&&!p.done?p.pos:0;
   var label='S'+String(ep.season).padStart(2,'0')+'E'+String(ep.episode_num).padStart(2,'0');
@@ -1548,6 +1597,7 @@ function runFull(){
   }
 }
 function paintFull(id){
+  if(NATIVE&&USER.favs&&USER.favs[fkey('live',id)]){clearTimeout(paintFull.w);paintFull.w=setTimeout(pushTonight,1500)}
   if(S.liveSports)sportPaint();
   var r=document.querySelector('[data-grow="'+id+'"] .gline');if(r)r.innerHTML=gridLine(id);
   if(sheet&&sheet.kind==='chguide'&&String(sheet.item.stream_id)===String(id)){renderSheet();if((sheet.day||0)===0)setTimeout(scrollNow,30)}
@@ -3258,7 +3308,7 @@ function renderInner(){
   }
   /* une liste qu'on fait glisser ne doit pas être remise au début par un rafraîchissement : on attend la fin du geste, puis on garde la position */
   if(Date.now()-ROWBUSY<450){clearTimeout(render.defer);render.defer=setTimeout(render,480);return}
-  if(NATIVE&&DATA&&syncChannels.data!==DATA){syncChannels.data=DATA;try{syncChannels()}catch(e){}}
+  if(NATIVE&&DATA&&syncChannels.data!==DATA){syncChannels.data=DATA;try{syncChannels()}catch(e){}pushListWidgets()}
   var rsk=S.tab,rsc={};[].forEach.call(document.querySelectorAll('main .row'),function(r,i){if(r.scrollLeft>0)rsc[rowKey(r,i)]=r.scrollLeft});
   BILL=false;var v=S.tab==='live'?viewLive():S.tab==='movies'?viewGrid('movie'):S.tab==='series'?viewGrid('series'):S.tab==='favs'?viewFavs():S.tab==='search'?viewSearch():viewHome();
   var hadFocus=document.activeElement&&document.activeElement.id==='q',sel=hadFocus?document.activeElement.selectionStart:0;
@@ -3460,6 +3510,7 @@ function resumeEpisode(sp){
 }
 function openItem(kind,id){
   var x=byId(kind,id);if(!x)return;
+  if(kind==='series'&&NATIVE){USER.seenSer=USER.seenSer||{};USER.seenSer[id]=+x.last_modified||Math.round(Date.now()/1000);saveUser();setTimeout(pushNewEps,100)}
   if(kind==='live'){playLive(x);return}
   openSheet({kind:kind,item:x,loading:true});
   /* show the saved sheet at once, then refresh it from the provider in the background */

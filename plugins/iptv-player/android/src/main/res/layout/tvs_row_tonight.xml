@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tvs_t_root" android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:gravity="center_vertical" android:orientation="horizontal" android:paddingTop="6dp" android:paddingBottom="6dp" android:paddingStart="4dp" android:paddingEnd="4dp">
+    <ImageView android:id="@+id/tvs_t_logo" android:layout_width="44dp" android:layout_height="32dp" android:scaleType="fitCenter" android:contentDescription="@null" />
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="10dp" android:orientation="vertical">
+        <TextView android:id="@+id/tvs_t_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+            android:textColor="#80FFFFFF" android:textSize="10sp" android:textStyle="bold" />
+        <TextView android:id="@+id/tvs_t_now" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+            android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" />
+        <ProgressBar android:id="@+id/tvs_t_prog" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="3dp"
+            android:layout_marginTop="2dp" android:max="100" android:progressTint="#E50914" android:progressBackgroundTint="#44FFFFFF" />
+        <TextView android:id="@+id/tvs_t_next" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" android:ellipsize="end"
+            android:layout_marginTop="2dp" android:textColor="#FFD27A" android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>
