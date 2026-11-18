@@ -18,7 +18,7 @@
   },
   "Ligue des champions": {
    "ok": true,
-   "n": 27,
+   "n": 36,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 32,
+   "n": 33,
    "keys": [
     "id",
     "uid",
@@ -135,23 +135,12 @@
   },
   "Ligue des nations": {
    "ok": true,
-   "n": 8,
-   "keys": [
-    "id",
-    "uid",
-    "date",
-    "name",
-    "shortName",
-    "season",
-    "competitions",
-    "status",
-    "venue",
-    "links"
-   ]
+   "n": 0,
+   "keys": []
   },
   "NBA": {
    "ok": true,
-   "n": 125,
+   "n": 120,
    "keys": [
     "id",
     "uid",
@@ -183,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 163,
+   "n": 155,
    "keys": [
     "id",
     "uid",
@@ -605,47 +594,11 @@
    }
   ],
   "Coupe du monde": [],
-  "Ligue des nations": [
-   {
-    "name": "Romania at Bosnia-Herzegovina",
-    "date": "2026-11-17T19:45Z",
-    "season": {
-     "year": 2026,
-     "type": 14105,
-     "slug": "league-phase"
-    },
-    "notes": [],
-    "competitor0": {
-     "team": [
-      "id",
-      "uid",
-      "abbreviation",
-      "displayName",
-      "shortDisplayName",
-      "name",
-      "location",
-      "color",
-      "alternateColor",
-      "isActive",
-      "logo",
-      "links",
-      "venue"
-     ],
-     "records": [
-      {
-       "name": "All Splits",
-       "type": "total",
-       "summary": "2-2-1",
-       "abbreviation": "Total"
-      }
-     ]
-    }
-   }
-  ],
+  "Ligue des nations": [],
   "NBA": [
    {
-    "name": "New York Knicks at Toronto Raptors",
-    "date": "2026-11-18T00:30Z",
+    "name": "Memphis Grizzlies at Cleveland Cavaliers",
+    "date": "2026-11-19T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -678,17 +631,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "5-8"
+       "summary": "8-7"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "2-4"
+       "summary": "6-2"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "3-4"
+       "summary": "2-5"
       }
      ]
     }
@@ -751,8 +704,8 @@
   ],
   "NHL": [
    {
-    "name": "Los Angeles Kings at Boston Bruins",
-    "date": "2026-11-18T00:00Z",
+    "name": "Boston Bruins at Detroit Red Wings",
+    "date": "2026-11-19T00:30Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -788,19 +741,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "13-6-1"
+       "summary": "8-10-3"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "8-3-0"
+       "summary": "4-5-1"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "5-3-1"
+       "summary": "4-5-2"
       }
      ]
     }
