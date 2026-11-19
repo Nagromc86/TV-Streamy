@@ -516,6 +516,7 @@ html.avplaying #app,html.avplaying #nav,html.avplaying #castbar{visibility:hidde
 #tvplayer.idle .tvp{opacity:0}
 #tvplayer h2{margin:0;font-family:var(--display);font-size:2rem}
 #tvplayer .sub{color:#ccc;margin:4px 0 16px}
+#tvplayer.scrubbing .bar{height:10px}#tvplayer.scrubbing .t1{color:#fff;font-weight:700;font-size:1.3em}#tvplayer.scrubbing .spin{display:none}
 #tvplayer .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}#tvplayer .bar i{display:block;height:100%;background:var(--accent)}
 #tvplayer .times{display:flex;justify-content:space-between;color:#ddd;margin-top:8px;font-variant-numeric:tabular-nums}
 #tvplayer .hint{color:#aaa;margin-top:12px}
@@ -901,10 +902,11 @@ function byId(kind,id){
   return null;
 }
 function progressOf(k){return USER.prog[k]||null}
-function saveProgress(k,res,meta){
+function saveProgress(k,res,meta,quiet){
   var pos=res.positionMs||0,d=res.durationMs||0;
   if(res.ended||(d&&pos>d*0.94)){USER.prog[k]=Object.assign({},meta,{pos:0,dur:d,done:true,at:Date.now()})}
   else if(pos>10000){USER.prog[k]=Object.assign({},meta,{pos:pos,dur:d,done:false,at:Date.now()})}
+  if(quiet){if(S.activeId){userPend={id:S.activeId,pid:S.profileId,u:USER};flushUser()}return}
   saveUser();
 }
 
@@ -3957,6 +3959,16 @@ function submitSync(f){
 var TVP=null;
 /* another device took over the provider's screen: stop here */
 function tvWatch(o,since){var poll=setInterval(function(){if(!TVP||TVP.o!==o){clearInterval(poll);return}screenTaken(since).then(function(by){if(by&&TVP&&TVP.o===o){clearInterval(poll);TVP.takenBy=by;tvStop()}})},20000)}
+/* the position is kept every 15 s and as soon as the app goes to the background (Samsung « Accueil »):
+   if the TV then closes the app, playback resumes where it was */
+function tvSaveProg(sync){
+  var t=TVP;if(!t||t.o.live||!t.o.progKey||t.ended)return;
+  try{var p=webapis.avplay.getCurrentTime();if(p)t.pos=p}catch(e){}
+  if(t.pos<10000)return;
+  var meta={};try{meta=JSON.parse(t.o.progMeta||'{}')}catch(e){}
+  saveProgress(t.o.progKey,{positionMs:t.pos,durationMs:t.dur},meta,!sync);
+  if(meta.kind==='ep'){seriesProg(meta,Date.now());if(sync)saveUser();else{userPend={id:S.activeId,pid:S.profileId,u:USER};flushUser()}}
+}
 function tvPlay(o){
   tvPrevStop();
   return new Promise(function(res){
@@ -3964,8 +3976,9 @@ function tvPlay(o){
     if(TVP)tvStop();
     if(o._since)tvWatch(o,o._since);
     TVP={o:o,res:res,pos:o.startMs||0,dur:0,ended:false,paused:false,buffering:true,urls:[o.url,o.fallbackUrl].filter(Boolean),u:0};
+    if(!o.live)TVP.saveT=setInterval(function(){tvSaveProg(false)},15000);
     document.documentElement.classList.add('avplaying');
-    el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'▲ ▼ : chaîne précédente / suivante · OK : liste des chaînes, audio et sous-titres · Retour : quitter':'OK : pause · ◀ ▶ : 10 s · ⏩ ⏪ : 1 min · ▲ ▼ : sous-titres et audio · Retour : quitter')+'</div></div><div id="tvsubs" hidden></div><div id="tvpanel" hidden></div>';
+    el.hidden=false;el.innerHTML='<object id="av" type="application/avplayer" style="position:absolute;left:0;top:0;width:100%;height:100%"></object><div class="spin"></div><div class="tvp"><h2>'+esc(o.title)+'</h2><div class="sub">'+esc(o.subtitle||'')+'</div>'+(o.live?'':'<div class="bar"><i></i></div><div class="times"><span class="t1">0:00</span><span class="t2"></span></div>')+'<div class="hint">'+(o.live?'▲ ▼ : chaîne précédente / suivante · OK : liste des chaînes, audio et sous-titres · Retour : quitter':'OK : pause · ◀ ▶ : 10 s, maintenir pour avancer vite · ▲ ▼ : sous-titres et audio · Retour : quitter')+'</div></div><div id="tvsubs" hidden></div><div id="tvpanel" hidden></div>';
     tvShowUi();tvOpen();
   });
 }
@@ -4120,19 +4133,26 @@ function tvFail(e){
 function tvPaint(){
   var t=TVP,el=$('#tvplayer');if(!t||el.hidden)return;
   var sp=el.querySelector('.spin');if(sp)sp.hidden=!t.buffering;
-  var i=el.querySelector('.bar i');if(i&&t.dur)i.style.width=Math.min(100,t.pos/t.dur*100).toFixed(1)+'%';
-  var a=el.querySelector('.t1'),b=el.querySelector('.t2');if(a)a.textContent=clock(t.pos)+(t.paused?' · pause':'');if(b&&t.dur)b.textContent=clock(t.dur);
+  var sc=t.scrub&&t.scrub.held?t.scrub:null,pos=sc?sc.to:t.pos;el.classList.toggle('scrubbing',!!sc);
+  var i=el.querySelector('.bar i');if(i&&t.dur)i.style.width=Math.min(100,pos/t.dur*100).toFixed(1)+'%';
+  var a=el.querySelector('.t1'),b=el.querySelector('.t2');if(a)a.textContent=sc?(sc.dir>0?'⏩ ':'⏪ ')+clock(pos):clock(pos)+(t.paused?' · pause':'');if(b&&t.dur)b.textContent=clock(t.dur);
 }
 var tvUiT=null;
 function tvShowUi(){var el=$('#tvplayer');el.classList.remove('idle');clearTimeout(tvUiT);tvUiT=setTimeout(function(){if(TVP&&!TVP.paused)el.classList.add('idle')},4000)}
 function tvStop(){
-  var t=TVP,el=$('#tvplayer');if(!t)return;TVP=null;
+  var t=TVP,el=$('#tvplayer');if(!t)return;TVP=null;clearInterval(t.saveT);clearTimeout(t.scrubT);
   try{var p=webapis.avplay.getCurrentTime();if(p)t.pos=p}catch(e){}
   try{webapis.avplay.stop()}catch(e){}try{webapis.avplay.close()}catch(e){}
   document.documentElement.classList.remove('avplaying');el.hidden=true;el.innerHTML='';
   t.res({positionMs:t.pos,durationMs:t.dur,ended:t.ended,takenBy:t.takenBy});
   keepFocus(function(){});
 }
+function tvScrubEnd(){
+  var t=TVP;if(!t||!t.scrub)return;var sc=t.scrub;t.scrub=null;clearTimeout(t.scrubT);
+  if(sc.held){try{webapis.avplay.seekTo(Math.floor(sc.to))}catch(e){}t.pos=sc.to;t.buffering=true}
+  var el=$('#tvplayer');if(el)el.classList.remove('scrubbing');tvPaint();tvShowUi();
+}
+document.addEventListener('keyup',function(e){var c=e.keyCode,k=e.key;if(TVP&&TVP.scrub&&(c===37||c===39||k==='ArrowLeft'||k==='ArrowRight'))tvScrubEnd()});
 function tvKey(e){
   var t=TVP,av=window.webapis&&webapis.avplay,k=e.key,c=e.keyCode;if(!t||!av)return;
   e.preventDefault();tvShowUi();
@@ -4142,8 +4162,13 @@ function tvKey(e){
   if(k==='Enter'||c===13||c===10252||k==='MediaPlayPause'||c===415||c===19||k==='MediaPlay'||k==='MediaPause'){
     if(t.o.live&&(k==='Enter'||c===13)){tvChanPanel();return}
     try{if(t.paused){av.play();t.paused=false}else{av.pause();t.paused=true}}catch(x){}tvPaint();return}
-  if(c===39||k==='ArrowRight'){seek(10000);return}
-  if(c===37||k==='ArrowLeft'){seek(-10000);return}
+  if(c===39||k==='ArrowRight'||c===37||k==='ArrowLeft'){var dir=(c===39||k==='ArrowRight')?1:-1;if(t.o.live)return;
+    /* held down: the cursor runs faster and faster; the video jumps there when the button is released */
+    var now=Date.now(),sc=t.scrub;
+    if(sc&&sc.dir===dir){var dt=Math.min(300,now-sc.last),h=now-sc.start,rate=h<1000?30:h<2500?90:h<4000?240:480;
+      sc.to=Math.max(0,Math.min(t.dur-3000,sc.to+dir*rate*dt));sc.last=now;sc.held=true;tvPaint();clearTimeout(t.scrubT);t.scrubT=setTimeout(tvScrubEnd,700);return}
+    if(sc)tvScrubEnd();
+    seek(dir*10000);if(t.dur)t.scrub={dir:dir,start:now,last:now,to:t.pos,held:false};clearTimeout(t.scrubT);t.scrubT=setTimeout(tvScrubEnd,700);return}
   if(t.o.live&&(c===38||k==='ArrowUp'||c===40||k==='ArrowDown'||c===427||c===428)){tvZap(c===38||k==='ArrowUp'||c===427?-1:1);return}
   if(c===38||k==='ArrowUp'||c===40||k==='ArrowDown'){tvPanel(true);return}
   if(c===417||k==='MediaFastForward'){seek(60000);return}
@@ -4151,7 +4176,7 @@ function tvKey(e){
 }
 /* Samsung remote: media keys must be registered to be received */
 if(TIZEN){try{tizen.tvinputdevice.registerKeyBatch(['MediaPlayPause','MediaPlay','MediaPause','MediaStop','MediaFastForward','MediaRewind'])}catch(e){}
-  document.addEventListener('visibilitychange',function(){if(document.hidden&&TVP){try{webapis.avplay.suspend()}catch(e){}}else if(TVP){try{webapis.avplay.restore()}catch(e){}}});}
+  document.addEventListener('visibilitychange',function(){if(document.hidden&&TVP){tvScrubEnd();tvSaveProg(true);try{webapis.avplay.suspend()}catch(e){}}else if(TVP){try{webapis.avplay.restore()}catch(e){}}});}
 /* big screens: scale the interface so it reads from the sofa */
 function tvScale(){if(!TV)return;var w=window.innerWidth,z=w>1300?+(w/1150).toFixed(3):1,r=document.documentElement;r.style.zoom=z>1?z:'';
   /* with zoom, 100vh / bottom:0 are measured on the unzoomed screen: give the TV frame its real size */
