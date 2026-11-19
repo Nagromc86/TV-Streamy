@@ -34,7 +34,7 @@
   },
   "Ligue Europa": {
    "ok": true,
-   "n": 18,
+   "n": 36,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 120,
+   "n": 108,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 43,
+   "n": 44,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 155,
+   "n": 163,
    "keys": [
     "id",
     "uid",
@@ -597,8 +597,8 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Memphis Grizzlies at Cleveland Cavaliers",
-    "date": "2026-11-19T00:00Z",
+    "name": "Golden State Warriors at Memphis Grizzlies",
+    "date": "2026-11-20T01:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -631,17 +631,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "8-7"
+       "summary": "11-4"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "6-2"
+       "summary": "3-4"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "2-5"
+       "summary": "8-0"
       }
      ]
     }
@@ -704,8 +704,8 @@
   ],
   "NHL": [
    {
-    "name": "Boston Bruins at Detroit Red Wings",
-    "date": "2026-11-19T00:30Z",
+    "name": "Los Angeles Kings at Toronto Maple Leafs",
+    "date": "2026-11-20T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -741,19 +741,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "8-10-3"
+       "summary": "8-13-2"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "4-5-1"
+       "summary": "4-9-1"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "4-5-2"
+       "summary": "4-4-1"
       }
      ]
     }
