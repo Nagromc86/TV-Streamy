@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 27,
+   "n": 28,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 30,
+   "n": 31,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 27,
+   "n": 28,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 108,
+   "n": 105,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 44,
+   "n": 43,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 163,
+   "n": 155,
    "keys": [
     "id",
     "uid",
@@ -275,8 +275,18 @@
   },
   "Champions Cup": {
    "ok": true,
-   "n": 0,
-   "keys": []
+   "n": 2,
+   "keys": [
+    "id",
+    "uid",
+    "date",
+    "name",
+    "shortName",
+    "season",
+    "competitions",
+    "links",
+    "status"
+   ]
   },
   "Tournoi des 6 Nations": {
    "ok": true,
@@ -597,14 +607,19 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Golden State Warriors at Memphis Grizzlies",
-    "date": "2026-11-20T01:00Z",
+    "name": "Charlotte Hornets at Atlanta Hawks",
+    "date": "2026-11-21T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [],
+    "notes": [
+     {
+      "type": "event",
+      "headline": "NBA Cup - Group Play"
+     }
+    ],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -631,17 +646,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "11-4"
+       "summary": "9-6"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "3-4"
+       "summary": "3-3"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "8-0"
+       "summary": "6-3"
       }
      ]
     }
@@ -649,8 +664,8 @@
   ],
   "NFL": [
    {
-    "name": "Indianapolis Colts at Houston Texans",
-    "date": "2026-11-20T01:15Z",
+    "name": "Miami Dolphins at Buffalo Bills",
+    "date": "2026-11-22T18:00Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -686,17 +701,17 @@
        "name": "overall",
        "abbreviation": "Any",
        "type": "total",
-       "summary": "3-6"
+       "summary": "8-1"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "0-4"
+       "summary": "3-1"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "3-2"
+       "summary": "5-0"
       }
      ]
     }
@@ -704,8 +719,8 @@
   ],
   "NHL": [
    {
-    "name": "Los Angeles Kings at Toronto Maple Leafs",
-    "date": "2026-11-20T00:00Z",
+    "name": "Edmonton Oilers at Carolina Hurricanes",
+    "date": "2026-11-21T18:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -741,19 +756,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "8-13-2"
+       "summary": "16-3-3"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "4-9-1"
+       "summary": "7-1-2"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "4-4-1"
+       "summary": "9-2-1"
       }
      ]
     }
@@ -769,8 +784,8 @@
      "slug": "regular-season"
     },
     "type": {
-     "id": "990",
-     "abbreviation": "Light Heavyweight"
+     "id": "986",
+     "abbreviation": "Lightweight"
     },
     "competitor0": {
      "team": [],
@@ -779,7 +794,7 @@
        "name": "overall",
        "abbreviation": "TOT",
        "type": "total",
-       "summary": "12-2-0"
+       "summary": "14-3-0"
       }
      ]
     }
@@ -818,6 +833,9 @@
     "type": {
      "id": "1",
      "abbreviation": "FP1"
+    },
+    "competitor0": {
+     "team": []
     }
    }
   ],
@@ -857,7 +875,42 @@
     }
    }
   ],
-  "Champions Cup": [],
+  "Champions Cup": [
+   {
+    "name": "Glasgow Warriors vs Pau",
+    "date": "2026-12-11T20:00Z",
+    "season": {
+     "year": 2027,
+     "type": 1,
+     "slug": "202324-european-rugby-champions-cup"
+    },
+    "notes": [],
+    "competitor0": {
+     "team": [
+      "id",
+      "uid",
+      "name",
+      "abbreviation",
+      "displayName",
+      "shortDisplayName",
+      "color",
+      "isActive",
+      "venue",
+      "links",
+      "logo",
+      "logoDark"
+     ],
+     "records": [
+      {
+       "name": "overall",
+       "abbreviation": "Total",
+       "type": "total",
+       "summary": "WWWWT"
+      }
+     ]
+    }
+   }
+  ],
   "Tournoi des 6 Nations": []
  }
 }
