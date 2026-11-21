@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 28,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 40,
+   "n": 44,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 33,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 31,
+   "n": 34,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 28,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 105,
+   "n": 104,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 155,
+   "n": 168,
    "keys": [
     "id",
     "uid",
@@ -187,7 +187,7 @@
   },
   "UFC": {
    "ok": true,
-   "n": 2,
+   "n": 3,
    "keys": [
     "id",
     "uid",
@@ -223,7 +223,7 @@
   },
   "Tennis WTA": {
    "ok": true,
-   "n": 4,
+   "n": 5,
    "keys": [
     "id",
     "uid",
@@ -275,7 +275,7 @@
   },
   "Champions Cup": {
    "ok": true,
-   "n": 2,
+   "n": 9,
    "keys": [
     "id",
     "uid",
@@ -317,8 +317,8 @@
  "sample": {
   "Ligue 1": [
    {
-    "name": "Le Havre AC at Troyes",
-    "date": "2026-11-20T19:45Z",
+    "name": "Paris Saint-Germain at Nice",
+    "date": "2026-11-21T16:15Z",
     "season": {
      "year": 2026,
      "type": 14252,
@@ -345,7 +345,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-2-6",
+       "summary": "5-2-3",
        "abbreviation": "Total"
       }
      ]
@@ -465,8 +465,8 @@
   ],
   "LaLiga": [
    {
-    "name": "Espanyol at Athletic Club",
-    "date": "2026-11-20T20:00Z",
+    "name": "Deportivo at Alavés",
+    "date": "2026-11-21T13:00Z",
     "season": {
      "year": 2026,
      "type": 14357,
@@ -493,7 +493,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "4-4-3",
+       "summary": "3-4-5",
        "abbreviation": "Total"
       }
      ]
@@ -539,8 +539,8 @@
   ],
   "Bundesliga": [
    {
-    "name": "FC Cologne at Bayern Munich",
-    "date": "2026-11-20T19:30Z",
+    "name": "RB Leipzig at 1. FC Union Berlin",
+    "date": "2026-11-21T14:30Z",
     "season": {
      "year": 2026,
      "type": 14358,
@@ -567,7 +567,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "6-3-0",
+       "summary": "1-4-4",
        "abbreviation": "Total"
       }
      ]
@@ -607,19 +607,14 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Charlotte Hornets at Atlanta Hawks",
-    "date": "2026-11-21T00:00Z",
+    "name": "Milwaukee Bucks at Philadelphia 76ers",
+    "date": "2026-11-21T18:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [
-     {
-      "type": "event",
-      "headline": "NBA Cup - Group Play"
-     }
-    ],
+    "notes": [],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -646,17 +641,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "9-6"
+       "summary": "13-3"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "3-3"
+       "summary": "6-2"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "6-3"
+       "summary": "7-1"
       }
      ]
     }
