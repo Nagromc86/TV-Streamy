@@ -1,0 +1,127 @@
+{
+ "week": "2026-11-15",
+ "films": [
+  {
+   "rank": 1,
+   "title": "The Good Lawyer",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 2,
+   "title": "Y'a pas de réseau",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 3,
+   "title": "Badh",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 4,
+   "title": "Ninho: Fame Ain’t Worth It",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 5,
+   "title": "The Squad",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 6,
+   "title": "Pídeme lo que quieras",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 7,
+   "title": "Never Surrender",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 8,
+   "title": "The Christmas Switch",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 9,
+   "title": "Knock, Knock, It’s Mom!",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 10,
+   "title": "Heartland",
+   "season": "N/A",
+   "weeks": 1
+  }
+ ],
+ "tv": [
+  {
+   "rank": 1,
+   "title": "Lupin",
+   "season": "Lupin: Part 4",
+   "weeks": 4
+  },
+  {
+   "rank": 2,
+   "title": "Black Doves",
+   "season": "Black Doves: Season 2",
+   "weeks": 2
+  },
+  {
+   "rank": 3,
+   "title": "Djadel Show",
+   "season": "Djadel Show: Season 2",
+   "weeks": 4
+  },
+  {
+   "rank": 4,
+   "title": "The Empress",
+   "season": "The Empress: Season 3",
+   "weeks": 1
+  },
+  {
+   "rank": 5,
+   "title": "Anaesthesia",
+   "season": "Anaesthesia: Season 1",
+   "weeks": 1
+  },
+  {
+   "rank": 6,
+   "title": "The Body",
+   "season": "The Body: Season 1",
+   "weeks": 1
+  },
+  {
+   "rank": 7,
+   "title": "A Couple of Lies",
+   "season": "A Couple of Lies: Limited Series",
+   "weeks": 3
+  },
+  {
+   "rank": 8,
+   "title": "Doozie's Doghouse",
+   "season": "Doozie's Doghouse: Season 1",
+   "weeks": 1
+  },
+  {
+   "rank": 9,
+   "title": "Black Doves",
+   "season": "Black Doves: Season 1",
+   "weeks": 6
+  },
+  {
+   "rank": 10,
+   "title": "Taken: Natalee Holloway",
+   "season": "Taken: Natalee Holloway: Season 1",
+   "weeks": 2
+  }
+ ]
+}
