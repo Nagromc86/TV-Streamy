@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 32,
+   "n": 30,
    "keys": [
     "id",
     "uid",
@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 44,
+   "n": 42,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 32,
+   "n": 38,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 32,
+   "n": 29,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 43,
+   "n": 56,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 168,
+   "n": 158,
    "keys": [
     "id",
     "uid",
@@ -187,7 +187,7 @@
   },
   "UFC": {
    "ok": true,
-   "n": 3,
+   "n": 2,
    "keys": [
     "id",
     "uid",
@@ -243,7 +243,7 @@
   },
   "Formule 1": {
    "ok": true,
-   "n": 3,
+   "n": 2,
    "keys": [
     "id",
     "uid",
@@ -275,7 +275,7 @@
   },
   "Champions Cup": {
    "ok": true,
-   "n": 9,
+   "n": 12,
    "keys": [
     "id",
     "uid",
@@ -317,8 +317,8 @@
  "sample": {
   "Ligue 1": [
    {
-    "name": "Paris Saint-Germain at Nice",
-    "date": "2026-11-21T16:15Z",
+    "name": "Angers at Paris FC",
+    "date": "2026-11-22T14:00Z",
     "season": {
      "year": 2026,
      "type": 14252,
@@ -345,7 +345,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "5-2-3",
+       "summary": "6-2-2",
        "abbreviation": "Total"
       }
      ]
@@ -428,8 +428,8 @@
   ],
   "Premier League": [
    {
-    "name": "Fulham at Manchester City",
-    "date": "2026-11-21T12:30Z",
+    "name": "Brighton & Hove Albion at Hull City",
+    "date": "2026-11-22T14:00Z",
     "season": {
      "year": 2026,
      "type": 14308,
@@ -456,7 +456,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "7-0-3",
+       "summary": "2-5-3",
        "abbreviation": "Total"
       }
      ]
@@ -465,8 +465,8 @@
   ],
   "LaLiga": [
    {
-    "name": "Deportivo at Alavés",
-    "date": "2026-11-21T13:00Z",
+    "name": "Villarreal at Barcelona",
+    "date": "2026-11-22T13:00Z",
     "season": {
      "year": 2026,
      "type": 14357,
@@ -493,7 +493,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "3-4-5",
+       "summary": "11-0-1",
        "abbreviation": "Total"
       }
      ]
@@ -502,8 +502,8 @@
   ],
   "Serie A": [
    {
-    "name": "Cagliari at Como",
-    "date": "2026-11-21T14:00Z",
+    "name": "Venezia at Juventus",
+    "date": "2026-11-22T11:30Z",
     "season": {
      "year": 2026,
      "type": 14240,
@@ -530,7 +530,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "7-2-2",
+       "summary": "5-3-3",
        "abbreviation": "Total"
       }
      ]
@@ -539,8 +539,8 @@
   ],
   "Bundesliga": [
    {
-    "name": "RB Leipzig at 1. FC Union Berlin",
-    "date": "2026-11-21T14:30Z",
+    "name": "Mainz at FC Augsburg",
+    "date": "2026-11-22T14:30Z",
     "season": {
      "year": 2026,
      "type": 14358,
@@ -567,7 +567,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "1-4-4",
+       "summary": "2-3-4",
        "abbreviation": "Total"
       }
      ]
@@ -607,8 +607,8 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Milwaukee Bucks at Philadelphia 76ers",
-    "date": "2026-11-21T18:00Z",
+    "name": "Detroit Pistons at Atlanta Hawks",
+    "date": "2026-11-22T20:30Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -641,17 +641,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "13-3"
+       "summary": "10-6"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "6-2"
+       "summary": "4-3"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "7-1"
+       "summary": "6-3"
       }
      ]
     }
@@ -714,8 +714,8 @@
   ],
   "NHL": [
    {
-    "name": "Edmonton Oilers at Carolina Hurricanes",
-    "date": "2026-11-21T18:00Z",
+    "name": "Carolina Hurricanes at New York Rangers",
+    "date": "2026-11-22T17:30Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -751,19 +751,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "16-3-3"
+       "summary": "13-8-1"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "7-1-2"
+       "summary": "9-2-0"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "9-2-1"
+       "summary": "4-6-1"
       }
      ]
     }
@@ -771,16 +771,16 @@
   ],
   "UFC": [
    {
-    "name": "UFC Fight Night: Procházka vs. Stirling",
-    "date": "2026-11-21T15:00Z",
+    "name": "UFC Fight Night: Adesanya vs Magomedov",
+    "date": "2026-12-05T15:00Z",
     "season": {
      "year": 2026,
      "type": 2,
      "slug": "regular-season"
     },
     "type": {
-     "id": "986",
-     "abbreviation": "Lightweight"
+     "id": "969",
+     "abbreviation": "Welterweight"
     },
     "competitor0": {
      "team": [],
@@ -789,7 +789,7 @@
        "name": "overall",
        "abbreviation": "TOT",
        "type": "total",
-       "summary": "14-3-0"
+       "summary": "15-3-0"
       }
      ]
     }
@@ -817,8 +817,8 @@
   ],
   "Formule 1": [
    {
-    "name": "Heineken Las Vegas Grand Prix",
-    "date": "2026-11-20T00:30Z",
+    "name": "Qatar Airways Qatar Grand Prix",
+    "date": "2026-11-27T13:30Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -828,9 +828,6 @@
     "type": {
      "id": "1",
      "abbreviation": "FP1"
-    },
-    "competitor0": {
-     "team": []
     }
    }
   ],
