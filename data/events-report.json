@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 30,
+   "n": 27,
    "keys": [
     "id",
     "uid",
@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 42,
+   "n": 41,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 38,
+   "n": 34,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 34,
+   "n": 31,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 29,
+   "n": 27,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 104,
+   "n": 108,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 56,
+   "n": 46,
    "keys": [
     "id",
     "uid",
@@ -203,7 +203,7 @@
   },
   "Tennis ATP": {
    "ok": true,
-   "n": 2,
+   "n": 1,
    "keys": [
     "id",
     "uid",
@@ -214,8 +214,6 @@
     "shortName",
     "season",
     "groupings",
-    "status",
-    "venue",
     "links",
     "previousWinners",
     "calendar"
@@ -223,7 +221,7 @@
   },
   "Tennis WTA": {
    "ok": true,
-   "n": 5,
+   "n": 4,
    "keys": [
     "id",
     "uid",
@@ -317,8 +315,8 @@
  "sample": {
   "Ligue 1": [
    {
-    "name": "Angers at Paris FC",
-    "date": "2026-11-22T14:00Z",
+    "name": "Paris FC at Brest",
+    "date": "2026-11-27T19:45Z",
     "season": {
      "year": 2026,
      "type": 14252,
@@ -345,7 +343,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "6-2-2",
+       "summary": "5-3-3",
        "abbreviation": "Total"
       }
      ]
@@ -428,8 +426,8 @@
   ],
   "Premier League": [
    {
-    "name": "Brighton & Hove Albion at Hull City",
-    "date": "2026-11-22T14:00Z",
+    "name": "Everton at Brentford",
+    "date": "2026-11-23T20:00Z",
     "season": {
      "year": 2026,
      "type": 14308,
@@ -456,7 +454,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-5-3",
+       "summary": "3-5-2",
        "abbreviation": "Total"
       }
      ]
@@ -465,8 +463,8 @@
   ],
   "LaLiga": [
    {
-    "name": "Villarreal at Barcelona",
-    "date": "2026-11-22T13:00Z",
+    "name": "Elche at Levante",
+    "date": "2026-11-23T20:00Z",
     "season": {
      "year": 2026,
      "type": 14357,
@@ -493,7 +491,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "11-0-1",
+       "summary": "2-5-5",
        "abbreviation": "Total"
       }
      ]
@@ -502,8 +500,8 @@
   ],
   "Serie A": [
    {
-    "name": "Venezia at Juventus",
-    "date": "2026-11-22T11:30Z",
+    "name": "Fiorentina at Monza",
+    "date": "2026-11-23T19:45Z",
     "season": {
      "year": 2026,
      "type": 14240,
@@ -530,7 +528,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "5-3-3",
+       "summary": "2-1-8",
        "abbreviation": "Total"
       }
      ]
@@ -539,8 +537,8 @@
   ],
   "Bundesliga": [
    {
-    "name": "Mainz at FC Augsburg",
-    "date": "2026-11-22T14:30Z",
+    "name": "Borussia Mönchengladbach at Werder Bremen",
+    "date": "2026-11-27T19:30Z",
     "season": {
      "year": 2026,
      "type": 14358,
@@ -567,7 +565,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-3-4",
+       "summary": "5-3-2",
        "abbreviation": "Total"
       }
      ]
@@ -607,8 +605,8 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Detroit Pistons at Atlanta Hawks",
-    "date": "2026-11-22T20:30Z",
+    "name": "Memphis Grizzlies at Charlotte Hornets",
+    "date": "2026-11-24T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -641,17 +639,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "10-6"
+       "summary": "4-11"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "4-3"
+       "summary": "3-4"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "6-3"
+       "summary": "1-7"
       }
      ]
     }
@@ -659,8 +657,8 @@
   ],
   "NFL": [
    {
-    "name": "Miami Dolphins at Buffalo Bills",
-    "date": "2026-11-22T18:00Z",
+    "name": "Cincinnati Bengals at Washington Commanders",
+    "date": "2026-11-24T01:15Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -696,17 +694,17 @@
        "name": "overall",
        "abbreviation": "Any",
        "type": "total",
-       "summary": "8-1"
+       "summary": "3-5-1"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "3-1"
+       "summary": "2-2-1"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "5-0"
+       "summary": "1-3"
       }
      ]
     }
@@ -714,8 +712,8 @@
   ],
   "NHL": [
    {
-    "name": "Carolina Hurricanes at New York Rangers",
-    "date": "2026-11-22T17:30Z",
+    "name": "Columbus Blue Jackets at New Jersey Devils",
+    "date": "2026-11-24T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -751,19 +749,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "13-8-1"
+       "summary": "15-8-0"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "9-2-0"
+       "summary": "9-3-0"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "4-6-1"
+       "summary": "6-5-0"
       }
      ]
     }
@@ -779,8 +777,8 @@
      "slug": "regular-season"
     },
     "type": {
-     "id": "969",
-     "abbreviation": "Welterweight"
+     "id": "970",
+     "abbreviation": "Bantamweight"
     },
     "competitor0": {
      "team": [],
@@ -789,7 +787,7 @@
        "name": "overall",
        "abbreviation": "TOT",
        "type": "total",
-       "summary": "15-3-0"
+       "summary": "16-2-0"
       }
      ]
     }
@@ -797,8 +795,8 @@
   ],
   "Tennis ATP": [
    {
-    "name": "Nitto ATP Finals",
-    "date": "2026-11-15T05:00Z",
+    "name": "Next Gen ATP Finals presented by PIF",
+    "date": "2026-12-08T05:00Z",
     "season": {
      "year": 2026,
      "type": 2
@@ -807,8 +805,8 @@
   ],
   "Tennis WTA": [
    {
-    "name": "LP Open by IND",
-    "date": "2026-11-15T05:00Z",
+    "name": "IEB+ Argentina Open",
+    "date": "2026-11-22T05:00Z",
     "season": {
      "year": 2026,
      "type": 2
