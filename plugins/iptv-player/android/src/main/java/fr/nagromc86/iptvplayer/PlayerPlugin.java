@@ -898,6 +898,9 @@ public class PlayerPlugin extends Plugin {
         } catch (Exception ignored) {
             // no controller info
         }
+        // known handheld consoles, whatever their controller reports
+        String who = (android.os.Build.MANUFACTURER + " " + android.os.Build.BRAND + " " + android.os.Build.MODEL).toLowerCase(java.util.Locale.ROOT);
+        if (who.matches(".*(retroid|ayn|odin|anbernic|ayaneo|gpd|powkiddy|miyoo|logitech g cloud|razer edge).*")) pad = true;
         JSObject r = new JSObject();
         r.put("tv", tv);
         r.put("pad", pad);
