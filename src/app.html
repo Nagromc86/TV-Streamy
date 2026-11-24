@@ -133,6 +133,8 @@ body.tv .tvguide .gwrap{margin-top:4px}
 .minivid{position:sticky;top:var(--toph,64px);z-index:30;background:var(--bg);margin:10px calc(-1 * max(16px,env(safe-area-inset-left,0px))) 0;padding:6px max(16px,env(safe-area-inset-left,0px)) 8px;box-shadow:0 10px 16px -10px rgba(0,0,0,.8)}
 .mv-box{aspect-ratio:16/9;border-radius:12px;background:#000;display:flex;align-items:center;justify-content:center;color:#888;font-size:.85rem}
 .mv-bar{display:flex;align-items:center;gap:8px;margin-top:8px}
+#mvbox{cursor:pointer}
+@media (orientation:landscape) and (max-height:620px){.minivid .mv-box{width:min(100%,calc((100dvh - var(--toph,64px) - var(--navh,62px) - 82px) * 16 / 9));margin:0 auto}.minivid .mv-bar{max-width:calc((100dvh - var(--toph,64px) - var(--navh,62px) - 82px) * 16 / 9);margin-inline:auto}}
 .mv-t{flex:1;min-width:0;display:flex;flex-direction:column}.mv-t b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mv-t small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mv-full{min-height:38px;padding:6px 12px;font-size:.85rem}.mv-full svg{width:18px;height:18px}
 .grow.on .glab{background:var(--accent);color:#fff}
@@ -675,7 +677,9 @@ var $=function(s,r){return (r||document).querySelector(s)};
 var NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 /* Samsung TV (Tizen web app) and TV mode (Android TV, Samsung, or ?tv in a browser for testing) */
 var TIZEN=typeof window.tizen!=='undefined'||/Tizen/i.test(navigator.userAgent);
-var TV=TIZEN||/[?&]tv\b/.test(location.search);
+/* display: 'auto' (TV on a TV or a handheld console with built-in controls), 'tv' or 'phone' — set in Réglages */
+var UIMODE=(function(){try{return localStorage.getItem('tvs:ui')||'auto'}catch(e){return 'auto'}})();
+var TV=TIZEN||/[?&]tv\b/.test(location.search)||UIMODE==='tv';
 var IC={
   cast:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><path d="M3 12a8 8 0 0 1 8 8M3 16a4 4 0 0 1 4 4"/><path d="M3 20h.01"/></svg>',
   pause:'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
@@ -3397,6 +3401,9 @@ function renderSheetInner(){
       '<div class="fld"><label for="os-pass">Mot de passe OpenSubtitles</label><input id="os-pass" type="password" value="'+esc(o.pass||'')+'"></div>'+
       '<p class="err" id="oserr" hidden></p><p class="okmsg" id="osok"'+(o.key&&o.remaining!=null?'':' hidden')+'>'+(o.remaining!=null?esc(o.remaining+' téléchargement'+(o.remaining>1?'s':'')+' restant'+(o.remaining>1?'s':'')+' aujourd\'hui'):'')+'</p>'+
       '<div class="acts"><button type="submit" class="btn ghost">Enregistrer et tester</button></div></form>'+secClose;
+    if(NATIVE&&!TIZEN)h+=secOpen('ui','Affichage',UIMODE==='tv'?'Mode TV et manette':UIMODE==='phone'?'Mode téléphone':'Automatique')+
+      '<p class="hint" style="margin:0 0 10px">Le mode TV se pilote avec les flèches ou la croix de la manette : OK ou A pour valider, B ou Retour pour revenir. Il s\'active tout seul sur une TV'+(S.hasPad?' et sur cette console':' et sur une console avec manette intégrée')+'.</p>'+
+      '<div class="acts">'+[['auto','Automatique'],['tv','Mode TV et manette'],['phone','Mode téléphone']].map(function(o){return '<button type="button" class="btn '+(UIMODE===o[0]?'red':'ghost')+'" data-uimode="'+o[0]+'">'+o[1]+'</button>'}).join('')+'</div>'+secClose;
     h+=secOpen('share','Partager l\'appli','Envoyer le lien à quelqu\'un')+shareHtml()+secClose;
     h+=secOpen('app','Appli et mises à jour','Version '+esc(APP_VERSION)+(S.apkUpdate?' · mise à jour disponible':''))+'<p class="hint" style="margin:0">Version de l\'appli : '+esc(APP_VERSION)+'</p>'+
       '<div class="acts"><button type="button" class="btn ghost" data-checkupd'+(S.updChecking?' disabled':'')+'>'+IC.refresh+(S.updChecking?'Recherche…':'Rechercher une mise à jour')+'</button>'+
@@ -3556,7 +3563,7 @@ function submitAccount(form){
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
-  var t=e.target.closest('[data-contrm],[data-tvq],[data-mvfull],[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlqual],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
+  var t=e.target.closest('[data-contrm],[data-tvq],[data-mvfull],[data-uimode],#mvbox,[data-mvmute],[data-exitapp],[data-kb],[data-tvsort],[data-stor],[data-seasonno],[data-chguide],[data-gday],[data-gridday],[data-lview],[data-gprog],[data-replay],[data-dlqual],[data-dlmovie],[data-dlep],[data-dlask],[data-dlrm],[data-dlplay],[data-tab],[data-open],[data-play],[data-fav],[data-lcat],[data-vcat],[data-scat],[data-more],[data-accounts],[data-addacc],[data-editacc],[data-useacc],[data-delacc],[data-refresh],[data-retry],[data-groups],[data-gall],[data-checkupd],[data-getapk],[data-tuto],[data-ext],[data-share],[data-copylink],[data-setsec],[data-xopen],[data-xplay],[data-xload],[data-profuse],[data-profedit],[data-profnew],[data-profmanage],[data-profcancel],[data-profswitch],[data-pfcolor],[data-profdel],[data-syncsetup],[data-syncmode],[data-syncnow],[data-syncout],[data-syncreset],[data-fcat],[data-dlgroup],[data-dlseries],[data-dlpause],[data-dlresume],[data-dlseason],[data-gopen],[data-bdot],[data-cast],[data-castdev],[data-castcancel],[data-castoff],[data-castscan],[data-mirror],[data-cc],[data-close],[data-playmovie],[data-playep],[data-season]');
   if(!t){if(e.target.id==='sheet')closeSheet();return}
   var d=t.dataset;
   if(d.contrm){var cr=USER.prog[d.contrm];if(cr){USER.prog[d.contrm]=Object.assign({},cr,{hidden:true,at:Date.now()});saveUser();updateWidget()}closeSheet();toast('Retiré de « Reprendre la lecture ».');render();return}
@@ -3635,13 +3642,14 @@ document.addEventListener('click',function(e){
     toast(hhmm(pp.s)+'–'+hhmm(pp.e)+' · '+pp.t+(pp.e<=nw?' · pas de replay sur cette chaîne':'')+(pp.d?' — '+pp.d.slice(0,140):''));return;
   }
   if(d.play){var pl=d.play.split(':');var x=byId(pl[0],pl.slice(1).join(':'));if(x){if(pl[0]==='live'&&S.tab==='live'&&miniOk()&&!sheet)miniZap(x);else if(pl[0]==='live'&&miniOk()&&!sheet)liveInDirect(x);else{miniStop();playLive(x)}}return}
-  if(t.hasAttribute('data-mvfull')){var mx=byId('live',MINI.id);if(mx){tvPrevStop();miniStop();playLive(mx)}return}
+  if(t.hasAttribute('data-mvfull')||(t.id==='mvbox'&&!TV)){var mx=byId('live',MINI.id);if(mx){tvPrevStop();miniStop();playLive(mx)}return}
   if(t.hasAttribute('data-mvmute')){MINI.muted=!MINI.muted;nat('miniMute',{muted:MINI.muted}).catch(function(){});paintMiniBar();return}
   if(d.fav){var f=d.fav.split(':'),it=byId(f[0],f.slice(1).join(':'));if(it){toggleFav(f[0],it);render();if(sheet)renderSheet()}return}
   if(d.lcat){S.liveCat=d.lcat;render();return}
   if(d.vcat){S.vodCat=d.vcat;if(d.goto)S.tab=d.goto;render();window.scrollTo(0,0);return}
   if(d.scat){S.serCat=d.scat;if(d.goto)S.tab=d.goto;render();window.scrollTo(0,0);return}
   if(d.more){S.limit[d.more]=(S.limit[d.more]||60)+60;var y=window.scrollY;render();window.scrollTo(0,y);return}
+  if(t.hasAttribute('data-uimode')){try{localStorage.setItem('tvs:ui',t.getAttribute('data-uimode'))}catch(x){}toast('Changement d\'affichage…');setTimeout(function(){location.reload()},400);return}
   if(t.hasAttribute('data-checkupd')){checkUpdate(true);return}
   if(t.hasAttribute('data-getapk')){openExternal(APK_URL);toast('Téléchargement de la mise à jour…');return}
   if(t.hasAttribute('data-cast')){openSheet({kind:'cast'});scanCast();return}
@@ -4178,7 +4186,7 @@ function tvKey(e){
 if(TIZEN){try{tizen.tvinputdevice.registerKeyBatch(['MediaPlayPause','MediaPlay','MediaPause','MediaStop','MediaFastForward','MediaRewind'])}catch(e){}
   document.addEventListener('visibilitychange',function(){if(document.hidden&&TVP){tvScrubEnd();tvSaveProg(true);try{webapis.avplay.suspend()}catch(e){}}else if(TVP){try{webapis.avplay.restore()}catch(e){}}});}
 /* big screens: scale the interface so it reads from the sofa */
-function tvScale(){if(!TV)return;var w=window.innerWidth,z=w>1300?+(w/1150).toFixed(3):1,r=document.documentElement;r.style.zoom=z>1?z:'';
+function tvScale(){if(!TV)return;var w=window.innerWidth,z=w>1300?+(w/1150).toFixed(3):w<1000?Math.max(.62,+(w/1150).toFixed(3)):1,r=document.documentElement;r.style.zoom=z!==1?z:'';
   /* with zoom, 100vh / bottom:0 are measured on the unzoomed screen: give the TV frame its real size */
   r.style.setProperty('--tvh',(window.innerHeight/z).toFixed(1)+'px');r.style.setProperty('--tvw',(w/z).toFixed(1)+'px')}
 tvScale();window.addEventListener('resize',tvScale);
@@ -4301,6 +4309,38 @@ function goBack(){
 }
 function exitApp(){if(NATIVE)window.Capacitor.nativePromise('App','exitApp',{});else if(TIZEN){try{tizen.application.getCurrentApplication().exit()}catch(e){try{tizen.application.getCurrentApplication().hide()}catch(x){}}}}
 /* on a TV, « Retour » at the top level asks before leaving */
+/* game controller (Gamepad API), as a fallback: Android usually turns the cross into arrows, A into OK and B into Retour;
+   when it does not, the controller is read here. A key event of the same kind just before = already handled. */
+(function(){
+  if(!('getGamepads' in navigator))return;
+  var seen={nav:0,ok:0,back:0},prev={},rep={},on=false,synth=false;
+  document.addEventListener('keydown',function(e){if(synth)return;var k=e.key,c=e.keyCode;
+    if(/^Arrow/.test(k)||(c>=37&&c<=40))seen.nav=Date.now();else if(k==='Enter'||c===13||k===' ')seen.ok=Date.now();else if(k==='Escape'||k==='GoBack'||k==='BrowserBack'||c===10009)seen.back=Date.now()},true);
+  try{window.Capacitor.addListener('App','backButton',function(){seen.back=Date.now()})}catch(e){}
+  function act(kind,dir){
+    setTimeout(function(){if(Date.now()-seen[kind]<250)return;
+      if(kind==='back'){backOrExit();return}
+      if(kind==='ok'){var a=document.activeElement;if(a&&a!==document.body&&a.click)a.click();else{synth=true;document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));synth=false}return}
+      var t=document.activeElement||document.body;synth=true;t.dispatchEvent(new KeyboardEvent('keydown',{key:'Arrow'+dir,bubbles:true,cancelable:true}));synth=false;
+    },70);
+  }
+  function poll(){
+    var pads=navigator.getGamepads?navigator.getGamepads():[],any=false,now=Date.now();
+    for(var i=0;i<pads.length;i++){var g=pads[i];if(!g)continue;any=true;
+      var st={ok:g.buttons[0]&&g.buttons[0].pressed,back:g.buttons[1]&&g.buttons[1].pressed,
+        Up:(g.buttons[12]&&g.buttons[12].pressed)||g.axes[1]<-.6,Down:(g.buttons[13]&&g.buttons[13].pressed)||g.axes[1]>.6,
+        Left:(g.buttons[14]&&g.buttons[14].pressed)||g.axes[0]<-.6,Right:(g.buttons[15]&&g.buttons[15].pressed)||g.axes[0]>.6};
+      Object.keys(st).forEach(function(k){var key=i+k,was=prev[key];prev[key]=st[k];
+        if(st[k]&&!was){rep[key]=now+400;act(k==='ok'||k==='back'?k:'nav',k)}
+        else if(st[k]&&k!=='ok'&&k!=='back'&&now>=rep[key]){rep[key]=now+140;act('nav',k)}});
+    }
+    if(any&&document.visibilityState!=='hidden')requestAnimationFrame(poll);else on=false;
+  }
+  function start(){if(!on){on=true;requestAnimationFrame(poll)}}
+  window.addEventListener('gamepadconnected',start);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')start()});
+  try{var gp=navigator.getGamepads();for(var j=0;j<gp.length;j++)if(gp[j]){start();break}}catch(e){}
+})();
 function backOrExit(){if(goBack())return;if(TV&&!(sheet&&sheet.kind==='exit')){openSheet({kind:'exit'});return}exitApp()}
 document.addEventListener('keydown',function(e){
   var k=e.key,c=e.keyCode;
@@ -4327,7 +4367,7 @@ document.addEventListener('scroll',function(e){if(!TV||!$('#tvplayer').hidden)re
 var lastFocus=null;
 document.addEventListener('focusin',function(e){if(TV&&e.target&&e.target!==document.body)lastFocus=e.target});
 if(TV)document.body.classList.add('tv');
-if(NATIVE)nat('deviceInfo').then(function(r){if(r&&r.tv&&!TV){TV=true;document.body.classList.add('tv');MINI.muted=false;tvScale();render()}},function(){});
+if(NATIVE)nat('deviceInfo').then(function(r){S.hasPad=!!(r&&r.pad);if(r&&(r.tv||(r.pad&&UIMODE==='auto'))&&UIMODE!=='phone'&&!TV){TV=true;document.body.classList.add('tv');MINI.muted=false;tvScale();render()}},function(){});
 
 /* ---------- start ---------- */
 /* TV: optionally start on the last channel watched */

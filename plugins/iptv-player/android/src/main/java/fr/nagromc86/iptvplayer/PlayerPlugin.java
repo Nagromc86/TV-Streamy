@@ -883,8 +883,24 @@ public class PlayerPlugin extends Plugin {
         } catch (Exception ignored) {
             // phone
         }
+        // a game controller built into the device (Retroid, Ayn Odin, Anbernic...): a handheld console
+        boolean pad = false;
+        try {
+            for (int id : android.view.InputDevice.getDeviceIds()) {
+                android.view.InputDevice d = android.view.InputDevice.getDevice(id);
+                if (d == null || d.isVirtual()) continue;
+                int src = d.getSources();
+                boolean isPad = (src & android.view.InputDevice.SOURCE_GAMEPAD) == android.view.InputDevice.SOURCE_GAMEPAD
+                        || (src & android.view.InputDevice.SOURCE_JOYSTICK) == android.view.InputDevice.SOURCE_JOYSTICK;
+                boolean external = android.os.Build.VERSION.SDK_INT >= 29 && d.isExternal();
+                if (isPad && !external) { pad = true; break; }
+            }
+        } catch (Exception ignored) {
+            // no controller info
+        }
         JSObject r = new JSObject();
         r.put("tv", tv);
+        r.put("pad", pad);
         call.resolve(r);
     }
 
