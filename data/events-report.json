@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 41,
+   "n": 40,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 34,
+   "n": 33,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 31,
+   "n": 30,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 108,
+   "n": 100,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 46,
+   "n": 45,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 158,
+   "n": 162,
    "keys": [
     "id",
     "uid",
@@ -426,8 +426,8 @@
   ],
   "Premier League": [
    {
-    "name": "Everton at Brentford",
-    "date": "2026-11-23T20:00Z",
+    "name": "Chelsea at Nottingham Forest",
+    "date": "2026-11-27T20:00Z",
     "season": {
      "year": 2026,
      "type": 14308,
@@ -454,7 +454,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "3-5-2",
+       "summary": "2-3-6",
        "abbreviation": "Total"
       }
      ]
@@ -463,8 +463,8 @@
   ],
   "LaLiga": [
    {
-    "name": "Elche at Levante",
-    "date": "2026-11-23T20:00Z",
+    "name": "Racing Santander at Levante",
+    "date": "2026-11-27T20:00Z",
     "season": {
      "year": 2026,
      "type": 14357,
@@ -491,7 +491,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-5-5",
+       "summary": "2-6-5",
        "abbreviation": "Total"
       }
      ]
@@ -500,8 +500,8 @@
   ],
   "Serie A": [
    {
-    "name": "Fiorentina at Monza",
-    "date": "2026-11-23T19:45Z",
+    "name": "Bologna at Venezia",
+    "date": "2026-11-27T19:45Z",
     "season": {
      "year": 2026,
      "type": 14240,
@@ -528,7 +528,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-1-8",
+       "summary": "2-0-10",
        "abbreviation": "Total"
       }
      ]
@@ -605,14 +605,19 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Memphis Grizzlies at Charlotte Hornets",
-    "date": "2026-11-24T00:00Z",
+    "name": "Detroit Pistons at Orlando Magic",
+    "date": "2026-11-25T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [],
+    "notes": [
+     {
+      "type": "event",
+      "headline": "NBA Cup - Group Play"
+     }
+    ],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -639,17 +644,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "4-11"
+       "summary": "7-9"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "3-4"
+       "summary": "1-5"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "1-7"
+       "summary": "6-4"
       }
      ]
     }
@@ -657,8 +662,8 @@
   ],
   "NFL": [
    {
-    "name": "Cincinnati Bengals at Washington Commanders",
-    "date": "2026-11-24T01:15Z",
+    "name": "Green Bay Packers at Los Angeles Rams",
+    "date": "2026-11-26T01:00Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -694,17 +699,17 @@
        "name": "overall",
        "abbreviation": "Any",
        "type": "total",
-       "summary": "3-5-1"
+       "summary": "6-4"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "2-2-1"
+       "summary": "2-3"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "1-3"
+       "summary": "4-1"
       }
      ]
     }
@@ -712,8 +717,8 @@
   ],
   "NHL": [
    {
-    "name": "Columbus Blue Jackets at New Jersey Devils",
-    "date": "2026-11-24T00:00Z",
+    "name": "Vegas Golden Knights at Edmonton Oilers",
+    "date": "2026-11-25T01:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -749,19 +754,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "15-8-0"
+       "summary": "17-5-4"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "9-3-0"
+       "summary": "7-3-2"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "6-5-0"
+       "summary": "10-2-2"
       }
      ]
     }
@@ -777,8 +782,8 @@
      "slug": "regular-season"
     },
     "type": {
-     "id": "970",
-     "abbreviation": "Bantamweight"
+     "id": "986",
+     "abbreviation": "Lightweight"
     },
     "competitor0": {
      "team": [],
@@ -787,7 +792,7 @@
        "name": "overall",
        "abbreviation": "TOT",
        "type": "total",
-       "summary": "16-2-0"
+       "summary": "21-5-0"
       }
      ]
     }
