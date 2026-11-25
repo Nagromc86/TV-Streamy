@@ -18,7 +18,7 @@
   },
   "Ligue des champions": {
    "ok": true,
-   "n": 36,
+   "n": 27,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 100,
+   "n": 110,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 162,
+   "n": 165,
    "keys": [
     "id",
     "uid",
@@ -352,8 +352,8 @@
   ],
   "Ligue des champions": [
    {
-    "name": "LASK Linz at Bodo/Glimt",
-    "date": "2026-11-24T17:45Z",
+    "name": "Barcelona at Sabah FK",
+    "date": "2026-11-25T17:45Z",
     "season": {
      "year": 2026,
      "type": 14534,
@@ -373,14 +373,13 @@
       "alternateColor",
       "isActive",
       "logo",
-      "links",
-      "venue"
+      "links"
      ],
      "records": [
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "1-1-2",
+       "summary": "1-0-3",
        "abbreviation": "Total"
       }
      ]
@@ -605,8 +604,8 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Detroit Pistons at Orlando Magic",
-    "date": "2026-11-25T00:00Z",
+    "name": "Miami Heat at Philadelphia 76ers",
+    "date": "2026-11-25T22:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -644,17 +643,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "7-9"
+       "summary": "14-4"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "1-5"
+       "summary": "7-3"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "6-4"
+       "summary": "7-1"
       }
      ]
     }
@@ -717,8 +716,8 @@
   ],
   "NHL": [
    {
-    "name": "Vegas Golden Knights at Edmonton Oilers",
-    "date": "2026-11-25T01:00Z",
+    "name": "Winnipeg Jets at Boston Bruins",
+    "date": "2026-11-26T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -754,19 +753,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "17-5-4"
+       "summary": "15-7-1"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "7-3-2"
+       "summary": "9-4-0"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "10-2-2"
+       "summary": "6-3-1"
       }
      ]
     }
