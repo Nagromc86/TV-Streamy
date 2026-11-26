@@ -18,7 +18,7 @@
   },
   "Ligue des champions": {
    "ok": true,
-   "n": 27,
+   "n": 18,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 110,
+   "n": 104,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 165,
+   "n": 159,
    "keys": [
     "id",
     "uid",
@@ -352,8 +352,8 @@
   ],
   "Ligue des champions": [
    {
-    "name": "Barcelona at Sabah FK",
-    "date": "2026-11-25T17:45Z",
+    "name": "Feyenoord Rotterdam at Viking FK",
+    "date": "2026-12-08T17:45Z",
     "season": {
      "year": 2026,
      "type": 14534,
@@ -373,13 +373,14 @@
       "alternateColor",
       "isActive",
       "logo",
-      "links"
+      "links",
+      "venue"
      ],
      "records": [
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "1-0-3",
+       "summary": "1-1-3",
        "abbreviation": "Total"
       }
      ]
@@ -604,8 +605,8 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Miami Heat at Philadelphia 76ers",
-    "date": "2026-11-25T22:00Z",
+    "name": "Miami Heat at New York Knicks",
+    "date": "2026-11-28T00:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -643,7 +644,7 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "14-4"
+       "summary": "12-6"
       },
       {
        "name": "Home",
@@ -653,7 +654,7 @@
       {
        "name": "Road",
        "type": "road",
-       "summary": "7-1"
+       "summary": "5-3"
       }
      ]
     }
@@ -661,8 +662,8 @@
   ],
   "NFL": [
    {
-    "name": "Green Bay Packers at Los Angeles Rams",
-    "date": "2026-11-26T01:00Z",
+    "name": "Chicago Bears at Detroit Lions",
+    "date": "2026-11-26T18:00Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -698,17 +699,17 @@
        "name": "overall",
        "abbreviation": "Any",
        "type": "total",
-       "summary": "6-4"
+       "summary": "8-2"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "2-3"
+       "summary": "6-0"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "4-1"
+       "summary": "2-2"
       }
      ]
     }
@@ -716,8 +717,8 @@
   ],
   "NHL": [
    {
-    "name": "Winnipeg Jets at Boston Bruins",
-    "date": "2026-11-26T00:00Z",
+    "name": "Toronto Maple Leafs at Boston Bruins",
+    "date": "2026-11-27T18:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -753,13 +754,13 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "15-7-1"
+       "summary": "15-8-1"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "9-4-0"
+       "summary": "9-5-0"
       },
       {
        "name": "Road",
