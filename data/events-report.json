@@ -34,7 +34,7 @@
   },
   "Ligue Europa": {
    "ok": true,
-   "n": 36,
+   "n": 18,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 30,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 27,
+   "n": 28,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 104,
+   "n": 116,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 45,
+   "n": 42,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 159,
+   "n": 167,
    "keys": [
     "id",
     "uid",
@@ -389,8 +389,8 @@
   ],
   "Ligue Europa": [
    {
-    "name": "Hapoel Be'er at Besiktas",
-    "date": "2026-11-26T17:45Z",
+    "name": "TSG Hoffenheim at Anderlecht",
+    "date": "2026-12-10T17:45Z",
     "season": {
      "year": 2026,
      "type": 14540,
@@ -417,7 +417,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-1-1",
+       "summary": "3-0-2",
        "abbreviation": "Total"
       }
      ]
@@ -662,8 +662,8 @@
   ],
   "NFL": [
    {
-    "name": "Chicago Bears at Detroit Lions",
-    "date": "2026-11-26T18:00Z",
+    "name": "Denver Broncos at Pittsburgh Steelers",
+    "date": "2026-11-27T20:00Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -699,17 +699,17 @@
        "name": "overall",
        "abbreviation": "Any",
        "type": "total",
-       "summary": "8-2"
+       "summary": "6-4"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "6-0"
+       "summary": "4-0"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "2-2"
+       "summary": "2-4"
       }
      ]
     }
