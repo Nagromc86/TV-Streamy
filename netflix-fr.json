@@ -1,0 +1,127 @@
+{
+ "week": "2026-11-22",
+ "films": [
+  {
+   "rank": 1,
+   "title": "Guarding Stars",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 2,
+   "title": "Badh",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 3,
+   "title": "Heartland",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 4,
+   "title": "Dr. Seuss' The Grinch",
+   "season": "N/A",
+   "weeks": 21
+  },
+  {
+   "rank": 5,
+   "title": "The Orphans",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 6,
+   "title": "Steps",
+   "season": "N/A",
+   "weeks": 1
+  },
+  {
+   "rank": 7,
+   "title": "The Good Lawyer",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 8,
+   "title": "Never Surrender",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 9,
+   "title": "Knock, Knock, It’s Mom!",
+   "season": "N/A",
+   "weeks": 2
+  },
+  {
+   "rank": 10,
+   "title": "The Christmas Switch",
+   "season": "N/A",
+   "weeks": 2
+  }
+ ],
+ "tv": [
+  {
+   "rank": 1,
+   "title": "The Countess of Monte Cristo",
+   "season": "The Countess of Monte Cristo: Limited Series",
+   "weeks": 1
+  },
+  {
+   "rank": 2,
+   "title": "The Law of Beasts",
+   "season": "The Law of Beasts: Season 1",
+   "weeks": 1
+  },
+  {
+   "rank": 3,
+   "title": "The Body",
+   "season": "The Body: Season 1",
+   "weeks": 2
+  },
+  {
+   "rank": 4,
+   "title": "The Empress",
+   "season": "The Empress: Season 3",
+   "weeks": 2
+  },
+  {
+   "rank": 5,
+   "title": "Murder in Galicia",
+   "season": "Murder in Galicia: Limited Series",
+   "weeks": 1
+  },
+  {
+   "rank": 6,
+   "title": "Lupin",
+   "season": "Lupin: Part 4",
+   "weeks": 5
+  },
+  {
+   "rank": 7,
+   "title": "Djadel Show",
+   "season": "Djadel Show: Season 2",
+   "weeks": 5
+  },
+  {
+   "rank": 8,
+   "title": "Black Doves",
+   "season": "Black Doves: Season 2",
+   "weeks": 3
+  },
+  {
+   "rank": 9,
+   "title": "Alicia's Law",
+   "season": "Alicia's Law: Season 1",
+   "weeks": 1
+  },
+  {
+   "rank": 10,
+   "title": "ChiaroScuro",
+   "season": "ChiaroScuro: Season 1",
+   "weeks": 1
+  }
+ ]
+}
