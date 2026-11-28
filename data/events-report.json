@@ -2,7 +2,7 @@
  "report": {
   "Ligue 1": {
    "ok": true,
-   "n": 27,
+   "n": 26,
    "keys": [
     "id",
     "uid",
@@ -50,7 +50,7 @@
   },
   "Premier League": {
    "ok": true,
-   "n": 40,
+   "n": 44,
    "keys": [
     "id",
     "uid",
@@ -66,7 +66,7 @@
   },
   "LaLiga": {
    "ok": true,
-   "n": 33,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -82,7 +82,7 @@
   },
   "Serie A": {
    "ok": true,
-   "n": 32,
+   "n": 34,
    "keys": [
     "id",
     "uid",
@@ -98,7 +98,7 @@
   },
   "Bundesliga": {
    "ok": true,
-   "n": 28,
+   "n": 32,
    "keys": [
     "id",
     "uid",
@@ -114,7 +114,7 @@
   },
   "Coupe de France": {
    "ok": true,
-   "n": 46,
+   "n": 43,
    "keys": [
     "id",
     "uid",
@@ -140,7 +140,7 @@
   },
   "NBA": {
    "ok": true,
-   "n": 116,
+   "n": 132,
    "keys": [
     "id",
     "uid",
@@ -155,7 +155,7 @@
   },
   "NFL": {
    "ok": true,
-   "n": 42,
+   "n": 43,
    "keys": [
     "id",
     "uid",
@@ -172,7 +172,7 @@
   },
   "NHL": {
    "ok": true,
-   "n": 167,
+   "n": 161,
    "keys": [
     "id",
     "uid",
@@ -258,7 +258,7 @@
   },
   "Top 14": {
    "ok": true,
-   "n": 14,
+   "n": 20,
    "keys": [
     "id",
     "uid",
@@ -315,8 +315,8 @@
  "sample": {
   "Ligue 1": [
    {
-    "name": "Paris FC at Brest",
-    "date": "2026-11-27T19:45Z",
+    "name": "Lens at Angers",
+    "date": "2026-11-28T16:15Z",
     "season": {
      "year": 2026,
      "type": 14252,
@@ -343,7 +343,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "5-3-3",
+       "summary": "2-2-7",
        "abbreviation": "Total"
       }
      ]
@@ -426,8 +426,8 @@
   ],
   "Premier League": [
    {
-    "name": "Chelsea at Nottingham Forest",
-    "date": "2026-11-27T20:00Z",
+    "name": "Coventry City at Leeds United",
+    "date": "2026-11-28T15:00Z",
     "season": {
      "year": 2026,
      "type": 14308,
@@ -454,7 +454,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-3-6",
+       "summary": "4-5-2",
        "abbreviation": "Total"
       }
      ]
@@ -463,8 +463,8 @@
   ],
   "LaLiga": [
    {
-    "name": "Racing Santander at Levante",
-    "date": "2026-11-27T20:00Z",
+    "name": "Rayo Vallecano at Real Betis",
+    "date": "2026-11-28T13:00Z",
     "season": {
      "year": 2026,
      "type": 14357,
@@ -491,7 +491,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-6-5",
+       "summary": "8-3-2",
        "abbreviation": "Total"
       }
      ]
@@ -500,8 +500,8 @@
   ],
   "Serie A": [
    {
-    "name": "Bologna at Venezia",
-    "date": "2026-11-27T19:45Z",
+    "name": "Parma at Frosinone",
+    "date": "2026-11-28T14:00Z",
     "season": {
      "year": 2026,
      "type": 14240,
@@ -528,7 +528,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "2-0-10",
+       "summary": "6-2-4",
        "abbreviation": "Total"
       }
      ]
@@ -537,8 +537,8 @@
   ],
   "Bundesliga": [
    {
-    "name": "Borussia Mönchengladbach at Werder Bremen",
-    "date": "2026-11-27T19:30Z",
+    "name": "SV Elversberg at FC Cologne",
+    "date": "2026-11-28T14:30Z",
     "season": {
      "year": 2026,
      "type": 14358,
@@ -565,7 +565,7 @@
       {
        "name": "All Splits",
        "type": "total",
-       "summary": "5-3-2",
+       "summary": "2-4-4",
        "abbreviation": "Total"
       }
      ]
@@ -574,8 +574,8 @@
   ],
   "Coupe de France": [
    {
-    "name": "Le Puy at AS Cannes",
-    "date": "2026-11-27T18:00Z",
+    "name": "Stade de Reims at Olympique Charleville Prix AM",
+    "date": "2026-11-28T12:30Z",
     "season": {
      "year": 2026,
      "type": 14638,
@@ -595,8 +595,7 @@
       "alternateColor",
       "isActive",
       "logo",
-      "links",
-      "venue"
+      "links"
      ]
     }
    }
@@ -605,19 +604,14 @@
   "Ligue des nations": [],
   "NBA": [
    {
-    "name": "Miami Heat at New York Knicks",
-    "date": "2026-11-28T00:00Z",
+    "name": "Orlando Magic at Washington Wizards",
+    "date": "2026-11-28T22:00Z",
     "season": {
      "year": 2027,
      "type": 2,
      "slug": "regular-season"
     },
-    "notes": [
-     {
-      "type": "event",
-      "headline": "NBA Cup - Group Play"
-     }
-    ],
+    "notes": [],
     "type": {
      "id": "1",
      "abbreviation": "STD"
@@ -644,17 +638,17 @@
        "name": "overall",
        "abbreviation": "Total",
        "type": "total",
-       "summary": "12-6"
+       "summary": "7-12"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "7-3"
+       "summary": "3-6"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "5-3"
+       "summary": "4-6"
       }
      ]
     }
@@ -662,8 +656,8 @@
   ],
   "NFL": [
    {
-    "name": "Denver Broncos at Pittsburgh Steelers",
-    "date": "2026-11-27T20:00Z",
+    "name": "New Orleans Saints at Cincinnati Bengals",
+    "date": "2026-11-29T18:00Z",
     "season": {
      "year": 2026,
      "type": 2,
@@ -699,17 +693,17 @@
        "name": "overall",
        "abbreviation": "Any",
        "type": "total",
-       "summary": "6-4"
+       "summary": "7-3"
       },
       {
        "name": "Home",
        "type": "home",
-       "summary": "4-0"
+       "summary": "3-1"
       },
       {
        "name": "Road",
        "type": "road",
-       "summary": "2-4"
+       "summary": "4-2"
       }
      ]
     }
@@ -717,8 +711,8 @@
   ],
   "NHL": [
    {
-    "name": "Toronto Maple Leafs at Boston Bruins",
-    "date": "2026-11-27T18:00Z",
+    "name": "Montreal Canadiens at Vegas Golden Knights",
+    "date": "2026-11-28T21:00Z",
     "season": {
      "year": 2027,
      "type": 2,
@@ -754,19 +748,19 @@
        "name": "overall",
        "abbreviation": "TOTAL",
        "type": "total",
-       "summary": "15-8-1"
+       "summary": "15-7-5"
       },
       {
        "name": "Home",
        "abbreviation": "HOME",
        "type": "home",
-       "summary": "9-5-0"
+       "summary": "7-4-3"
       },
       {
        "name": "Road",
        "abbreviation": "AWAY",
        "type": "road",
-       "summary": "6-3-1"
+       "summary": "8-3-2"
       }
      ]
     }
@@ -831,6 +825,9 @@
     "type": {
      "id": "1",
      "abbreviation": "FP1"
+    },
+    "competitor0": {
+     "team": []
     }
    }
   ],
